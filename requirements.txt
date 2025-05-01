@@ -5,4 +5,5 @@ numpy==1.24.3
 opencv-python==4.8.0.76
 pickle-mixin==1.0.2
 bz2file==0.98
-imutils==0.5.4 
+imutils==0.5.4
+psycopg2-binary==2.9.9 

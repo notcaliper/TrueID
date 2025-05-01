@@ -8,11 +8,11 @@ import dlib
 from imutils import face_utils
 import urllib.request
 import bz2
+from database import FaceDatabase
 
 class FaceAuth:
-    def __init__(self, data_dir="face_data"):
+    def __init__(self, db_params=None):
         # Initialize data structures first
-        self.data_dir = data_dir
         self.known_face_encodings = []
         self.known_face_names = []
         self.video_capture = None
@@ -23,6 +23,9 @@ class FaceAuth:
         self.face_names = []
         self.cap = None
         self.landmarks_file = "shape_predictor_68_face_landmarks.dat"
+        
+        # Initialize database
+        self.db = FaceDatabase(**(db_params or {}))
         
         # Download landmarks if not present
         if not os.path.exists(self.landmarks_file):
@@ -61,37 +64,12 @@ class FaceAuth:
         print("Download and extraction complete!")
         
     def load_face_data(self):
-        """Load existing face data from the data directory"""
-        if not os.path.exists(self.data_dir):
-            os.makedirs(self.data_dir)
-            return
-            
-        # Load all user data files
-        for filename in os.listdir(self.data_dir):
-            if filename.endswith(".pkl"):
-                try:
-                    user_name = filename[:-4]  # Remove .pkl extension
-                    with open(os.path.join(self.data_dir, filename), 'rb') as f:
-                        user_data = pickle.load(f)
-                        if isinstance(user_data, dict) and 'encoding' in user_data:
-                            self.known_face_encodings.append(user_data['encoding'])
-                            self.known_face_names.append(user_name)
-                        else:
-                            print(f"Warning: Invalid data format in {filename}")
-                except Exception as e:
-                    print(f"Error loading data for {user_name}: {str(e)}")
+        """Load existing face data from the database"""
+        self.known_face_encodings, self.known_face_names = self.db.load_face_data()
     
     def save_user_data(self, name, face_encoding, landmarks):
-        """Save user data to a separate file"""
-        user_data = {
-            'encoding': face_encoding,
-            'landmarks': landmarks,
-            'registration_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        
-        user_file = os.path.join(self.data_dir, f"{name}.pkl")
-        with open(user_file, 'wb') as f:
-            pickle.dump(user_data, f)
+        """Save user data to the database"""
+        return self.db.save_user_data(name, face_encoding, landmarks)
     
     def draw_landmarks(self, frame, landmarks):
         """Draw facial landmarks on the frame"""
@@ -224,15 +202,16 @@ class FaceAuth:
         # Average the face encodings
         avg_encoding = np.mean(face_encodings, axis=0)
         
-        # Save user data
-        self.save_user_data(name, avg_encoding, landmarks_list[0])  # Save first landmarks as reference
-        
-        # Update known faces
-        self.known_face_encodings.append(avg_encoding)
-        self.known_face_names.append(name)
-        
-        print(f"Successfully registered face for {name}")
-        return True
+        # Save user data to database
+        if self.save_user_data(name, avg_encoding, landmarks_list[0]):  # Save first landmarks as reference
+            # Update known faces
+            self.known_face_encodings.append(avg_encoding)
+            self.known_face_names.append(name)
+            print(f"Successfully registered face for {name}")
+            return True
+        else:
+            print("Failed to save face data to database")
+            return False
     
     def authenticate(self):
         """Authenticate a face with confidence threshold"""
@@ -285,7 +264,7 @@ class FaceAuth:
         confidence = 1 - best_distance
         
         if matches[best_match_index] and confidence >= self.confidence_threshold:
-            return self.known_face_names[best_match_index], confidence
+            return self.known_face_names[best_match_index]
         return None
     
     def __del__(self):

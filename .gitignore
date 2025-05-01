@@ -48,3 +48,7 @@ logs/
 # OS specific
 .DS_Store
 Thumbs.db 
+
+# Database
+database.db
+db_config.json
