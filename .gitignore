@@ -47,8 +47,58 @@ logs/
 
 # OS specific
 .DS_Store
-Thumbs.db 
+Thumbs.db
 
 # Database
 database.db
 db_config.json
+
+# Gradle files
+.gradle/
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/captures/
+android-app/.externalNativeBuild/
+android-app/.cxx/
+android-app/local.properties
+android-app/gradle.properties
+
+# Generated files
+android-app/bin/
+android-app/gen/
+android-app/out/
+
+# Android Studio Navigation editor temp files
+android-app/.navigation/
+
+# IntelliJ
+*.iml
+android-app/**/*.iml
+
+# Google Services (e.g. APIs or Firebase)
+android-app/google-services.json
+
+# Keystore files
+*.jks
+*.keystore
+
+# External native build folder generated in Android Studio 2.2 and later
+.externalNativeBuild
+.cxx/
+
+# Environment files
+backend/.env
+backend/.env.local
+backend/.env.development.local
+backend/.env.test.local
+backend/.env.production.local
+
+# Dependencies
+backend/node_modules/
+backend/coverage/
+
+# NPM/Yarn logs
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
