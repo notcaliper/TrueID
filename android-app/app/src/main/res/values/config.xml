@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Backend API URL -->
+    <string name="backend_api_url">http://10.0.2.2:3000</string>
+    <!-- Contract address on Polygon Mumbai testnet -->
+    <string name="contract_address">YOUR_CONTRACT_ADDRESS</string>
+</resources>
