@@ -1,305 +1,534 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Typography, 
-  Grid, 
-  Card, 
-  CardContent, 
-  CardHeader,
-  Paper,
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Chip,
-  IconButton,
-  Tooltip,
-  Pagination
-} from '@mui/material';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import EditIcon from '@mui/icons-material/Edit';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
+import { Link } from 'react-router-dom';
+import ApiService from '../services/ApiService';
+import { FaUsers, FaUserCheck, FaUserClock, FaUserTimes, 
+         FaCheckCircle, FaTimesCircle, FaEdit, FaHistory, 
+         FaCog, FaLink, FaChevronRight, FaFingerprint, 
+         FaChartLine, FaShieldAlt, FaIdCard, FaArrowUp, 
+         FaArrowDown, FaSync, FaExclamationTriangle, FaUserShield } from 'react-icons/fa';
 import { useAuth } from '../utils/AuthContext';
-import UserDetailModal from '../components/UserDetailModal';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   const [stats, setStats] = useState({
     totalUsers: 0,
-    pendingVerifications: 0,
-    verifiedIdentities: 0,
-    totalRecords: 0
+    verifiedUsers: 0,
+    pendingUsers: 0,
+    rejectedUsers: 0,
+    recentActivities: [],
+    lastUpdated: null,
+    trends: {
+      totalChange: 0,
+      verifiedChange: 0,
+      pendingChange: 0,
+      rejectedChange: 0
+    }
   });
-  const [users, setUsers] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // In a real application, you would fetch this data from your API
-    // This is just mock data for demonstration
-    setStats({
-      totalUsers: 1248,
-      pendingVerifications: 37,
-      verifiedIdentities: 892,
-      totalRecords: 3156
-    });
+    fetchDashboardData();
+    // Set up auto-refresh every 5 minutes
+    const refreshInterval = setInterval(() => {
+      handleRefresh(true);
+    }, 300000);
     
-    // Mock user data with Indian names
-    const mockUsers = [
-      { id: 1, name: 'Rajesh Kumar', uniqueId: 'USR001', verified: true, lastUpdated: '2025-05-10T14:30:00', facemeshHash: '0xabcd1234efgh5678ijkl9012mnop3456qrst7890', blockchainTxHash: '0x123abc456def789ghi' },
-      { id: 2, name: 'Priya Sharma', uniqueId: 'USR002', verified: true, lastUpdated: '2025-05-09T11:20:00', facemeshHash: '0x1234abcd5678efgh9012ijkl3456mnop7890qrst', blockchainTxHash: '0x456def789ghi123abc' },
-      { id: 3, name: 'Amit Patel', uniqueId: 'USR003', verified: false, lastUpdated: '2025-05-08T09:15:00', facemeshHash: '0xefgh1234abcd5678ijkl9012mnop3456qrst7890', blockchainTxHash: null },
-      { id: 4, name: 'Deepika Singh', uniqueId: 'USR004', verified: true, lastUpdated: '2025-05-07T16:45:00', facemeshHash: '0x5678abcd1234efgh9012ijkl3456mnop7890qrst', blockchainTxHash: '0x789ghi123abc456def' },
-      { id: 5, name: 'Vikram Malhotra', uniqueId: 'USR005', verified: false, lastUpdated: '2025-05-06T13:10:00', facemeshHash: '0x9012efgh1234abcd5678ijkl3456mnop7890qrst', blockchainTxHash: null },
-      { id: 6, name: 'Neha Gupta', uniqueId: 'USR006', verified: true, lastUpdated: '2025-05-05T10:30:00', facemeshHash: '0x3456abcd1234efgh9012ijkl7890mnop5678qrst', blockchainTxHash: '0xabc456def789ghi123' },
-      { id: 7, name: 'Arjun Reddy', uniqueId: 'USR007', verified: true, lastUpdated: '2025-05-04T15:20:00', facemeshHash: '0x7890abcd1234efgh9012ijkl3456mnop5678qrst', blockchainTxHash: '0xdef789ghi123abc456' },
-      { id: 8, name: 'Ananya Desai', uniqueId: 'USR008', verified: false, lastUpdated: '2025-05-03T09:45:00', facemeshHash: '0x2345abcd1234efgh9012ijkl3456mnop7890qrst', blockchainTxHash: null },
-      { id: 9, name: 'Rahul Verma', uniqueId: 'USR009', verified: true, lastUpdated: '2025-05-02T14:15:00', facemeshHash: '0x6789abcd1234efgh9012ijkl3456mnop7890qrst', blockchainTxHash: '0xghi123abc456def789' },
-      { id: 10, name: 'Meera Joshi', uniqueId: 'USR010', verified: false, lastUpdated: '2025-05-01T11:30:00', facemeshHash: '0x0123abcd5678efgh9012ijkl3456mnop7890qrst', blockchainTxHash: null },
-      { id: 11, name: 'Karthik Iyer', uniqueId: 'USR011', verified: true, lastUpdated: '2025-04-30T16:20:00', facemeshHash: '0x4567abcd1234efgh9012ijkl3456mnop7890qrst', blockchainTxHash: '0x123abc456def789ghi' },
-      { id: 12, name: 'Pooja Mehta', uniqueId: 'USR012', verified: true, lastUpdated: '2025-04-29T10:10:00', facemeshHash: '0x8901abcd1234efgh9012ijkl3456mnop7890qrst', blockchainTxHash: '0x456def789ghi123abc' }
-    ];
-    
-    setUsers(mockUsers);
+    return () => clearInterval(refreshInterval);
   }, []);
 
-  // Handle search
-  const handleSearchChange = (event) => {
-    setSearchQuery(event.target.value);
-    setPage(0); // Reset to first page when searching
-  };
-  
-  // Handle modal open/close
-  const handleOpenModal = (user) => {
-    setSelectedUser(user);
-    setModalOpen(true);
-  };
-  
-  const handleCloseModal = () => {
-    setModalOpen(false);
-  };
-  
-  // Handle pagination
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage - 1);
+  // Mock data for dashboard
+  const mockData = {
+    totalUsers: 1248,
+    verifiedUsers: 876,
+    pendingUsers: 289,
+    rejectedUsers: 83,
+    lastUpdated: new Date(),
+    trends: {
+      totalChange: 42,
+      verifiedChange: 28,
+      pendingChange: -15,
+      rejectedChange: -3
+    },
+    recentActivities: [
+      {
+        id: 1,
+        action: 'User Verified',
+        timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+        userName: 'Rahul Sharma',
+        userId: 'ID-78945612',
+        adminName: 'Admin Singh',
+        txHash: '0x7d5c9b6c8f4a3d2e1b0a7c6b5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e'
+      },
+      {
+        id: 2,
+        action: 'Biometric Updated',
+        timestamp: new Date(Date.now() - 1000 * 60 * 120), // 2 hours ago
+        userName: 'Priya Patel',
+        userId: 'ID-45678912',
+        adminName: 'Admin Singh',
+        txHash: '0x3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2'
+      },
+      {
+        id: 3,
+        action: 'User Rejected',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
+        userName: 'Amit Kumar',
+        userId: 'ID-12345678',
+        adminName: 'Supervisor Gupta',
+        txHash: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2'
+      },
+      {
+        id: 4,
+        action: 'User Verified',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
+        userName: 'Neha Verma',
+        userId: 'ID-98765432',
+        adminName: 'Supervisor Gupta',
+        txHash: '0x5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4'
+      }
+    ]
   };
 
-  // Filter users based on search query
-  const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.uniqueId.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Use mock data instead of API call
+      // const data = await ApiService.getDashboardStats();
+      const data = {...mockData, lastUpdated: new Date()};
+      
+      setStats(data);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError('Failed to load dashboard data. Please try again.');
+      setLoading(false);
+    }
+  };
 
-  // Format date
+  const handleRefresh = async (silent = false) => {
+    if (silent) {
+      // Silent refresh doesn't show loading indicator
+      setRefreshing(true);
+      try {
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Use mock data with slight variations to simulate changes
+        const updatedMockData = {
+          ...mockData,
+          totalUsers: mockData.totalUsers + Math.floor(Math.random() * 5),
+          verifiedUsers: mockData.verifiedUsers + Math.floor(Math.random() * 3),
+          pendingUsers: Math.max(0, mockData.pendingUsers - Math.floor(Math.random() * 2)),
+          lastUpdated: new Date(),
+          trends: {
+            ...mockData.trends,
+            totalChange: mockData.trends.totalChange + Math.floor(Math.random() * 3) - 1
+          }
+        };
+        
+        setStats(updatedMockData);
+      } catch (err) {
+        console.error('Error refreshing dashboard data:', err);
+        // Don't show error for silent refresh
+      } finally {
+        setRefreshing(false);
+      }
+    } else {
+      // Regular refresh with loading indicator
+      setRefreshing(true);
+      setLoading(true);
+      try {
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        
+        // Use mock data with variations to simulate changes
+        const updatedMockData = {
+          ...mockData,
+          totalUsers: mockData.totalUsers + Math.floor(Math.random() * 10),
+          verifiedUsers: mockData.verifiedUsers + Math.floor(Math.random() * 7),
+          pendingUsers: Math.max(0, mockData.pendingUsers - Math.floor(Math.random() * 5)),
+          rejectedUsers: mockData.rejectedUsers + Math.floor(Math.random() * 2),
+          lastUpdated: new Date(),
+          trends: {
+            totalChange: mockData.trends.totalChange + Math.floor(Math.random() * 5) - 2,
+            verifiedChange: mockData.trends.verifiedChange + Math.floor(Math.random() * 4) - 1,
+            pendingChange: mockData.trends.pendingChange - Math.floor(Math.random() * 3),
+            rejectedChange: mockData.trends.rejectedChange + Math.floor(Math.random() * 2) - 1
+          }
+        };
+        
+        // Add a new activity item occasionally
+        if (Math.random() > 0.6) {
+          const actions = ['User Verified', 'Biometric Updated', 'User Rejected'];
+          const names = ['Vikram Mehta', 'Anjali Desai', 'Sanjay Patel', 'Meera Kapoor'];
+          const admins = ['Admin Singh', 'Supervisor Gupta'];
+          
+          updatedMockData.recentActivities.unshift({
+            id: Date.now(),
+            action: actions[Math.floor(Math.random() * actions.length)],
+            timestamp: new Date(),
+            userName: names[Math.floor(Math.random() * names.length)],
+            userId: `ID-${Math.floor(10000000 + Math.random() * 90000000)}`,
+            adminName: admins[Math.floor(Math.random() * admins.length)],
+            txHash: `0x${Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`
+          });
+          
+          // Keep only the most recent 5 activities
+          updatedMockData.recentActivities = updatedMockData.recentActivities.slice(0, 5);
+        }
+        
+        setStats(updatedMockData);
+        setError(null);
+      } catch (err) {
+        console.error('Error refreshing dashboard data:', err);
+        setError('Failed to refresh dashboard data. Please try again.');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  };
+
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   // Truncate hash for display
   const truncateHash = (hash) => {
-    if (!hash) return 'N/A';
-    return `${hash.substring(0, 6)}...${hash.substring(hash.length - 4)}`;
+    if (!hash) return '';
+    return `${hash.substring(0, 10)}...${hash.substring(hash.length - 8)}`;
+  };
+
+  const getActionIcon = (action) => {
+    if (action.includes('Verified')) return <FaCheckCircle className="action-icon verified" />;
+    if (action.includes('Rejected')) return <FaTimesCircle className="action-icon rejected" />;
+    if (action.includes('Updated')) return <FaEdit className="action-icon updated" />;
+    if (action.includes('Biometric')) return <FaFingerprint className="action-icon biometric" />;
+    return <FaUserClock className="action-icon pending" />;
   };
 
   return (
-    <div>
-      <Typography variant="h4" component="h1" className="page-header">
-        User Management
-      </Typography>
+    <div className="dashboard">
+      <div className="dashboard-header">
+        <div className="header-left">
+          <h1 className="page-title">
+            <FaChartLine className="page-title-icon" />
+            Dashboard
+          </h1>
+          {stats.lastUpdated && (
+            <div className="last-updated">
+              Last updated: {formatDate(stats.lastUpdated)}
+              {refreshing && <FaSync className="refresh-icon spinning" />}
+            </div>
+          )}
+        </div>
+        <div className="header-right">
+          <button 
+            className="refresh-button" 
+            onClick={() => handleRefresh()}
+            disabled={loading || refreshing}
+          >
+            <FaSync className={refreshing ? 'spinning' : ''} />
+            Refresh Data
+          </button>
+        </div>
+      </div>
       
-      <Box mb={4}>
-        <Paper elevation={1} sx={{ p: 3, bgcolor: '#f8f9fa' }}>
-          <Typography variant="h6" gutterBottom>
-            Welcome, {user?.fullName || user?.username || 'Government Official'}
-          </Typography>
-          <Typography variant="body1">
-            Manage and verify user identities in the DBIS system.
-          </Typography>
-        </Paper>
-      </Box>
+      {error && (
+        <div className="error-message">
+          <FaExclamationTriangle className="error-icon" />
+          {error}
+        </div>
+      )}
       
       {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="dashboard-card" sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>Total Users</Typography>
-              <Typography variant="h3" component="div" align="center">
-                {stats.totalUsers}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+      <div className="stats-grid">
+        <div className="stats-card total">
+          <div className="stats-icon-container">
+            <FaIdCard className="stats-icon" />
+          </div>
+          <div className="stats-info">
+            <h3 className="stats-label">Total Users</h3>
+            <p className="stats-value">
+              {loading ? <span className="loading-dots">...</span> : stats.totalUsers.toLocaleString()}
+            </p>
+            <p className="stats-description">Registered identities in the system</p>
+            {!loading && stats.trends.totalChange !== 0 && (
+              <div className={`stats-change ${stats.trends.totalChange > 0 ? 'positive' : 'negative'}`}>
+                {stats.trends.totalChange > 0 ? (
+                  <>
+                    <FaArrowUp className="trend-icon" />
+                    <span>+{stats.trends.totalChange} since last week</span>
+                  </>
+                ) : (
+                  <>
+                    <FaArrowDown className="trend-icon" />
+                    <span>{stats.trends.totalChange} since last week</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
         
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="dashboard-card" sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>Pending Verifications</Typography>
-              <Typography variant="h3" component="div" align="center" color="warning.main">
-                {stats.pendingVerifications}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+        <div className="stats-card verified">
+          <div className="stats-icon-container">
+            <FaUserCheck className="stats-icon" />
+          </div>
+          <div className="stats-info">
+            <h3 className="stats-label">Verified Users</h3>
+            <p className="stats-value">
+              {loading ? <span className="loading-dots">...</span> : stats.verifiedUsers.toLocaleString()}
+            </p>
+            <div className="stats-meta">
+              <p className="stats-description">Confirmed identities</p>
+              <div className="stats-percentage">
+                {loading ? '' : `${Math.round((stats.verifiedUsers / (stats.totalUsers || 1)) * 100)}%`}
+              </div>
+            </div>
+            {!loading && stats.trends.verifiedChange !== 0 && (
+              <div className={`stats-change ${stats.trends.verifiedChange > 0 ? 'positive' : 'negative'}`}>
+                {stats.trends.verifiedChange > 0 ? (
+                  <>
+                    <FaArrowUp className="trend-icon" />
+                    <span>+{stats.trends.verifiedChange} since last week</span>
+                  </>
+                ) : (
+                  <>
+                    <FaArrowDown className="trend-icon" />
+                    <span>{stats.trends.verifiedChange} since last week</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
         
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="dashboard-card" sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>Verified Identities</Typography>
-              <Typography variant="h3" component="div" align="center" color="success.main">
-                {stats.verifiedIdentities}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+        <div className="stats-card pending">
+          <div className="stats-icon-container">
+            <FaUserClock className="stats-icon" />
+          </div>
+          <div className="stats-info">
+            <h3 className="stats-label">Pending Users</h3>
+            <p className="stats-value">
+              {loading ? <span className="loading-dots">...</span> : stats.pendingUsers.toLocaleString()}
+            </p>
+            <div className="stats-meta">
+              <p className="stats-description">Awaiting verification</p>
+              <div className="stats-percentage">
+                {loading ? '' : `${Math.round((stats.pendingUsers / (stats.totalUsers || 1)) * 100)}%`}
+              </div>
+            </div>
+            {!loading && stats.trends.pendingChange !== 0 && (
+              <div className={`stats-change ${stats.trends.pendingChange < 0 ? 'positive' : 'negative'}`}>
+                {stats.trends.pendingChange > 0 ? (
+                  <>
+                    <FaArrowUp className="trend-icon" />
+                    <span>+{stats.trends.pendingChange} since last week</span>
+                  </>
+                ) : (
+                  <>
+                    <FaArrowDown className="trend-icon" />
+                    <span>{Math.abs(stats.trends.pendingChange)} fewer since last week</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
         
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="dashboard-card" sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>Total Records</Typography>
-              <Typography variant="h3" component="div" align="center">
-                {stats.totalRecords}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+        <div className="stats-card rejected">
+          <div className="stats-icon-container">
+            <FaUserTimes className="stats-icon" />
+          </div>
+          <div className="stats-info">
+            <h3 className="stats-label">Rejected Users</h3>
+            <p className="stats-value">
+              {loading ? <span className="loading-dots">...</span> : stats.rejectedUsers.toLocaleString()}
+            </p>
+            <div className="stats-meta">
+              <p className="stats-description">Failed verification</p>
+              <div className="stats-percentage">
+                {loading ? '' : `${Math.round((stats.rejectedUsers / (stats.totalUsers || 1)) * 100)}%`}
+              </div>
+            </div>
+            {!loading && stats.trends.rejectedChange !== 0 && (
+              <div className={`stats-change ${stats.trends.rejectedChange < 0 ? 'positive' : 'negative'}`}>
+                {stats.trends.rejectedChange > 0 ? (
+                  <>
+                    <FaArrowUp className="trend-icon" />
+                    <span>+{stats.trends.rejectedChange} since last week</span>
+                  </>
+                ) : (
+                  <>
+                    <FaArrowDown className="trend-icon" />
+                    <span>{Math.abs(stats.trends.rejectedChange)} fewer since last week</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
       
-      {/* User List Table */}
-      <Paper elevation={1} sx={{ p: 3, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h6">
-            User List
-          </Typography>
-          <TextField
-            label="Search Users"
-            variant="outlined"
-            size="small"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            sx={{ width: 300 }}
-          />
-        </Box>
+      {/* Recent Activity */}
+      <div className="activity-section">
+        <div className="section-header">
+          <h2 className="section-title">
+            <FaHistory className="section-icon" />
+            Recent Activity
+          </h2>
+          <Link to="/activity-logs" className="view-all-link">
+            View All <FaChevronRight className="view-all-icon" />
+          </Link>
+        </div>
         
-        <TableContainer>
-          <Table sx={{ minWidth: 650 }} aria-label="user list table">
-            <TableHead>
-              <TableRow>
-                <TableCell>Serial No.</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Unique ID</TableCell>
-                <TableCell>Verification Status</TableCell>
-                <TableCell>Last Updated</TableCell>
-                <TableCell>Facemesh Hash</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredUsers
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((user, index) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                    <TableCell>{user.name}</TableCell>
-                    <TableCell>{user.uniqueId}</TableCell>
-                    <TableCell>
-                      {user.verified ? (
-                        <Chip 
-                          icon={<CheckCircleIcon />} 
-                          label="Verified" 
-                          color="success" 
-                          size="small" 
-                        />
-                      ) : (
-                        <Chip 
-                          icon={<CancelIcon />} 
-                          label="Unverified" 
-                          color="error" 
-                          size="small" 
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell>{formatDate(user.lastUpdated)}</TableCell>
-                    <TableCell>{truncateHash(user.facemeshHash)}</TableCell>
-                    <TableCell>
-                      <Tooltip title="View Details">
-                        <IconButton 
-                          size="small" 
-                          color="primary"
-                          onClick={() => handleOpenModal(user)}
-                        >
-                          <VisibilityIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit User">
-                        <IconButton 
-                          size="small" 
-                          color="secondary"
-                          onClick={() => handleOpenModal(user)}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <div className="section-content">
+          {loading ? (
+            <div className="loading-container">
+              <div className="loading-spinner"></div>
+              <p className="loading-text">Loading recent activity...</p>
+            </div>
+          ) : stats.recentActivities.length === 0 ? (
+            <div className="empty-state">
+              <FaHistory className="empty-icon" />
+              <p className="empty-text">No recent activity found.</p>
+              <p className="empty-subtext">Activities will appear here as users are verified or updated.</p>
+            </div>
+          ) : (
+            <div className="activity-cards">
+              {stats.recentActivities.map((activity) => (
+                <div key={activity.id} className="activity-card">
+                  <div className="activity-header">
+                    <div className="activity-action">
+                      {getActionIcon(activity.action)}
+                      <span className="action-text">{activity.action}</span>
+                    </div>
+                    <div className="activity-time">
+                      <FaHistory className="time-icon" />
+                      {formatDate(activity.timestamp)}
+                    </div>
+                  </div>
+                  
+                  <div className="activity-body">
+                    <div className="activity-user">
+                      <div className="user-avatar">
+                        {activity.userName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="user-info">
+                        <div className="user-name">{activity.userName}</div>
+                        <div className="user-id">
+                          <FaIdCard className="id-icon" />
+                          {activity.userId}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="activity-admin">
+                      <span className="admin-label">Verified by:</span>
+                      <span className="admin-name">
+                        <FaUserShield className="admin-icon" />
+                        {activity.adminName}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {activity.txHash && (
+                    <div className="activity-footer">
+                      <div className="tx-hash">
+                        <FaLink className="tx-icon" />
+                        <span className="tx-label">Blockchain TX:</span>
+                        <Link to={`/activity-logs?txHash=${activity.txHash}`} className="tx-value">
+                          {truncateHash(activity.txHash)}
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Quick Actions */}
+      <div className="section quick-actions-section">
+        <div className="section-header">
+          <h2 className="section-title">
+            <FaShieldAlt className="section-icon" />
+            Quick Actions
+          </h2>
+          <p className="section-subtitle">Common tasks for government officials</p>
+        </div>
         
-        {/* Pagination */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            Showing {Math.min(filteredUsers.length, page * rowsPerPage + 1)} - {Math.min(filteredUsers.length, (page + 1) * rowsPerPage)} of {filteredUsers.length} users
-          </Typography>
-          <Pagination 
-            count={Math.ceil(filteredUsers.length / rowsPerPage)} 
-            page={page + 1} 
-            onChange={handleChangePage} 
-            color="primary" 
-          />
-        </Box>
-      </Paper>
-      
-      {/* System Status */}
-      <Paper elevation={1} sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          System Status
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <Typography variant="body2" gutterBottom>
-              <strong>Backend API:</strong> Online
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Database:</strong> Connected
-            </Typography>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Typography variant="body2" gutterBottom>
-              <strong>Blockchain Node:</strong> Synced
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Last Update:</strong> {new Date().toLocaleString()}
-            </Typography>
-          </Grid>
-        </Grid>
-      </Paper>
-      
-      {/* User Detail Modal */}
-      <UserDetailModal 
-        open={modalOpen} 
-        onClose={handleCloseModal} 
-        user={selectedUser} 
-      />
+        <div className="quick-actions-grid">
+          <Link to="/records" className="quick-action-card">
+            <div className="quick-action-icon-container records">
+              <FaIdCard className="quick-action-icon" />
+            </div>
+            <div className="quick-action-content">
+              <h3 className="quick-action-title">Manage Records</h3>
+              <p className="quick-action-description">View and update user identity records</p>
+              <ul className="quick-action-features">
+                <li>Search and filter users</li>
+                <li>Verify identities</li>
+                <li>Update biometric data</li>
+              </ul>
+            </div>
+            <div className="quick-action-arrow">
+              <FaChevronRight />
+            </div>
+          </Link>
+          
+          <Link to="/activity-logs" className="quick-action-card">
+            <div className="quick-action-icon-container logs">
+              <FaHistory className="quick-action-icon" />
+            </div>
+            <div className="quick-action-content">
+              <h3 className="quick-action-title">Activity Logs</h3>
+              <p className="quick-action-description">View system audit trail and verification history</p>
+              <ul className="quick-action-features">
+                <li>Track verification activities</li>
+                <li>Monitor blockchain transactions</li>
+                <li>Export audit reports</li>
+              </ul>
+            </div>
+            <div className="quick-action-arrow">
+              <FaChevronRight />
+            </div>
+          </Link>
+          
+          <Link to="/settings" className="quick-action-card">
+            <div className="quick-action-icon-container settings">
+              <FaCog className="quick-action-icon" />
+            </div>
+            <div className="quick-action-content">
+              <h3 className="quick-action-title">Admin Settings</h3>
+              <p className="quick-action-description">Manage account preferences and security settings</p>
+              <ul className="quick-action-features">
+                <li>Update admin profile</li>
+                <li>Configure security options</li>
+                <li>Manage notification preferences</li>
+              </ul>
+            </div>
+            <div className="quick-action-arrow">
+              <FaChevronRight />
+            </div>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 };
