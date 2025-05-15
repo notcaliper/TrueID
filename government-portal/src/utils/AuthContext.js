@@ -1,146 +1,134 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import jwtDecode from 'jwt-decode';
+import ApiService from '../services/ApiService';
 
-// Development mode flag - set to true to enable dev features
-const DEV_MODE = true;
+// Development mode configuration
+const DEV_MODE = process.env.NODE_ENV === 'development';
+const DEV_USER = {
+  id: 'dev-admin-001',
+  name: 'Development Admin',
+  email: 'dev@example.gov',
+  role: 'admin',
+  department: 'IT Security',
+  lastLogin: new Date().toISOString()
+};
 
-// Create context
 const AuthContext = createContext();
 
-export const useAuth = () => useContext(AuthContext);
+// Check if dev mode is enabled in localStorage
+const getInitialDevMode = () => {
+  // Set developer mode to true by default
+  const savedDevMode = localStorage.getItem('devMode');
+  return savedDevMode ? JSON.parse(savedDevMode) : true;
+};
 
-export const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+export function AuthProvider({ children }) {
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  const navigate = useNavigate();
-  
-  // Check if token exists and is valid on initial load
+  const [error, setError] = useState('');
+  const [devMode, setDevMode] = useState(getInitialDevMode);
+
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      
-      if (token) {
-        try {
-          // Check if token is expired
-          const decodedToken = jwtDecode(token);
-          const currentTime = Date.now() / 1000;
-          
-          if (decodedToken.exp < currentTime) {
-            // Token expired
-            localStorage.removeItem('token');
-            setIsAuthenticated(false);
-            setUser(null);
-          } else {
-            // Set auth header
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            
-            // Get user profile
-            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/profile`);
-            
-            setUser(response.data);
-            setIsAuthenticated(true);
-          }
-        } catch (err) {
-          console.error('Auth error:', err);
-          localStorage.removeItem('token');
-          setIsAuthenticated(false);
-          setUser(null);
-          setError('Authentication failed. Please login again.');
-        }
-      }
-      
+    // Check if user is already logged in
+    const token = localStorage.getItem('authToken');
+    if (token || devMode) {
+      fetchUserProfile();
+    } else {
       setLoading(false);
-    };
-    
-    checkAuth();
-  }, []);
-  
-  // Login function
-  const login = async (email, password) => {
-    setLoading(true);
-    setError(null);
-    
-    // Development bypass login
-    if (DEV_MODE && email === 'dev' && password === 'dev') {
-      console.log('DEV MODE: Bypassing authentication');
-      
-      // Create mock user data
-      const mockUser = {
-        id: 999,
-        username: 'dev_admin',
-        fullName: 'Development Admin',
-        email: 'dev@example.com',
-        roles: ['ADMIN_ROLE', 'GOVERNMENT_ROLE']
-      };
-      
-      // Create mock token
-      const mockToken = 'dev_token_' + Date.now();
-      
-      // Save token to localStorage
-      localStorage.setItem('token', mockToken);
-      
-      // Set auth header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${mockToken}`;
-      
-      setIsAuthenticated(true);
-      setUser(mockUser);
-      navigate('/');
-      
-      setLoading(false);
-      return true;
     }
-    
+  }, [devMode]);
+
+  // Save dev mode state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('devMode', JSON.stringify(devMode));
+  }, [devMode]);
+
+  const fetchUserProfile = async () => {
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
-        email,
-        password
+      // Always enable developer mode for this session
+      setDevMode(true);
+      
+      // Set a mock admin user for dev mode
+      setCurrentUser({
+        id: 'dev-admin',
+        name: 'Developer Admin',
+        email: 'dev@example.com',
+        role: 'admin',
+        permissions: ['all'],
+        isDevMode: true
       });
       
-      const { token, user } = response.data;
-      
-      // Save token to localStorage
-      localStorage.setItem('token', token);
-      
-      // Set auth header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      setIsAuthenticated(true);
-      setUser(user);
-      navigate('/');
-      
-      return true;
+      // Only try to fetch real user if not in dev mode
+      if (!devMode) {
+        try {
+          const response = await ApiService.getCurrentUser();
+          setCurrentUser(response.user);
+        } catch (apiErr) {
+          console.log('Using dev mode instead of API');
+        }
+      }
     } catch (err) {
-      console.error('Login error:', err);
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
-      return false;
+      console.error('Error in profile setup:', err);
+      // Don't logout in dev mode
+      if (!devMode) logout();
     } finally {
       setLoading(false);
     }
   };
-  
-  // Logout function
+
+  const login = async (email, password) => {
+    try {
+      setError('');
+      const response = await ApiService.login(email, password);
+      localStorage.setItem('authToken', response.token);
+      ApiService.setAuthToken(response.token);
+      setCurrentUser(response.user);
+      return { success: true };
+    } catch (error) {
+      setError(error.message || 'Failed to login');
+      return { success: false, error: error.message };
+    }
+  };
+
   const logout = () => {
-    localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
-    setIsAuthenticated(false);
-    setUser(null);
-    navigate('/login');
+    localStorage.removeItem('authToken');
+    ApiService.setAuthToken(null);
+    setCurrentUser(null);
+    // Don't disable dev mode on logout - it should persist until explicitly toggled off
   };
-  
-  // Context value
+
+  const toggleDevMode = () => {
+    setDevMode(prevMode => !prevMode);
+  };
+
+  const enableDevMode = () => {
+    setDevMode(true);
+  };
+
+  const disableDevMode = () => {
+    setDevMode(false);
+  };
+
   const value = {
-    isAuthenticated,
-    user,
-    loading,
-    error,
+    currentUser,
     login,
-    logout
+    logout,
+    error,
+    loading,
+    devMode,
+    toggleDevMode,
+    enableDevMode,
+    disableDevMode
   };
-  
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
+export default AuthContext;

@@ -1,70 +1,90 @@
-import React, { useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-
-// Layouts
-import MainLayout from './components/layouts/MainLayout';
-
-// Pages
-import Dashboard from './pages/Dashboard';
-import Login from './pages/Login';
-import UserManagement from './pages/UserManagement';
-import IdentityVerification from './pages/IdentityVerification';
-import RecordManagement from './pages/RecordManagement';
-import AuditTrail from './pages/AuditTrail';
-import NotFound from './pages/NotFound';
-
-// Auth Context
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './utils/AuthContext';
 
-// Theme
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
+// Pages
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import RecordManagement from './pages/RecordManagement';
+import ActivityLogs from './pages/ActivityLogs';
+import Settings from './pages/Settings';
 
-// Protected Route Component
+// Components
+import MainLayout from './components/MainLayout';
+
+// Protected Route component
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
-  
-  if (!isAuthenticated) {
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner">
+          <div className="spinner"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
     return <Navigate to="/login" />;
   }
-  
+
   return children;
 };
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AuthProvider>
+    <AuthProvider>
+      <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
           
           <Route path="/" element={
             <ProtectedRoute>
-              <MainLayout />
+              <MainLayout>
+                <Dashboard />
+              </MainLayout>
             </ProtectedRoute>
-          }>
-            <Route index element={<Dashboard />} />
-            <Route path="users" element={<UserManagement />} />
-            <Route path="identity-verification" element={<IdentityVerification />} />
-            <Route path="records" element={<RecordManagement />} />
-            <Route path="audit" element={<AuditTrail />} />
-          </Route>
+          } />
           
-          <Route path="*" element={<NotFound />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Dashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/records" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <RecordManagement />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/activity-logs" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ActivityLogs />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Settings />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Redirect any unknown routes to Dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
-      </AuthProvider>
-    </ThemeProvider>
+      </Router>
+    </AuthProvider>
   );
 }
 
