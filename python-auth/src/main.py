@@ -1,4 +1,4 @@
-from face_auth import FaceAuth
+from src.face_auth import FaceAuth
 import time
 import sys
 import json

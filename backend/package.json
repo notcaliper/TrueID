@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "test": "jest"
+    "test": "jest",
+    "blockchain:start": "node src/blockchain/start-local-blockchain.js",
+    "blockchain:deploy": "node src/blockchain/deploy.js",
+    "blockchain:test": "node src/blockchain/test-blockchain.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -23,8 +26,11 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "@truffle/hdwallet-provider": "^2.1.15",
+    "ganache": "^7.9.2",
     "jest": "^29.5.0",
     "nodemon": "^3.1.10",
+    "solc": "^0.8.19",
     "supertest": "^6.3.3"
   },
   "engines": {

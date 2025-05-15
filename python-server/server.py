@@ -12,12 +12,12 @@ import sys
 import os
 import time
 
-# Add parent directory to path so we can import from main.py
+# Add parent directory to path so we can import from the python-auth module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import the face authentication system
-from face_auth import FaceAuth
-import main as face_auth_main
+from python_auth.src.face_auth import FaceAuth
+import python_auth.src.main as face_auth_main
 
 class FaceAuthServer:
     def __init__(self, host='0.0.0.0', port=8080):

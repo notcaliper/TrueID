@@ -4,11 +4,16 @@ A comprehensive decentralized identity management system that enables users to r
 
 ## System Architecture
 
-The DBIS consists of three main components:
+The DBIS consists of the following components:
 
 1. **Android Mobile App**: For user registration, biometric authentication, and professional identity management
 2. **Backend Server**: Node.js with Express.js for API endpoints, blockchain integration, and database operations
 3. **Government Portal**: Web dashboard for government officials to verify and modify user records
+4. **Python Authentication**: Face recognition and authentication system
+5. **Python Server**: TCP server for the face authentication system
+6. **Python Client**: Python client for interacting with the DBIS API
+7. **C Client**: C client for interacting with the DBIS API
+8. **Database**: PostgreSQL database scripts and migrations
 
 ## Technologies Used
 

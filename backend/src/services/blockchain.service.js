@@ -3,9 +3,22 @@
  * Handles interaction with the blockchain network
  */
 const ethers = require('ethers');
-const IdentityManagementABI = require('../blockchain/contracts/abi/IdentityManagement.json');
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
 
-// Load environment variables
+// Load environment variables from .env and .env.local (if exists)
+dotenv.config();
+const envLocalPath = path.resolve(__dirname, '..', '..', '.env.local');
+if (fs.existsSync(envLocalPath)) {
+  dotenv.config({ path: envLocalPath });
+}
+
+// Load contract ABI
+const abiPath = path.resolve(__dirname, '..', 'blockchain', 'contracts', 'abi', 'IdentityManagement.json');
+const IdentityManagementABI = require(abiPath);
+
+// Get blockchain configuration from environment variables
 const {
   BLOCKCHAIN_RPC_URL,
   CONTRACT_ADDRESS,
@@ -18,6 +31,18 @@ const {
  */
 const initBlockchain = () => {
   try {
+    if (!BLOCKCHAIN_RPC_URL) {
+      throw new Error('BLOCKCHAIN_RPC_URL is not defined in environment variables');
+    }
+    
+    if (!CONTRACT_ADDRESS) {
+      throw new Error('CONTRACT_ADDRESS is not defined in environment variables');
+    }
+    
+    if (!PRIVATE_KEY) {
+      throw new Error('PRIVATE_KEY is not defined in environment variables');
+    }
+    
     // Create provider
     const provider = new ethers.providers.JsonRpcProvider(BLOCKCHAIN_RPC_URL);
     
@@ -34,7 +59,37 @@ const initBlockchain = () => {
     return { provider, wallet, contract };
   } catch (error) {
     console.error('Blockchain initialization error:', error);
-    throw new Error('Failed to initialize blockchain connection');
+    throw new Error(`Failed to initialize blockchain connection: ${error.message}`);
+  }
+};
+
+/**
+ * Get the current wallet address
+ * @returns {String} Wallet address
+ */
+exports.getWalletAddress = () => {
+  try {
+    const { wallet } = initBlockchain();
+    return wallet.address;
+  } catch (error) {
+    console.error('Get wallet address error:', error);
+    throw new Error('Failed to get wallet address');
+  }
+};
+
+/**
+ * Check if the contract is deployed and accessible
+ * @returns {Boolean} True if contract is accessible
+ */
+exports.isContractAccessible = async () => {
+  try {
+    const { contract } = initBlockchain();
+    // Try to call a view function to check if contract is accessible
+    await contract.USER_ROLE();
+    return true;
+  } catch (error) {
+    console.error('Contract accessibility check error:', error);
+    return false;
   }
 };
 
@@ -261,7 +316,13 @@ exports.getBiometricHash = async (userAddress) => {
     const biometricHashBytes = await contract.getBiometricHash(userAddress);
     
     // Convert bytes32 to string
-    return ethers.utils.parseBytes32String(biometricHashBytes);
+    try {
+      return ethers.utils.parseBytes32String(biometricHashBytes);
+    } catch (parseError) {
+      // If parsing fails, return the raw hash
+      console.warn('Could not parse biometric hash as string:', parseError.message);
+      return biometricHashBytes;
+    }
   } catch (error) {
     console.error('Get biometric hash from blockchain error:', error);
     throw new Error('Failed to get biometric hash from blockchain');
@@ -317,8 +378,17 @@ exports.getProfessionalRecord = async (userAddress, recordIndex) => {
     // Call contract method
     const record = await contract.getProfessionalRecord(userAddress, recordIndex);
     
+    let dataHashStr;
+    try {
+      dataHashStr = ethers.utils.parseBytes32String(record.dataHash);
+    } catch (parseError) {
+      // If parsing fails, use the raw hash
+      console.warn('Could not parse data hash as string:', parseError.message);
+      dataHashStr = record.dataHash;
+    }
+    
     return {
-      dataHash: ethers.utils.parseBytes32String(record.dataHash),
+      dataHash: dataHashStr,
       startDate: new Date(record.startDate.toNumber() * 1000),
       endDate: record.endDate.toNumber() > 0 ? new Date(record.endDate.toNumber() * 1000) : null,
       verifier: record.verifier,

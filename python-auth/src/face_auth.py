@@ -8,7 +8,7 @@ import dlib
 from imutils import face_utils
 import urllib.request
 import bz2
-from database import FaceDatabase
+from src.database import FaceDatabase
 
 class FaceAuth:
     def __init__(self, db_params=None):

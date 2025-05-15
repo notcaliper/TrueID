@@ -33,6 +33,10 @@
 │   ├── .env                     # Environment variables
 │   ├── package.json             # Node.js dependencies
 │   └── server.js                # Entry point
+├── c-client/                    # C API client
+│   ├── bin/                     # Compiled binaries
+│   ├── src/                     # Source code
+│   └── Makefile                 # Build configuration
 ├── database/                    # Database scripts
 │   ├── migrations/              # Database migrations
 │   └── seeds/                   # Database seed data
@@ -45,10 +49,21 @@
 │   │   └── utils/               # Utility functions
 │   ├── package.json             # Node.js dependencies
 │   └── index.js                 # Entry point
-└── docs/                        # Documentation
-    ├── api/                     # API documentation
-    ├── architecture/            # Architecture diagrams
-    └── user-guides/             # User guides
+├── python-auth/                 # Python face authentication
+│   ├── src/                     # Source code
+│   │   ├── face_auth.py         # Face authentication implementation
+│   │   ├── database.py          # Database integration
+│   │   ├── main.py              # Main application
+│   │   └── utils/               # Utility functions
+│   └── requirements.txt         # Python dependencies
+├── python-client/               # Python API client
+│   ├── dbis_api_client.py       # API client implementation
+│   └── README.md                # Documentation
+├── python-server/               # Python face auth server
+│   ├── server.py                # TCP server implementation
+│   └── requirements.txt         # Python dependencies
+├── Makefile                     # Main build configuration
+└── README.md                    # Project documentation
 ```
 
 ## System Components
