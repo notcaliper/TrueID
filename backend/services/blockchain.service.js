@@ -99,8 +99,15 @@ const initBlockchain = () => {
       throw new Error('ADMIN_PRIVATE_KEY is not defined in environment variables');
     }
     
-    // Create provider
-    const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    // Create provider with explicit network configuration
+    const provider = new ethers.providers.JsonRpcProvider(
+      rpcUrl,
+      {
+        name: networkName,
+        chainId: networkName === 'Polygon Mumbai' ? 80001 : 31337,
+        ensAddress: null
+      }
+    );
     
     // Create wallet
     const wallet = new ethers.Wallet(privateKey, provider);
@@ -240,7 +247,6 @@ exports.registerIdentity = async (walletAddress, biometricHash, professionalData
     
     // Create identity on blockchain
     const tx = await contract.createIdentity(
-      walletAddress,
       biometricHashBytes,
       professionalDataHashBytes,
       { gasLimit: 300000 }
@@ -563,5 +569,48 @@ exports.verifyDocumentHash = async (hash) => {
   } catch (error) {
     console.error('Verify document hash error:', error);
     throw new Error('Failed to verify document hash on blockchain');
+  }
+};
+
+/**
+ * Get transaction details from the blockchain
+ * @param {String} txHash - Transaction hash
+ * @returns {Object} Transaction details
+ */
+exports.getTransactionDetails = async (txHash) => {
+  try {
+    const { provider, networkName } = initBlockchain();
+    
+    // Get transaction from blockchain
+    const transaction = await provider.getTransaction(txHash);
+    if (!transaction) {
+      throw new Error('Transaction not found on blockchain');
+    }
+    
+    // Get transaction receipt for additional details
+    const receipt = await provider.getTransactionReceipt(txHash);
+    
+    // Get block information
+    const block = await provider.getBlock(transaction.blockNumber);
+    
+    return {
+      hash: transaction.hash,
+      blockNumber: transaction.blockNumber,
+      blockHash: transaction.blockHash,
+      timestamp: block ? new Date(block.timestamp * 1000).toISOString() : null,
+      from: transaction.from,
+      to: transaction.to,
+      value: ethers.utils.formatEther(transaction.value),
+      gasPrice: ethers.utils.formatUnits(transaction.gasPrice, 'gwei'),
+      gasLimit: transaction.gasLimit.toString(),
+      gasUsed: receipt ? receipt.gasUsed.toString() : null,
+      nonce: transaction.nonce,
+      status: receipt ? (receipt.status === 1 ? 'success' : 'failed') : 'pending',
+      confirmations: transaction.confirmations,
+      network: networkName
+    };
+  } catch (error) {
+    console.error('Get transaction details error:', error);
+    throw new Error(`Failed to get transaction details: ${error.message}`);
   }
 };

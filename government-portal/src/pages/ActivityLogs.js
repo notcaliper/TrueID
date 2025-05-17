@@ -3,6 +3,7 @@ import ApiService from '../services/ApiService';
 import { FaSearch, FaDownload, FaCalendarAlt, FaFilter, 
          FaCheckCircle, FaTimesCircle, FaEdit, FaClock, 
          FaLink, FaChevronLeft, FaChevronRight, FaHistory } from 'react-icons/fa';
+import '../styles/activity-logs.css';
 
 const ActivityLogs = () => {
   const [logs, setLogs] = useState([]);
@@ -32,14 +33,34 @@ const ActivityLogs = () => {
         search: searchQuery || undefined
       };
       
-      const data = await ApiService.getActivityLogs(currentPage, logsPerPage, filters);
-      setLogs(data.logs);
-      setTotalPages(Math.ceil(data.total / logsPerPage));
+      const response = await ApiService.getActivityLogs(currentPage, logsPerPage, filters);
+      
+      // Handle different response formats
+      if (response.logs) {
+        // Direct logs array
+        setLogs(response.logs);
+        setTotalPages(Math.ceil(response.pagination?.total || 0) / logsPerPage);
+      } else if (response.data && response.data.logs) {
+        // Nested in data property
+        setLogs(response.data.logs);
+        setTotalPages(Math.ceil(response.data.pagination?.total || 0) / logsPerPage);
+      } else if (Array.isArray(response)) {
+        // Response is the array itself
+        setLogs(response);
+        setTotalPages(1); // Can't determine total pages
+      } else {
+        // Fallback - empty array
+        setLogs([]);
+        setTotalPages(1);
+        console.error('Unexpected response format:', response);
+      }
+      
       setLoading(false);
     } catch (err) {
       console.error('Error fetching activity logs:', err);
       setError('Failed to load activity logs. Please try again.');
       setLoading(false);
+      setLogs([]);
     }
   };
 
@@ -245,54 +266,68 @@ const ActivityLogs = () => {
       
       {/* Activity Logs Table */}
       <div className="table-container">
+        <div className="logs-table-body">
         {loading ? (
           <div className="loading-container">
-            <div className="loading-spinner">
               <div className="spinner"></div>
+              <p>Loading activity logs...</p>
             </div>
+          ) : logs.length === 0 ? (
+            <div className="no-logs-message">
+              <p>No activity logs found matching your criteria.</p>
           </div>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Action</th>
-                <th>User</th>
-                <th>Admin</th>
-                <th>Timestamp</th>
-                <th>TX Hash</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="no-data">
-                    No activity logs found matching your criteria.
-                  </td>
-                </tr>
-              ) : (
-                logs.map((log) => (
-                  <tr key={log.id} className="data-row">
-                    <td>
-                      <div className="action-cell">
-                        {getActionIcon(log.action)}
-                        <span>{log.action}</span>
+            logs.map((log) => (
+              <div key={log.id} className="log-row">
+                <div className="log-cell log-action">
+                  <div className="action-icon-container">
+                    {getActionIcon(log.action)}
+                  </div>
+                  <div className="action-details">
+                    <span className="action-name">{log.action.replace(/_/g, ' ')}</span>
+                    <span className="entity-type">
+                      {log.entity_type ? log.entity_type.replace(/_/g, ' ') : 'Unknown Entity'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="log-cell log-user">
+                  {log.user_name || log.admin_username || 'System'}
+                  {log.government_id && (
+                    <span className="government-id">{log.government_id}</span>
+                  )}
+                </div>
+                
+                <div className="log-cell log-details">
+                  {log.details && typeof log.details === 'object' ? (
+                    <div className="details-list">
+                      {Object.entries(log.details).map(([key, value]) => (
+                        <div key={key} className="details-item">
+                          <span className="details-key">{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()}:</span>
+                          <span className="details-value">
+                            {typeof value === 'object' 
+                              ? JSON.stringify(value) 
+                              : String(value).length > 30 
+                                ? `${String(value).substring(0, 30)}...` 
+                                : String(value)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : log.details ? (
+                    String(log.details)
+                  ) : (
+                    <em>No details</em>
+                  )}
+                </div>
+                
+                <div className="log-cell log-date">
+                  {log.created_at ? formatDate(log.created_at) : 'Unknown date'}
                       </div>
-                    </td>
-                    <td>
-                      <div className="user-cell">
-                        <div className="user-name">{log.userName}</div>
-                        <div className="user-id">{log.userId}</div>
                       </div>
-                    </td>
-                    <td>{log.adminName}</td>
-                    <td>{formatDate(log.timestamp)}</td>
-                    <td className="hash-cell">{truncateHash(log.txHash)}</td>
-                  </tr>
                 ))
               )}
-            </tbody>
-          </table>
-        )}
+        </div>
       </div>
       
       {/* Pagination */}

@@ -1,0 +1,110 @@
+{
+  "_format": "hh-sol-cache-2",
+  "files": {
+    "/home/caliper/DBIS/backend/blockchain/contracts/BiometricIdentitySystem.sol": {
+      "lastModificationDate": 1747378560610,
+      "contentHash": "69793ad40596997705e15454b3839c46",
+      "sourceName": "blockchain/contracts/BiometricIdentitySystem.sol",
+      "solcConfig": {
+        "version": "0.8.17",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.17"
+      ],
+      "artifacts": [
+        "BiometricIdentitySystem"
+      ]
+    },
+    "/home/caliper/DBIS/backend/blockchain/contracts/DBISIdentityContract.sol": {
+      "lastModificationDate": 1747378710660,
+      "contentHash": "947ecad20fb68b6d4969897efa551a59",
+      "sourceName": "blockchain/contracts/DBISIdentityContract.sol",
+      "solcConfig": {
+        "version": "0.8.17",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.17"
+      ],
+      "artifacts": [
+        "DBISIdentityContract"
+      ]
+    },
+    "/home/caliper/DBIS/backend/blockchain/contracts/IdentityManagement.sol": {
+      "lastModificationDate": 1747377012488,
+      "contentHash": "a0b2d7a4407572c161123dbfebbbaf26",
+      "sourceName": "blockchain/contracts/IdentityManagement.sol",
+      "solcConfig": {
+        "version": "0.8.17",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.0"
+      ],
+      "artifacts": [
+        "IdentityManagement"
+      ]
+    }
+  }
+}
