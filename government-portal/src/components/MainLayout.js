@@ -3,27 +3,27 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
 import { FaChevronLeft, FaChevronRight, FaTachometerAlt, FaUsers, 
          FaHistory, FaCog, FaSignOutAlt, FaCode, FaToggleOn, FaToggleOff,
-         FaShieldAlt, FaBell, FaUserShield, FaFingerprint, FaIdCard } from 'react-icons/fa';
+         FaShieldAlt, FaBell, FaUserShield, FaFingerprint, FaIdCard,
+         FaExchangeAlt } from 'react-icons/fa';
+import BackendStatusChecker from './BackendStatusChecker';
+import './BackendStatusChecker.css';
 
 const MainLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [showDevControls, setShowDevControls] = useState(false);
-  const { currentUser, logout, devMode, toggleDevMode } = useAuth();
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/admin/login');
   };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
   
-  const toggleDevControls = () => {
-    setShowDevControls(prev => !prev);
-  };
+  // No development controls in production
 
   return (
     <div className="main-layout">
@@ -34,7 +34,6 @@ const MainLayout = ({ children }) => {
             <FaShieldAlt className="logo-icon" />
             DBIS Admin
           </h2>
-          {devMode && sidebarOpen && <span className="dev-badge"><FaCode /> DEV</span>}
           <button 
             onClick={toggleSidebar}
             className="sidebar-toggle"
@@ -49,7 +48,7 @@ const MainLayout = ({ children }) => {
           <ul>
             <li>
               <NavLink
-                to="/dashboard"
+                to="/admin/dashboard"
                 className={({ isActive }) => isActive ? 'active' : ''}
               >
                 <FaTachometerAlt className="nav-icon" />
@@ -58,7 +57,7 @@ const MainLayout = ({ children }) => {
             </li>
             <li>
               <NavLink
-                to="/records"
+                to="/admin/records"
                 className={({ isActive }) => isActive ? 'active' : ''}
               >
                 <FaIdCard className="nav-icon" />
@@ -67,7 +66,16 @@ const MainLayout = ({ children }) => {
             </li>
             <li>
               <NavLink
-                to="/activity-logs"
+                to="/admin/blockchain"
+                className={({ isActive }) => isActive ? 'active' : ''}
+              >
+                <FaExchangeAlt className="nav-icon" />
+                {sidebarOpen && <span>Blockchain</span>}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/admin/activity-logs"
                 className={({ isActive }) => isActive ? 'active' : ''}
               >
                 <FaHistory className="nav-icon" />
@@ -78,7 +86,7 @@ const MainLayout = ({ children }) => {
             {sidebarOpen && <div className="nav-section-title">SYSTEM</div>}
             <li>
               <NavLink
-                to="/settings"
+                to="/admin/settings"
                 className={({ isActive }) => isActive ? 'active' : ''}
               >
                 <FaCog className="nav-icon" />
@@ -86,18 +94,7 @@ const MainLayout = ({ children }) => {
               </NavLink>
             </li>
             
-            {/* Developer Mode Toggle (only visible when sidebar is open) */}
-            {sidebarOpen && devMode && (
-              <li className="dev-mode-menu-item">
-                <button 
-                  className="dev-mode-menu-button"
-                  onClick={toggleDevControls}
-                >
-                  <FaCode className="nav-icon" />
-                  <span>Developer Tools</span>
-                </button>
-              </li>
-            )}
+            {/* No developer tools in production */}
           </ul>
         </nav>
 
@@ -125,65 +122,18 @@ const MainLayout = ({ children }) => {
           </div>
           
           <div className="header-right">
+            {/* Backend Status Checker */}
+            <div className="backend-status-container">
+              <BackendStatusChecker />
+            </div>
+            
             {/* Notification Icon */}
             <div className="header-icon-button">
               <FaBell />
               <span className="notification-badge">3</span>
             </div>
             
-            {/* Developer Mode Indicator - Always visible when dev mode is active */}
-            {devMode && (
-              <div className="dev-mode-indicator" onClick={toggleDevControls}>
-                <FaCode className="dev-icon" />
-                <span>Developer Mode</span>
-              </div>
-            )}
-          
-          {/* Developer Controls Panel - Only visible when toggled */}
-          {showDevControls && devMode && (
-            <div className="dev-controls-panel">
-              <div className="dev-controls-header">
-                <h3>
-                  <FaCode className="dev-controls-icon" />
-                  Developer Controls
-                </h3>
-                <button 
-                  className="dev-controls-close" 
-                  onClick={toggleDevControls}
-                  aria-label="Close developer controls"
-                >
-                  &times;
-                </button>
-              </div>
-              
-              <div className="dev-controls-body">
-                <div className="dev-control-item">
-                  <span className="dev-control-label">Developer Mode</span>
-                  <button 
-                    className="dev-mode-toggle-button" 
-                    onClick={toggleDevMode}
-                    aria-label="Toggle developer mode"
-                  >
-                    {devMode ? 
-                      <FaToggleOn className="toggle-icon on" /> : 
-                      <FaToggleOff className="toggle-icon off" />
-                    }
-                    <span>{devMode ? 'Enabled' : 'Disabled'}</span>
-                  </button>
-                </div>
-                
-                <div className="dev-info-item">
-                  <span className="dev-info-label">User ID:</span>
-                  <span className="dev-info-value">{currentUser?.id || 'dev-admin'}</span>
-                </div>
-                
-                <div className="dev-info-item">
-                  <span className="dev-info-label">Current Path:</span>
-                  <span className="dev-info-value">{location.pathname}</span>
-                </div>
-              </div>
-            </div>
-          )}
+            {/* No developer mode in production */}
           
             {/* User Profile */}
             {currentUser && (
@@ -193,10 +143,7 @@ const MainLayout = ({ children }) => {
                 </div>
                 <div className="user-details">
                   <p className="user-name">{currentUser.name || 'Admin'}</p>
-                  <p className="user-role">
-                    {devMode ? 'Developer' : 'Government Official'}
-                    {devMode && <span className="dev-badge-small"><FaCode /></span>}
-                  </p>
+                  <p className="user-role">Government Official</p>
                 </div>
               </div>
             )}

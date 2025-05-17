@@ -11,7 +11,22 @@ const blockchainService = require('../services/blockchain.service');
  */
 exports.registerIdentity = async (req, res) => {
   try {
-    const userId = req.user.id;
+    // Extract userId either from the authenticated user, the request body, or URL parameters
+    let userId;
+    
+    // First check if recordId is provided in URL parameters (for /push/:recordId endpoint)
+    if (req.params.recordId) {
+      userId = req.params.recordId;
+    } 
+    // Then check if userId is provided in the request body
+    else if (req.body.userId) {
+      userId = req.body.userId;
+    }
+    // Finally default to authenticated user's ID
+    else {
+      userId = req.user.id;
+    }
+    
     const db = req.app.locals.db;
 
     // Check if user has a wallet address

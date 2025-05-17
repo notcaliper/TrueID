@@ -14,26 +14,54 @@ const generateAdminToken = (admin) => {
   const payload = {
     id: admin.id,
     username: admin.username,
+    email: admin.email,
     role: admin.role,
     type: 'admin'
   };
 
+  // Use environment variables for JWT secrets
+  const JWT_SECRET = process.env.JWT_SECRET;
+  const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
+  
+  // Parse expiration time or use defaults
+  let expiresIn = '24h';
+  let expiresInSeconds = 86400; // 24 hours in seconds
+  
+  if (process.env.JWT_EXPIRES_IN) {
+    if (process.env.JWT_EXPIRES_IN.endsWith('s')) {
+      expiresInSeconds = parseInt(process.env.JWT_EXPIRES_IN);
+      expiresIn = process.env.JWT_EXPIRES_IN;
+    } else if (process.env.JWT_EXPIRES_IN.endsWith('h')) {
+      expiresInSeconds = parseInt(process.env.JWT_EXPIRES_IN) * 3600;
+      expiresIn = process.env.JWT_EXPIRES_IN;
+    } else if (process.env.JWT_EXPIRES_IN.endsWith('d')) {
+      expiresInSeconds = parseInt(process.env.JWT_EXPIRES_IN) * 86400;
+      expiresIn = process.env.JWT_EXPIRES_IN;
+    } else {
+      // Assume seconds if no unit is provided
+      expiresInSeconds = parseInt(process.env.JWT_EXPIRES_IN);
+      expiresIn = `${expiresInSeconds}s`;
+    }
+  }
+  
+  console.log(`Generating token for admin ${admin.username} with expiration ${expiresIn}`);
+
   const accessToken = jwt.sign(
     payload,
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+    JWT_SECRET,
+    { expiresIn }
   );
 
   const refreshToken = jwt.sign(
     { ...payload, jti: uuidv4() },
-    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+    JWT_REFRESH_SECRET,
     { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
   );
 
   return {
     accessToken,
     refreshToken,
-    expiresIn: parseInt(process.env.JWT_EXPIRES_IN) || 86400 // 24h in seconds
+    expiresIn: expiresInSeconds
   };
 };
 
@@ -45,13 +73,20 @@ const generateAdminToken = (admin) => {
 exports.loginAdmin = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
-  const { username, password } = req.body;
+  const { username, email, password } = req.body;
+  
+  // Allow login with either username or email
+  const loginIdentifier = email || username;
+  
+  if (!loginIdentifier || !password) {
+    return res.status(400).json({ message: 'Username/email and password are required' });
+  }
 
   try {
-    // Get admin by username
+    // Get admin by username or email
     const adminResult = await db.query(
-      'SELECT id, username, password, email, role, is_active FROM admins WHERE username = $1',
-      [username]
+      'SELECT id, username, password, email, role, is_active FROM admins WHERE username = $1 OR email = $1',
+      [loginIdentifier]
     );
 
     if (adminResult.rows.length === 0) {
@@ -126,16 +161,21 @@ exports.loginAdmin = async (req, res) => {
       ]
     );
 
-    // Return admin data and token
+    // Return admin data and token in the format expected by the frontend
     res.status(200).json({
-      message: 'Login successful',
-      admin: {
-        id: admin.id,
-        username: admin.username,
-        email: admin.email,
-        role: admin.role
+      success: true,
+      data: {
+        token: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        user: {
+          id: admin.id,
+          name: admin.username,
+          email: admin.email,
+          role: admin.role
+        },
+        expiresIn: tokens.expiresIn
       },
-      tokens
+      message: 'Login successful'
     });
   } catch (error) {
     logger.error('Admin login error:', error);
@@ -640,5 +680,44 @@ exports.createAdmin = async (req, res) => {
   } catch (error) {
     logger.error('Create admin error:', error);
     res.status(500).json({ message: 'Server error while creating admin' });
+  }
+};
+
+/**
+ * Get admin profile
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+ exports.getAdminProfile = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  
+  try {
+    // Get admin from database using the ID from the JWT token
+    const adminResult = await db.query(
+      'SELECT id, username, email, role, created_at, last_login FROM admins WHERE id = $1',
+      [req.admin.id]
+    );
+    
+    if (adminResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+    
+    const admin = adminResult.rows[0];
+    
+    // Return admin profile data
+    res.status(200).json({
+      admin: {
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        role: admin.role,
+        createdAt: admin.created_at,
+        lastLogin: admin.last_login
+      }
+    });
+  } catch (error) {
+    logger.error('Get admin profile error:', error);
+    res.status(500).json({ message: 'Server error while retrieving admin profile' });
   }
 };

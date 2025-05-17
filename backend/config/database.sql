@@ -3,9 +3,11 @@
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
+  username VARCHAR(50) UNIQUE NOT NULL, -- Added username field for authentication
   name VARCHAR(255) NOT NULL,
   government_id VARCHAR(255) UNIQUE NOT NULL,
   email VARCHAR(255) UNIQUE,
+  password_hash VARCHAR(255), -- Added password hash for authentication
   phone VARCHAR(50),
   wallet_address VARCHAR(42),
   is_verified BOOLEAN DEFAULT FALSE,
@@ -66,8 +68,8 @@ CREATE TABLE IF NOT EXISTS professional_records (
 CREATE TABLE IF NOT EXISTS user_sessions (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(255) NOT NULL,
-  refresh_token VARCHAR(255),
+  token TEXT NOT NULL,
+  refresh_token TEXT,
   ip_address VARCHAR(45),
   user_agent TEXT,
   expires_at TIMESTAMP NOT NULL,
@@ -78,8 +80,8 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 CREATE TABLE IF NOT EXISTS admin_sessions (
   id SERIAL PRIMARY KEY,
   admin_id INTEGER REFERENCES admins(id) ON DELETE CASCADE,
-  token VARCHAR(255) NOT NULL,
-  refresh_token VARCHAR(255),
+  token TEXT NOT NULL,
+  refresh_token TEXT,
   ip_address VARCHAR(45),
   user_agent TEXT,
   expires_at TIMESTAMP NOT NULL,

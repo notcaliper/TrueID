@@ -19,7 +19,8 @@ exports.register = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { username, email, password, fullName, dateOfBirth, phoneNumber } = req.body;
+    const { username, fullName, email, password, government_id, phone } = req.body;
+    const name = fullName; // Use fullName as name for backward compatibility
     const db = req.app.locals.db;
 
     // Check if email already exists
@@ -34,25 +35,27 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: 'Username already taken' });
     }
 
-    // Hash password
+    // Check if government ID already exists
+    const govIdCheck = await db.query('SELECT * FROM users WHERE government_id = $1', [government_id]);
+    if (govIdCheck.rows.length > 0) {
+      return res.status(400).json({ message: 'Government ID already registered' });
+    }
+
+    // Hash password for secure storage
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create new user
     const result = await db.query(
-      'INSERT INTO users (username, email, password_hash, full_name, date_of_birth, phone_number) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, email, full_name, created_at',
-      [username, email, hashedPassword, fullName, dateOfBirth, phoneNumber]
+      'INSERT INTO users (username, government_id, name, email, password_hash, phone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, government_id, name, email, phone, created_at',
+      [username, government_id, name, email, hashedPassword, phone]
     );
 
-    // Assign user role
-    await db.query(
-      'INSERT INTO user_roles (user_id, role_id) VALUES ($1, (SELECT id FROM roles WHERE name = $2))',
-      [result.rows[0].id, 'user']
-    );
+    // No need to assign user role as we don't have a roles table in our schema
 
     // Create JWT token
     const token = jwt.sign(
-      { id: result.rows[0].id, username: result.rows[0].username },
+      { id: result.rows[0].id, username: result.rows[0].username, government_id: result.rows[0].government_id },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -63,8 +66,8 @@ exports.register = async (req, res) => {
     refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 30); // 30 days
 
     await db.query(
-      'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-      [result.rows[0].id, refreshToken, refreshTokenExpiry]
+      'INSERT INTO user_sessions (user_id, token, refresh_token, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5, $6)',
+      [result.rows[0].id, token, refreshToken, refreshTokenExpiry, req.ip, req.headers['user-agent']]
     );
 
     // Log the registration
@@ -85,8 +88,10 @@ exports.register = async (req, res) => {
       user: {
         id: result.rows[0].id,
         username: result.rows[0].username,
+        government_id: result.rows[0].government_id,
+        name: result.rows[0].name,
         email: result.rows[0].email,
-        fullName: result.rows[0].full_name,
+        phone: result.rows[0].phone,
         createdAt: result.rows[0].created_at
       },
       token,
