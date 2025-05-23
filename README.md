@@ -215,3 +215,59 @@ The system uses a hybrid architecture that combines:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Avalanche Integration
+
+The TrueID system can now be deployed on Avalanche C-Chain for production-ready identity management. This integration allows for:
+
+1. **Dual-blockchain approach**
+   - Pending IDs are stored on local blockchain for testing
+   - Verified IDs are stored on Avalanche (Fuji Testnet or Mainnet)
+
+2. **Deployment Options**
+   - Deploy to Fuji Testnet for testing (recommended)
+   - Deploy to Avalanche Mainnet for production (requires real AVAX)
+
+### Getting Started with Avalanche
+
+1. **Configure your environment**
+   ```
+   cp backend/.env.example backend/.env
+   ```
+   Edit the `.env` file and set:
+   - `ADMIN_PRIVATE_KEY` with your wallet's private key
+   - `SNOWTRACE_API_KEY` if you want to verify contracts
+
+2. **Use the Blockchain Manager**
+   ```
+   cd backend
+   node blockchain-manager.js
+   ```
+   Select option 9 for "Avalanche Management" and follow the prompts
+
+3. **Development Workflow**
+   - Start with local development (option 2)
+   - Deploy to Fuji Testnet for staging
+   - Deploy to Mainnet for production
+
+### Integration Details
+
+The system has been updated to make smart decisions based on the verification status:
+- Unverified users utilize the local blockchain
+- Verified users utilize the Avalanche blockchain
+
+### Network Information
+
+- **Fuji Testnet (C-Chain)**
+  - Network Name: Avalanche Fuji C-Chain
+  - RPC URL: https://api.avax-test.network/ext/bc/C/rpc
+  - ChainID: 43113
+  - Symbol: AVAX
+  - Block Explorer: https://testnet.snowtrace.io/
+
+- **Avalanche Mainnet (C-Chain)**
+  - Network Name: Avalanche C-Chain
+  - RPC URL: https://api.avax.network/ext/bc/C/rpc
+  - ChainID: 43114
+  - Symbol: AVAX
+  - Block Explorer: https://snowtrace.io/

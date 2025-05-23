@@ -15,7 +15,7 @@ dotenv.config();
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 // Middleware
 // Configure Helmet with adjusted settings for development
@@ -71,7 +71,7 @@ const pool = new Pool({
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : undefined,
+  port: process.env.DB_PORT,
 });
 
 // Test database connection
@@ -155,18 +155,41 @@ app.get('/api/test', (req, res) => {
 });
 
 // Network status endpoint
-app.get('/api/network/status', (req, res) => {
-  res.json({
-    success: true,
-    status: 'online',
-    network: process.env.BLOCKCHAIN_NETWORK || 'mumbai',
-    connections: {
-      database: true,
-      blockchain: true,
-      cache: true
-    },
-    timestamp: new Date().toISOString()
-  });
+app.get('/api/network/status', async (req, res) => {
+  const blockchainService = require('./services/blockchain.service');
+  
+  try {
+    // Get blockchain network information
+    const networkInfo = blockchainService.getNetworkInfo();
+    
+    // Check if contract is accessible
+    const contractStatus = await blockchainService.isContractAccessible();
+    
+    res.json({
+      success: true,
+      status: 'online',
+      network: {
+        name: networkInfo.network.networkName,
+        status: contractStatus.accessible ? 'online' : 'offline',
+        contractAddress: networkInfo.network.contractAddress,
+        error: contractStatus.error
+      },
+      connections: {
+        database: true,
+        blockchain: contractStatus.accessible,
+        cache: true
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Network status error:', error);
+    res.json({
+      success: false,
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Admin login endpoint for GET requests (for status checking)

@@ -1,13 +1,13 @@
 /**
  * Hardhat configuration for DBIS
- * Supports both local development and Polygon Mumbai testnet
+ * Configured for Avalanche Fuji Testnet (AVAX Testnet)
  */
 require('@nomiclabs/hardhat-waffle');
 require('@nomiclabs/hardhat-ethers');
 require('dotenv').config();
 
 // Load private key from .env file
-const PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000000';
+const PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000001';
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
@@ -29,24 +29,21 @@ module.exports = {
     artifacts: "./blockchain/artifacts"
   },
   networks: {
-    // Hardhat local network (default)
+    // Hardhat local network (for testing contract compilation only)
     hardhat: {
       chainId: 31337
     },
-    // Local development network
-    localhost: {
-      url: "http://127.0.0.1:8545",
-      chainId: 31337
-    },
-    // Polygon Mumbai testnet
-    polygon_mumbai: {
-      url: process.env.POLYGON_RPC_URL || "https://rpc-mumbai.maticvigil.com",
+    // Avalanche Fuji Testnet - main deployment target
+    avalanche_fuji: {
+      url: process.env.AVALANCHE_FUJI_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc",
       accounts: [PRIVATE_KEY],
-      chainId: 80001
+      chainId: 43113
     }
   },
-  // Etherscan API key for contract verification
+  // Contract verification is done manually through the Snowtrace interface
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY || ""
+    apiKey: {
+      avalancheFujiTestnet: ""
+    }
   }
 };
