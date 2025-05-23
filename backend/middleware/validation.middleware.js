@@ -71,28 +71,13 @@ exports.userLoginRules = [
  */
 exports.adminLoginRules = [
   body('username')
-    .optional()
     .trim()
     .isLength({ min: 3, max: 50 })
     .withMessage('Username must be between 3 and 50 characters'),
   
-  body('email')
-    .optional()
-    .isEmail()
-    .withMessage('Must provide a valid email address')
-    .normalizeEmail(),
-  
   body('password')
     .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters long'),
-    
-  // Custom validator to ensure either username or email is provided
-  body().custom(body => {
-    if (!(body.username || body.email)) {
-      throw new Error('Either username or email must be provided');
-    }
-    return true;
-  })
+    .withMessage('Password must be at least 8 characters long')
 ];
 
 /**

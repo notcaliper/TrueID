@@ -1,178 +1,197 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
-import { FaLock, FaUser, FaEnvelope, FaShieldAlt, FaServer, FaExclamationTriangle } from 'react-icons/fa';
-import { motion } from 'framer-motion';
-import ApiService from '../services/ApiService';
+import { FaUser, FaLock, FaEye, FaEyeSlash, FaExclamationCircle, FaShieldAlt, FaCode, FaToggleOn, FaToggleOff } from 'react-icons/fa';
 
 const Login = () => {
-  const [email, setEmail] = useState('admin@dbis.gov');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [apiStatus, setApiStatus] = useState({ checked: false, available: false });
-  const { login } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showDevOptions, setShowDevOptions] = useState(false);
+  const [devClickCount, setDevClickCount] = useState(0);
+  const { login, currentUser, devMode, toggleDevMode, enableDevMode } = useAuth();
   const navigate = useNavigate();
 
-  // Check API endpoint availability when component loads
+  // Redirect if already logged in
   useEffect(() => {
-    const checkApiStatus = async () => {
-      try {
-        const isAvailable = await ApiService.checkEndpointHealth('/admin/login');
-        setApiStatus({ checked: true, available: isAvailable });
-      } catch (error) {
-        setApiStatus({ checked: true, available: false });
-        console.error('API status check failed:', error);
-      }
-    };
+    if (currentUser) {
+      navigate('/dashboard');
+    }
+  }, [currentUser, navigate]);
 
-    checkApiStatus();
-  }, []);
+  // Reset dev click count after 3 seconds of inactivity
+  useEffect(() => {
+    if (devClickCount > 0) {
+      const timer = setTimeout(() => {
+        setDevClickCount(0);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [devClickCount]);
+
+  // Check for dev mode activation (5 rapid clicks on the logo)
+  const handleLogoClick = () => {
+    setDevClickCount(prevCount => {
+      const newCount = prevCount + 1;
+      if (newCount >= 5) {
+        setShowDevOptions(true);
+        return 0;
+      }
+      return newCount;
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate input
+    setIsLoading(true);
+    setError('');
+
     if (!email || !password) {
       setError('Please enter both email and password');
+      setIsLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
-      setError('');
-      console.log('Submitting login form with email:', email);
-
-      // Call the login method from AuthContext
       const result = await login(email, password);
-      console.log('Login result:', result);
-      
       if (result.success) {
-        // Redirect to admin dashboard on successful login
-        console.log('Login successful, redirecting to dashboard');
-        navigate('/admin/dashboard');
+        navigate('/dashboard');
       } else {
         setError(result.error || 'Invalid credentials. Please try again.');
       }
     } catch (err) {
-      console.error('Login error:', err);
-      setError('Login failed: ' + (err.message || 'Unknown error'));
+      setError('An error occurred. Please try again later.');
+      console.error(err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  const handleDevModeActivate = () => {
+    enableDevMode();
+    navigate('/dashboard');
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex justify-center items-center p-4">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="max-w-md w-full bg-white rounded-xl shadow-xl overflow-hidden"
-      >
-        <div className="p-8">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-800">DBIS Admin Portal</h2>
-            <p className="text-gray-600 mt-2">Decentralized Biometric Identity System</p>
-          </div>
-
-          {apiStatus.checked && !apiStatus.available && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded"
-            >
-              <div className="flex items-center">
-                <FaExclamationTriangle className="text-red-500 mr-2" />
-                <p className="text-sm text-red-600">
-                  API service is currently unavailable. Login might not work properly.
-                </p>
-              </div>
-            </motion.div>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <div className="space-y-5">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaEnvelope className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email"
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaLock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password"
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200"
-                >
-                  {error}
-                </motion.div>
-              )}
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="text-sm">
-                    <span className="text-indigo-600 hover:text-indigo-500 cursor-pointer">
-                      Forgot your password?
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <FaServer className={`${apiStatus.available ? 'text-green-500' : 'text-red-500'}`} />
-                  <span>{apiStatus.available ? 'Server online' : 'Server offline'}</span>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                  loading
-                    ? 'bg-indigo-300 cursor-not-allowed'
-                    : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-                }`}
-              >
-                {loading ? (
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <FaShieldAlt className="h-5 w-5 mr-2" />
-                )}
-                {loading ? 'Signing in...' : 'Sign in'}
-              </button>
+    <div className="login-container">
+      <div className="login-background">
+        <div className="login-shape"></div>
+        <div className="login-shape"></div>
+      </div>
+      
+      <div className="login-card">
+        <div className="login-header">
+          <div className="login-logo-container" onClick={handleLogoClick}>
+            <div className="login-logo-circle">
+              <span className="login-logo-text">DBIS</span>
             </div>
-          </form>
+          </div>
+          <h1 className="login-title">DBIS Government Portal</h1>
+          <p className="login-subtitle">Decentralized Biometric Identity System</p>
         </div>
-
-        <div className="bg-gray-50 py-4 px-8 border-t">
-          <p className="text-xs text-center text-gray-500">
-            Government of India · DBIS Administration · {new Date().getFullYear()}
+        
+        {error && (
+          <div className="error-message">
+            <FaExclamationCircle className="error-icon" />
+            {error}
+          </div>
+        )}
+        
+        <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group">
+            <label htmlFor="email" className="form-label">
+              <FaUser className="form-label-icon" />
+              Email Address
+            </label>
+            <div className="input-container">
+              <input
+                type="email"
+                id="email"
+                className="form-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                placeholder="Enter your government email"
+                autoComplete="email"
+                required
+              />
+              <span className="input-focus-border"></span>
+            </div>
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="password" className="form-label">
+              <FaLock className="form-label-icon" />
+              Password
+            </label>
+            <div className="input-container password-container">
+              <input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                className="form-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                placeholder="Enter your secure password"
+                autoComplete="current-password"
+                required
+              />
+              <button 
+                type="button" 
+                className="password-toggle" 
+                onClick={togglePasswordVisibility}
+                tabIndex="-1"
+              >
+                {showPassword ? <FaEyeSlash /> : <FaEye />}
+              </button>
+              <span className="input-focus-border"></span>
+            </div>
+          </div>
+          
+          <div className="form-actions">
+            <button type="submit" className="button button-primary">
+              {isLoading ? (
+                <>
+                  <div className="button-spinner"></div>
+                  <span>Logging in...</span>
+                </>
+              ) : (
+                <>
+                  <FaShieldAlt className="button-icon" />
+                  <span>Secure Login</span>
+                </>
+              )}
+            </button>
+            
+            <div className="dev-mode-divider"></div>
+            
+            <button 
+              type="button" 
+              className="dev-bypass-button"
+              onClick={handleDevModeActivate}
+            >
+              <FaCode className="dev-bypass-icon" />
+              <span>Developer Bypass</span>
+            </button>
+          </div>
+        </form>
+        
+        <div className="login-footer">
+          <p className="security-note">
+            <span className="security-icon">🔒</span>
+            <span>Secure Government Access Portal</span>
+          </p>
+          <p className="copyright">
+            &copy; {new Date().getFullYear()} Department of Identity Management
           </p>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };

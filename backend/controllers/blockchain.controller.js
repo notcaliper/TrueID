@@ -12,15 +12,10 @@ const blockchainService = require('../services/blockchain.service');
 exports.recordIdentityOnBlockchain = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
+  const { userId } = req.body;
   
-  // Extract userId either from body or from recordId in params
-  let userId;
-  if (req.body.userId) {
-    userId = req.body.userId;
-  } else if (req.params.recordId) {
-    userId = req.params.recordId; // Use recordId from URL as userId
-  } else {
-    return res.status(400).json({ message: 'User ID is required either in body or as recordId in URL' });
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required' });
   }
   
   try {
@@ -447,159 +442,6 @@ exports.verifyDocumentHash = async (req, res) => {
 };
 
 /**
- * Get all blockchain transactions
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-exports.getAllTransactions = async (req, res) => {
-  const db = req.app.locals.db;
-  const logger = req.app.locals.logger;
-  const { page = 1, limit = 10, type, status, startDate, endDate } = req.query;
-  
-  try {
-    // Build query with filters
-    let query = 'SELECT COUNT(*) FROM blockchain_transactions';
-    let whereClause = [];
-    let queryParams = [];
-    let paramIndex = 1;
-    
-    if (type) {
-      whereClause.push(`transaction_type = $${paramIndex}`);
-      queryParams.push(type);
-      paramIndex++;
-    }
-    
-    if (status) {
-      whereClause.push(`status = $${paramIndex}`);
-      queryParams.push(status);
-      paramIndex++;
-    }
-    
-    if (startDate) {
-      whereClause.push(`created_at >= $${paramIndex}`);
-      queryParams.push(startDate);
-      paramIndex++;
-    }
-    
-    if (endDate) {
-      whereClause.push(`created_at <= $${paramIndex}`);
-      queryParams.push(endDate);
-      paramIndex++;
-    }
-    
-    if (whereClause.length > 0) {
-      query += ' WHERE ' + whereClause.join(' AND ');
-    }
-    
-    // Count total transactions
-    const countResult = await db.query(query, queryParams);
-    const totalTransactions = parseInt(countResult.rows[0].count);
-    
-    // Get transactions with pagination
-    const offset = (page - 1) * limit;
-    
-    // Build main query
-    let mainQuery = `
-      SELECT bt.id, bt.user_id, bt.transaction_type, bt.transaction_hash, 
-             bt.block_number, bt.status, bt.data, bt.created_at, bt.updated_at,
-             u.name as user_name, u.government_id
-      FROM blockchain_transactions bt
-      LEFT JOIN users u ON bt.user_id = u.id
-    `;
-    
-    if (whereClause.length > 0) {
-      mainQuery += ' WHERE ' + whereClause.join(' AND ');
-    }
-    
-    mainQuery += ' ORDER BY bt.created_at DESC LIMIT $' + paramIndex + ' OFFSET $' + (paramIndex + 1);
-    queryParams.push(parseInt(limit), offset);
-    
-    const result = await db.query(mainQuery, queryParams);
-    
-    res.status(200).json({
-      success: true,
-      data: {
-        transactions: result.rows,
-        pagination: {
-          total: totalTransactions,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          pages: Math.ceil(totalTransactions / limit)
-        }
-      }
-    });
-  } catch (error) {
-    logger.error('Get all transactions error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error while retrieving blockchain transactions',
-      error: error.message
-    });
-  }
-};
-
-/**
- * Get details of a specific blockchain transaction
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-exports.getTransactionDetails = async (req, res) => {
-  const db = req.app.locals.db;
-  const logger = req.app.locals.logger;
-  const { txHash } = req.params;
-  
-  if (!txHash) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Transaction hash is required' 
-    });
-  }
-  
-  try {
-    // Get transaction from database
-    const dbResult = await db.query(
-      `SELECT bt.id, bt.user_id, bt.transaction_type, bt.transaction_hash, 
-              bt.block_number, bt.status, bt.data, bt.created_at, bt.updated_at,
-              u.name as user_name, u.government_id, u.wallet_address
-       FROM blockchain_transactions bt
-       LEFT JOIN users u ON bt.user_id = u.id
-       WHERE bt.transaction_hash = $1`,
-      [txHash]
-    );
-    
-    if (dbResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Transaction not found' 
-      });
-    }
-    
-    const transaction = dbResult.rows[0];
-    
-    // Get transaction details from blockchain
-    const blockchainDetails = await blockchainService.getTransactionDetails(txHash);
-    
-    // Combine database and blockchain data
-    const transactionDetails = {
-      ...transaction,
-      blockchain: blockchainDetails
-    };
-    
-    res.status(200).json({
-      success: true,
-      data: transactionDetails
-    });
-  } catch (error) {
-    logger.error('Get transaction details error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error while retrieving transaction details',
-      error: error.message
-    });
-  }
-};
-
-/**
  * Get blockchain transactions for a user
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -607,17 +449,8 @@ exports.getTransactionDetails = async (req, res) => {
 exports.getUserTransactions = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
-  const { userId } = req.params;
+  const userId = req.user.id;
   const { page = 1, limit = 10 } = req.query;
-  
-  // Check if user is authorized to view these transactions
-  const requestingUserId = req.user.id;
-  if (requestingUserId !== userId && !req.admin) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Not authorized to view these transactions' 
-    });
-  }
   
   try {
     // Count total transactions
@@ -641,23 +474,16 @@ exports.getUserTransactions = async (req, res) => {
     );
     
     res.status(200).json({
-      success: true,
-      data: {
-        transactions: result.rows,
-        pagination: {
-          total: totalTransactions,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          pages: Math.ceil(totalTransactions / limit)
-        }
+      transactions: result.rows,
+      pagination: {
+        total: totalTransactions,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(totalTransactions / limit)
       }
     });
   } catch (error) {
     logger.error('Get user transactions error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error while retrieving blockchain transactions',
-      error: error.message
-    });
+    res.status(500).json({ message: 'Server error while retrieving blockchain transactions' });
   }
 };

@@ -63,11 +63,4 @@ router.get('/logs', authenticateAdmin, adminController.getActivityLogs);
  */
 router.post('/create', authenticateAdmin, requireSuperAdmin, adminController.createAdmin);
 
-/**
- * @route GET /api/admin/profile
- * @desc Get admin profile
- * @access Admin
- */
-router.get('/profile', authenticateAdmin, adminController.getAdminProfile);
-
 module.exports = router;
