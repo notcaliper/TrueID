@@ -57,17 +57,9 @@ const verifyToken = (req, res, next) => {
 // Basic blockchain service implementation
 const blockchainService = {
   getBlockchainConfig: () => {
-    const network = process.env.BLOCKCHAIN_NETWORK || 'local';
-    let rpcUrl, contractAddress;
-    
-    if (network === 'local') {
-      rpcUrl = process.env.LOCAL_RPC_URL || 'http://127.0.0.1:8545';
-      contractAddress = process.env.LOCAL_CONTRACT_ADDRESS;
-    } else if (network === 'polygon') {
-      rpcUrl = process.env.POLYGON_RPC_URL || 'https://rpc-mumbai.maticvigil.com';
-      contractAddress = process.env.POLYGON_CONTRACT_ADDRESS;
-    }
-    
+    const network = process.env.BLOCKCHAIN_NETWORK || 'hardhat';
+    const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545';
+    const contractAddress = process.env.LOCAL_CONTRACT_ADDRESS;
     const privateKey = process.env.ADMIN_PRIVATE_KEY;
     
     return {

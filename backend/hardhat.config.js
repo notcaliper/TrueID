@@ -1,6 +1,6 @@
 /**
  * Hardhat configuration for DBIS
- * Supports both local development and Polygon Mumbai testnet
+ * Local development configuration
  */
 require('@nomiclabs/hardhat-waffle');
 require('@nomiclabs/hardhat-ethers');
@@ -37,12 +37,6 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545",
       chainId: 31337
-    },
-    // Polygon Mumbai testnet
-    polygon_mumbai: {
-      url: process.env.POLYGON_RPC_URL || "https://rpc-mumbai.maticvigil.com",
-      accounts: [PRIVATE_KEY],
-      chainId: 80001
     }
   },
   // Etherscan API key for contract verification
