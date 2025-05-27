@@ -12,31 +12,16 @@ const blockchainService = require('../services/blockchain.service');
 exports.recordIdentityOnBlockchain = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
+  const { userId } = req.body;
   
-  // Extract userId either from body or from recordId in params
-  let userId;
-  if (req.body.userId) {
-    userId = req.body.userId;
-  } else if (req.params.recordId) {
-    userId = req.params.recordId; // Use recordId from URL as userId
-  } else {
-    return res.status(400).json({ message: 'User ID is required either in body or as recordId in URL' });
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required' });
   }
   
   try {
-    // Check if contract is accessible
-    const contractStatus = await blockchainService.isContractAccessible();
-    if (!contractStatus.accessible) {
-      return res.status(503).json({ 
-        message: 'Blockchain service unavailable', 
-        details: contractStatus.error,
-        network: contractStatus.network
-      });
-    }
-    
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, government_id, wallet_address FROM users WHERE id = $1',
+      'SELECT id, name, government_id, wallet_address, is_verified FROM users WHERE id = $1',
       [userId]
     );
     
@@ -45,6 +30,17 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
     }
     
     const user = userResult.rows[0];
+    const isVerified = user.is_verified === true;
+    
+    // Check if contract is accessible
+    const contractStatus = await blockchainService.isContractAccessible(isVerified);
+    if (!contractStatus.accessible) {
+      return res.status(503).json({ 
+        message: 'Blockchain service unavailable', 
+        details: contractStatus.error,
+        network: contractStatus.network
+      });
+    }
     
     // Check if user has a wallet address
     if (!user.wallet_address) {
@@ -66,33 +62,39 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
     // Generate a hash for professional data (placeholder)
     const professionalDataHash = 'professional_data_hash_placeholder';
     
+    // Log network being used
+    logger.info(`Recording identity on ${isVerified ? 'Avalanche' : 'local'} blockchain for user ${userId}`);
+    
     // Record identity on blockchain
     const result = await blockchainService.registerIdentity(
       user.wallet_address,
       biometricData.facemesh_hash,
-      professionalDataHash
+      professionalDataHash,
+      isVerified
     );
     
     // Update biometric data with blockchain transaction hash
     await db.query(
-      'UPDATE biometric_data SET blockchain_tx_hash = $1 WHERE id = $2',
-      [result.transactionHash, biometricData.id]
+      'UPDATE biometric_data SET blockchain_tx_hash = $1, blockchain_network = $2 WHERE id = $3',
+      [result.transactionHash, result.network, biometricData.id]
     );
     
     // Record transaction in database
     await db.query(
       `INSERT INTO blockchain_transactions 
-         (user_id, transaction_type, transaction_hash, block_number, status, data)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+         (user_id, transaction_type, transaction_hash, block_number, status, network, data)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         userId,
         'IDENTITY_REGISTRATION',
         result.transactionHash,
         result.blockNumber,
         result.status,
+        result.network,
         JSON.stringify({
           walletAddress: user.wallet_address,
-          biometricId: biometricData.id
+          biometricId: biometricData.id,
+          isVerified: isVerified
         })
       ]
     );
@@ -110,18 +112,20 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
         JSON.stringify({
           transactionHash: result.transactionHash,
           blockNumber: result.blockNumber,
-          status: result.status
+          status: result.status,
+          network: result.network
         }),
         req.ip
       ]
     );
     
     res.status(200).json({
-      message: 'Identity recorded on blockchain successfully',
+      message: `Identity recorded on ${isVerified ? 'Avalanche' : 'local'} blockchain successfully`,
       transaction: {
         hash: result.transactionHash,
         blockNumber: result.blockNumber,
-        status: result.status
+        status: result.status,
+        network: result.network
       }
     });
   } catch (error) {
@@ -143,7 +147,7 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, government_id, wallet_address FROM users WHERE id = $1',
+      'SELECT id, name, government_id, wallet_address, is_verified FROM users WHERE id = $1',
       [userId]
     );
     
@@ -152,6 +156,7 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
     }
     
     const user = userResult.rows[0];
+    const isVerified = user.is_verified === true;
     
     // Check if user has a wallet address
     if (!user.wallet_address) {
@@ -159,21 +164,23 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
     }
     
     // Fetch identity from blockchain
-    const isRegistered = await blockchainService.isIdentityRegistered(user.wallet_address);
+    const isRegistered = await blockchainService.isIdentityRegistered(user.wallet_address, isVerified);
     
     if (!isRegistered) {
-      return res.status(404).json({ message: 'Identity not found on blockchain' });
+      return res.status(404).json({
+        message: `Identity not found on ${isVerified ? 'Avalanche' : 'local'} blockchain`
+      });
     }
     
-    const biometricHash = await blockchainService.getBiometricHash(user.wallet_address);
-    const isVerified = await blockchainService.isIdentityVerified(user.wallet_address);
-    const recordCount = await blockchainService.getProfessionalRecordCount(user.wallet_address);
+    const biometricHash = await blockchainService.getBiometricHash(user.wallet_address, isVerified);
+    const identityVerified = await blockchainService.isIdentityVerified(user.wallet_address, isVerified);
+    const recordCount = await blockchainService.getProfessionalRecordCount(user.wallet_address, isVerified);
     
     // Get records if any
     const records = [];
     for (let i = 0; i < recordCount; i++) {
       try {
-        const record = await blockchainService.getProfessionalRecord(user.wallet_address, i);
+        const record = await blockchainService.getProfessionalRecord(user.wallet_address, i, isVerified);
         records.push({
           index: i,
           ...record
@@ -182,6 +189,12 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
         logger.error(`Error fetching record at index ${i}:`, error);
       }
     }
+    
+    // Get blockchain network info
+    const networkInfo = blockchainService.getNetworkInfo();
+    const networkName = isVerified ? 
+      networkInfo.verifiedNetwork.networkName : 
+      networkInfo.pendingNetwork.networkName;
     
     // Log the action
     await db.query(
@@ -195,21 +208,23 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
         JSON.stringify({
           walletAddress: user.wallet_address,
           isRegistered,
-          isVerified,
-          recordCount
+          isVerified: identityVerified,
+          recordCount,
+          network: networkName
         }),
         req.ip
       ]
     );
     
     res.status(200).json({
-      message: 'Identity fetched from blockchain successfully',
+      message: `Identity fetched from ${isVerified ? 'Avalanche' : 'local'} blockchain successfully`,
       identity: {
         walletAddress: user.wallet_address,
         biometricHash,
-        isVerified,
+        isVerified: identityVerified,
         professionalRecordCount: recordCount,
-        professionalRecords: records
+        professionalRecords: records,
+        network: networkName
       }
     });
   } catch (error) {
@@ -229,9 +244,9 @@ exports.getUserBlockchainStatus = async (req, res) => {
   const userId = req.user.id;
   
   try {
-    // Get user wallet address
+    // Get user wallet address and verification status
     const userResult = await db.query(
-      'SELECT wallet_address FROM users WHERE id = $1',
+      'SELECT wallet_address, is_verified FROM users WHERE id = $1',
       [userId]
     );
     
@@ -240,43 +255,46 @@ exports.getUserBlockchainStatus = async (req, res) => {
     }
     
     const walletAddress = userResult.rows[0].wallet_address;
+    const isVerified = userResult.rows[0].is_verified === true;
     
     if (!walletAddress) {
       return res.status(400).json({ message: 'User does not have a wallet address' });
     }
     
+    // Get network info
+    const networkInfo = blockchainService.getNetworkInfo();
+    const network = isVerified ? 
+      networkInfo.verifiedNetwork.networkName : 
+      networkInfo.pendingNetwork.networkName;
+    
     // Get blockchain status
-    const isRegistered = await blockchainService.isIdentityRegistered(walletAddress);
+    const isRegistered = await blockchainService.isIdentityRegistered(walletAddress, isVerified);
+    const isIdentityVerified = isRegistered ? 
+      await blockchainService.isIdentityVerified(walletAddress, isVerified) : false;
     
-    if (!isRegistered) {
-      return res.status(200).json({
-        message: 'Identity not registered on blockchain',
-        identity: {
-          walletAddress,
-          isRegistered: false,
-          isVerified: false,
-          professionalRecordCount: 0
-        }
-      });
-    }
-    
-    const biometricHash = await blockchainService.getBiometricHash(walletAddress);
-    const isVerified = await blockchainService.isIdentityVerified(walletAddress);
-    const recordCount = await blockchainService.getProfessionalRecordCount(walletAddress);
+    // Get recent blockchain transactions
+    const transactionsResult = await db.query(
+      `SELECT transaction_hash, transaction_type, status, created_at, network
+       FROM blockchain_transactions
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 5`,
+      [userId]
+    );
     
     res.status(200).json({
-      message: 'Blockchain identity status retrieved successfully',
-      identity: {
+      status: {
         walletAddress,
-        biometricHash,
-        isRegistered: true,
-        isVerified,
-        professionalRecordCount: recordCount
-      }
+        isRegistered,
+        isVerified: isIdentityVerified,
+        network,
+        identityStatus: isIdentityVerified ? 'VERIFIED' : (isRegistered ? 'REGISTERED' : 'NOT_REGISTERED')
+      },
+      recentTransactions: transactionsResult.rows
     });
   } catch (error) {
     logger.error('Get user blockchain status error:', error);
-    res.status(500).json({ message: 'Server error while retrieving blockchain status' });
+    res.status(500).json({ message: 'Server error while fetching blockchain status' });
   }
 };
 
@@ -424,159 +442,6 @@ exports.verifyDocumentHash = async (req, res) => {
 };
 
 /**
- * Get all blockchain transactions
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-exports.getAllTransactions = async (req, res) => {
-  const db = req.app.locals.db;
-  const logger = req.app.locals.logger;
-  const { page = 1, limit = 10, type, status, startDate, endDate } = req.query;
-  
-  try {
-    // Build query with filters
-    let query = 'SELECT COUNT(*) FROM blockchain_transactions';
-    let whereClause = [];
-    let queryParams = [];
-    let paramIndex = 1;
-    
-    if (type) {
-      whereClause.push(`transaction_type = $${paramIndex}`);
-      queryParams.push(type);
-      paramIndex++;
-    }
-    
-    if (status) {
-      whereClause.push(`status = $${paramIndex}`);
-      queryParams.push(status);
-      paramIndex++;
-    }
-    
-    if (startDate) {
-      whereClause.push(`created_at >= $${paramIndex}`);
-      queryParams.push(startDate);
-      paramIndex++;
-    }
-    
-    if (endDate) {
-      whereClause.push(`created_at <= $${paramIndex}`);
-      queryParams.push(endDate);
-      paramIndex++;
-    }
-    
-    if (whereClause.length > 0) {
-      query += ' WHERE ' + whereClause.join(' AND ');
-    }
-    
-    // Count total transactions
-    const countResult = await db.query(query, queryParams);
-    const totalTransactions = parseInt(countResult.rows[0].count);
-    
-    // Get transactions with pagination
-    const offset = (page - 1) * limit;
-    
-    // Build main query
-    let mainQuery = `
-      SELECT bt.id, bt.user_id, bt.transaction_type, bt.transaction_hash, 
-             bt.block_number, bt.status, bt.data, bt.created_at, bt.updated_at,
-             u.name as user_name, u.government_id
-      FROM blockchain_transactions bt
-      LEFT JOIN users u ON bt.user_id = u.id
-    `;
-    
-    if (whereClause.length > 0) {
-      mainQuery += ' WHERE ' + whereClause.join(' AND ');
-    }
-    
-    mainQuery += ' ORDER BY bt.created_at DESC LIMIT $' + paramIndex + ' OFFSET $' + (paramIndex + 1);
-    queryParams.push(parseInt(limit), offset);
-    
-    const result = await db.query(mainQuery, queryParams);
-    
-    res.status(200).json({
-      success: true,
-      data: {
-        transactions: result.rows,
-        pagination: {
-          total: totalTransactions,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          pages: Math.ceil(totalTransactions / limit)
-        }
-      }
-    });
-  } catch (error) {
-    logger.error('Get all transactions error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error while retrieving blockchain transactions',
-      error: error.message
-    });
-  }
-};
-
-/**
- * Get details of a specific blockchain transaction
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-exports.getTransactionDetails = async (req, res) => {
-  const db = req.app.locals.db;
-  const logger = req.app.locals.logger;
-  const { txHash } = req.params;
-  
-  if (!txHash) {
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Transaction hash is required' 
-    });
-  }
-  
-  try {
-    // Get transaction from database
-    const dbResult = await db.query(
-      `SELECT bt.id, bt.user_id, bt.transaction_type, bt.transaction_hash, 
-              bt.block_number, bt.status, bt.data, bt.created_at, bt.updated_at,
-              u.name as user_name, u.government_id, u.wallet_address
-       FROM blockchain_transactions bt
-       LEFT JOIN users u ON bt.user_id = u.id
-       WHERE bt.transaction_hash = $1`,
-      [txHash]
-    );
-    
-    if (dbResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Transaction not found' 
-      });
-    }
-    
-    const transaction = dbResult.rows[0];
-    
-    // Get transaction details from blockchain
-    const blockchainDetails = await blockchainService.getTransactionDetails(txHash);
-    
-    // Combine database and blockchain data
-    const transactionDetails = {
-      ...transaction,
-      blockchain: blockchainDetails
-    };
-    
-    res.status(200).json({
-      success: true,
-      data: transactionDetails
-    });
-  } catch (error) {
-    logger.error('Get transaction details error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error while retrieving transaction details',
-      error: error.message
-    });
-  }
-};
-
-/**
  * Get blockchain transactions for a user
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -584,17 +449,8 @@ exports.getTransactionDetails = async (req, res) => {
 exports.getUserTransactions = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
-  const { userId } = req.params;
+  const userId = req.user.id;
   const { page = 1, limit = 10 } = req.query;
-  
-  // Check if user is authorized to view these transactions
-  const requestingUserId = req.user.id;
-  if (requestingUserId !== userId && !req.admin) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Not authorized to view these transactions' 
-    });
-  }
   
   try {
     // Count total transactions
@@ -618,23 +474,16 @@ exports.getUserTransactions = async (req, res) => {
     );
     
     res.status(200).json({
-      success: true,
-      data: {
-        transactions: result.rows,
-        pagination: {
-          total: totalTransactions,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          pages: Math.ceil(totalTransactions / limit)
-        }
+      transactions: result.rows,
+      pagination: {
+        total: totalTransactions,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(totalTransactions / limit)
       }
     });
   } catch (error) {
     logger.error('Get user transactions error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error while retrieving blockchain transactions',
-      error: error.message
-    });
+    res.status(500).json({ message: 'Server error while retrieving blockchain transactions' });
   }
 };

@@ -15,16 +15,6 @@ router.get('/identity-status', blockchainController.getIdentityStatus);
 router.post('/add-professional-record', blockchainController.addProfessionalRecord);
 router.get('/professional-records', blockchainController.getProfessionalRecords);
 
-// Push to blockchain endpoint - supports both HEAD and POST
-router.head('/push/:recordId', (req, res) => {
-  // Handle HEAD request (for preflight checks)
-  res.status(200).json({
-    success: true,
-    message: 'Blockchain push endpoint is available'
-  });
-});
-router.post('/push/:recordId', blockchainController.registerIdentity); // Reuse the registerIdentity function
-
 // Admin routes
 router.use('/admin', authMiddleware.hasRole('admin'));
 router.post('/admin/grant-role', blockchainController.grantRole);

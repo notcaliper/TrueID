@@ -43,38 +43,22 @@ const GOVERNMENT_ROLE = ethers.utils.id("GOVERNMENT");
 const ADMIN_ROLE = ethers.utils.id("ADMIN");
 
 /**
- * Get blockchain configuration based on selected network
+ * Get blockchain configuration - always use Avalanche Fuji Testnet
  * @returns {Object} Blockchain configuration
  */
 const getBlockchainConfig = () => {
-  const network = process.env.BLOCKCHAIN_NETWORK || 'local';
-  
-  // Configuration for local network
-  if (network === 'local') {
-    return {
-      rpcUrl: process.env.LOCAL_RPC_URL || 'http://127.0.0.1:8545',
-      contractAddress: process.env.LOCAL_CONTRACT_ADDRESS,
-      privateKey: process.env.ADMIN_PRIVATE_KEY,
-      networkName: 'Local Hardhat'
-    };
-  }
-  
-  // Configuration for Polygon Mumbai testnet
-  if (network === 'polygon') {
-    return {
-      rpcUrl: process.env.POLYGON_RPC_URL || 'https://rpc-mumbai.maticvigil.com',
-      contractAddress: process.env.POLYGON_CONTRACT_ADDRESS,
-      privateKey: process.env.ADMIN_PRIVATE_KEY,
-      networkName: 'Polygon Mumbai'
-    };
-  }
-  
-  // Default to local if network is not recognized
+  // Always use AVAX Fuji Testnet
+  const rpcUrl = process.env.AVALANCHE_FUJI_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc';
+  const contractAddress = process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS;
+  const chainId = 43113;
+  const networkName = 'Avalanche Fuji Testnet';
+
   return {
-    rpcUrl: process.env.LOCAL_RPC_URL || 'http://127.0.0.1:8545',
-    contractAddress: process.env.LOCAL_CONTRACT_ADDRESS,
+    rpcUrl,
+    contractAddress,
     privateKey: process.env.ADMIN_PRIVATE_KEY,
-    networkName: 'Local Hardhat'
+    networkName,
+    chainId
   };
 };
 
@@ -85,7 +69,7 @@ const getBlockchainConfig = () => {
 const initBlockchain = () => {
   try {
     const config = getBlockchainConfig();
-    const { rpcUrl, contractAddress, privateKey, networkName } = config;
+    const { rpcUrl, contractAddress, privateKey, networkName, chainId } = config;
     
     if (!rpcUrl) {
       throw new Error(`RPC URL is not defined for ${networkName} network`);
@@ -99,15 +83,20 @@ const initBlockchain = () => {
       throw new Error('ADMIN_PRIVATE_KEY is not defined in environment variables');
     }
     
+<<<<<<< HEAD
     // Create provider with explicit network configuration
     const provider = new ethers.providers.JsonRpcProvider(
       rpcUrl,
       {
         name: networkName,
-        chainId: networkName === 'Polygon Mumbai' ? 80001 : 31337,
+        chainId: chainId,
         ensAddress: null
       }
     );
+=======
+    // Create provider
+    const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+>>>>>>> parent of 645e0af (Merge pull request #4 from notcaliper/blockchain)
     
     // Create wallet
     const wallet = new ethers.Wallet(privateKey, provider);
@@ -134,57 +123,17 @@ exports.getNetworkInfo = () => {
   try {
     const config = getBlockchainConfig();
     return {
-      network: process.env.BLOCKCHAIN_NETWORK || 'local',
-      networkName: config.networkName,
-      rpcUrl: config.rpcUrl,
-      contractAddress: config.contractAddress
+      network: {
+        networkName: config.networkName,
+        rpcUrl: config.rpcUrl,
+        contractAddress: config.contractAddress
+      }
     };
   } catch (error) {
     console.error('Get network info error:', error);
     return {
-      network: 'unknown',
       error: error.message
     };
-  }
-};
-
-/**
- * Switch blockchain network
- * @param {String} network - Network to switch to ('local' or 'polygon')
- * @returns {Boolean} True if switch was successful
- */
-exports.switchNetwork = async (network) => {
-  try {
-    if (network !== 'local' && network !== 'polygon') {
-      throw new Error('Invalid network. Must be "local" or "polygon"');
-    }
-    
-    // Update .env file
-    const fs = require('fs');
-    const path = require('path');
-    const envPath = path.resolve(process.cwd(), '.env');
-    
-    if (fs.existsSync(envPath)) {
-      let envContent = fs.readFileSync(envPath, 'utf8');
-      
-      // Replace network setting
-      envContent = envContent.replace(
-        /BLOCKCHAIN_NETWORK=.*/,
-        `BLOCKCHAIN_NETWORK=${network}`
-      );
-      
-      fs.writeFileSync(envPath, envContent);
-      
-      // Update environment variable in current process
-      process.env.BLOCKCHAIN_NETWORK = network;
-      
-      return true;
-    } else {
-      throw new Error('.env file not found');
-    }
-  } catch (error) {
-    console.error('Switch network error:', error);
-    return false;
   }
 };
 
@@ -202,10 +151,11 @@ exports.isContractAccessible = async () => {
       network: networkName
     };
   } catch (error) {
-    console.error('Contract accessibility check error:', error);
+    console.error(`Contract accessibility check error:`, error);
     return {
       accessible: false,
-      error: error.message
+      error: error.message,
+      network: getBlockchainConfig().networkName
     };
   }
 };
@@ -247,9 +197,9 @@ exports.registerIdentity = async (walletAddress, biometricHash, professionalData
     
     // Create identity on blockchain
     const tx = await contract.createIdentity(
+      walletAddress,
       biometricHashBytes,
-      professionalDataHashBytes,
-      { gasLimit: 300000 }
+      professionalDataHashBytes
     );
     
     // Wait for transaction to be mined
@@ -263,7 +213,7 @@ exports.registerIdentity = async (walletAddress, biometricHash, professionalData
     };
   } catch (error) {
     console.error('Register identity error:', error);
-    throw new Error(`Failed to register identity on blockchain: ${error.message}`);
+    throw new Error('Failed to register identity on blockchain');
   }
 };
 
@@ -413,17 +363,11 @@ exports.verifyProfessionalRecord = async (walletAddress, recordIndex) => {
  */
 exports.getBiometricHash = async (walletAddress) => {
   try {
-    const { contract, networkName } = initBlockchain();
-    
-    // Call contract method
-    const biometricHashBytes = await contract.getBiometricHash(walletAddress);
-    
-    return {
-      biometricHash: biometricHashBytes,
-      network: networkName
-    };
+    const { contract } = initBlockchain();
+    const biometricHash = await contract.getBiometricHash(walletAddress);
+    return biometricHash;
   } catch (error) {
-    console.error('Get biometric hash from blockchain error:', error);
+    console.error('Get biometric hash error:', error);
     throw new Error('Failed to get biometric hash from blockchain');
   }
 };
@@ -431,22 +375,16 @@ exports.getBiometricHash = async (walletAddress) => {
 /**
  * Check if identity is verified on blockchain
  * @param {String} walletAddress - User's wallet address
- * @returns {Boolean} Verification status
+ * @returns {Boolean} True if identity is verified
  */
 exports.isIdentityVerified = async (walletAddress) => {
   try {
-    const { contract, networkName } = initBlockchain();
-    
-    // Call contract method
-    const isVerified = await contract.isIdentityVerified(walletAddress);
-    
-    return {
-      verified: isVerified,
-      network: networkName
-    };
+    const { contract } = initBlockchain();
+    const verified = await contract.isIdentityVerified(walletAddress);
+    return verified;
   } catch (error) {
-    console.error('Check identity verification on blockchain error:', error);
-    throw new Error('Failed to check identity verification on blockchain');
+    console.error('Check identity verification error:', error);
+    throw new Error('Failed to check if identity is verified on blockchain');
   }
 };
 
@@ -457,17 +395,11 @@ exports.isIdentityVerified = async (walletAddress) => {
  */
 exports.getProfessionalRecordCount = async (walletAddress) => {
   try {
-    const { contract, networkName } = initBlockchain();
-    
-    // Call contract method
+    const { contract } = initBlockchain();
     const count = await contract.getProfessionalRecordCount(walletAddress);
-    
-    return {
-      count: count.toNumber(),
-      network: networkName
-    };
+    return count.toNumber();
   } catch (error) {
-    console.error('Get professional record count from blockchain error:', error);
+    console.error('Get professional record count error:', error);
     throw new Error('Failed to get professional record count from blockchain');
   }
 };
@@ -476,26 +408,22 @@ exports.getProfessionalRecordCount = async (walletAddress) => {
  * Get professional record from blockchain
  * @param {String} walletAddress - User's wallet address
  * @param {Number} recordIndex - Index of the record
- * @returns {Object} Professional record details
+ * @returns {Object} Professional record
  */
 exports.getProfessionalRecord = async (walletAddress, recordIndex) => {
   try {
-    const { contract, networkName } = initBlockchain();
-    
-    // Call contract method
+    const { contract } = initBlockchain();
     const record = await contract.getProfessionalRecord(walletAddress, recordIndex);
-    
     return {
       dataHash: record.dataHash,
-      startDate: new Date(record.startDate.toNumber() * 1000),
-      endDate: record.endDate.toNumber() > 0 ? new Date(record.endDate.toNumber() * 1000) : null,
+      startDate: record.startDate.toNumber(),
+      endDate: record.endDate.toNumber(),
       verifier: record.verifier,
       isVerified: record.isVerified,
-      createdAt: new Date(record.createdAt.toNumber() * 1000),
-      network: networkName
+      createdAt: record.createdAt.toNumber()
     };
   } catch (error) {
-    console.error('Get professional record from blockchain error:', error);
+    console.error('Get professional record error:', error);
     throw new Error('Failed to get professional record from blockchain');
   }
 };
@@ -569,48 +497,5 @@ exports.verifyDocumentHash = async (hash) => {
   } catch (error) {
     console.error('Verify document hash error:', error);
     throw new Error('Failed to verify document hash on blockchain');
-  }
-};
-
-/**
- * Get transaction details from the blockchain
- * @param {String} txHash - Transaction hash
- * @returns {Object} Transaction details
- */
-exports.getTransactionDetails = async (txHash) => {
-  try {
-    const { provider, networkName } = initBlockchain();
-    
-    // Get transaction from blockchain
-    const transaction = await provider.getTransaction(txHash);
-    if (!transaction) {
-      throw new Error('Transaction not found on blockchain');
-    }
-    
-    // Get transaction receipt for additional details
-    const receipt = await provider.getTransactionReceipt(txHash);
-    
-    // Get block information
-    const block = await provider.getBlock(transaction.blockNumber);
-    
-    return {
-      hash: transaction.hash,
-      blockNumber: transaction.blockNumber,
-      blockHash: transaction.blockHash,
-      timestamp: block ? new Date(block.timestamp * 1000).toISOString() : null,
-      from: transaction.from,
-      to: transaction.to,
-      value: ethers.utils.formatEther(transaction.value),
-      gasPrice: ethers.utils.formatUnits(transaction.gasPrice, 'gwei'),
-      gasLimit: transaction.gasLimit.toString(),
-      gasUsed: receipt ? receipt.gasUsed.toString() : null,
-      nonce: transaction.nonce,
-      status: receipt ? (receipt.status === 1 ? 'success' : 'failed') : 'pending',
-      confirmations: transaction.confirmations,
-      network: networkName
-    };
-  } catch (error) {
-    console.error('Get transaction details error:', error);
-    throw new Error(`Failed to get transaction details: ${error.message}`);
   }
 };

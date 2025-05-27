@@ -1,13 +1,13 @@
 /**
  * Hardhat configuration for DBIS
- * Local development configuration
+ * Supports both local development and Polygon Mumbai testnet
  */
 require('@nomiclabs/hardhat-waffle');
 require('@nomiclabs/hardhat-ethers');
 require('dotenv').config();
 
 // Load private key from .env file
-const PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000000';
+const PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || '0x0000000000000000000000000000000000000000000000000000000000000001';
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
@@ -29,7 +29,7 @@ module.exports = {
     artifacts: "./blockchain/artifacts"
   },
   networks: {
-    // Hardhat local network (default)
+    // Hardhat local network (for testing contract compilation only)
     hardhat: {
       chainId: 31337
     },
@@ -37,10 +37,18 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545",
       chainId: 31337
+    },
+    // Polygon Mumbai testnet
+    polygon_mumbai: {
+      url: process.env.POLYGON_RPC_URL || "https://rpc-mumbai.maticvigil.com",
+      accounts: [PRIVATE_KEY],
+      chainId: 80001
     }
   },
-  // Etherscan API key for contract verification
+  // Contract verification is done manually through the Snowtrace interface
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY || ""
+    apiKey: {
+      avalancheFujiTestnet: ""
+    }
   }
 };

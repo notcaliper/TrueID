@@ -1,6 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { AuthProvider } from './utils/AuthContext';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './utils/AuthContext';
 
 // Pages
 import Login from './pages/Login';
@@ -8,20 +8,29 @@ import Dashboard from './pages/Dashboard';
 import RecordManagement from './pages/RecordManagement';
 import ActivityLogs from './pages/ActivityLogs';
 import Settings from './pages/Settings';
-import BlockchainHistory from './pages/BlockchainHistory';
-import Debug from './pages/Debug';
 
 // Components
 import MainLayout from './components/MainLayout';
-import PrivateRoute from './components/PrivateRoute';
 
-// Admin Layout wrapper
-const AdminLayout = () => {
-  return (
-    <MainLayout>
-      <Outlet />
-    </MainLayout>
-  );
+// Protected Route component
+const ProtectedRoute = ({ children }) => {
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner">
+          <div className="spinner"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <Navigate to="/login" />;
+  }
+
+  return children;
 };
 
 function App() {
@@ -29,31 +38,50 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Public routes */}
-          <Route path="/admin/login" element={<Login />} />
-          <Route path="/debug" element={<Debug />} />
+          <Route path="/login" element={<Login />} />
           
-          {/* Redirect root to admin dashboard */}
-          <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Dashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
           
-          {/* Legacy routes - redirect to new admin routes */}
-          <Route path="/login" element={<Navigate to="/admin/login" replace />} />
-          <Route path="/dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Dashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
           
-          {/* Protected admin routes */}
-          <Route element={<PrivateRoute />}>
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="records" element={<RecordManagement />} />
-              <Route path="blockchain" element={<BlockchainHistory />} />
-              <Route path="activity-logs" element={<ActivityLogs />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
-          </Route>
+          <Route path="/records" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <RecordManagement />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
           
-          {/* Redirect any unknown routes to admin dashboard */}
-          <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/activity-logs" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ActivityLogs />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <Settings />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Redirect any unknown routes to Dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>
     </AuthProvider>

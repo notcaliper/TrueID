@@ -2,15 +2,15 @@
  * Script to create a new admin user for DBIS
  * 
  * Usage:
- * node create-admin.js <username> <password> <email> <role>
+ * node create-admin.js
  * 
- * Example:
- * node create-admin.js govadmin Password123! govadmin@dbis.gov ADMIN
+ * The script will prompt for username, password, email, and role
  */
 
 require('dotenv').config({ path: '../.env' });
 const { Pool } = require('pg');
 const argon2 = require('argon2');
+const readline = require('readline');
 
 // Database configuration
 const pool = new Pool({
@@ -21,18 +21,92 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'postgres'
 });
 
-async function createAdmin(username, password, email, role = 'ADMIN') {
-  if (!username || !password || !email) {
-    console.error('Error: Username, password, and email are required');
-    process.exit(1);
-  }
+// Create readline interface
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 
-  // Validate role
-  const validRoles = ['ADMIN', 'SUPER_ADMIN'];
-  if (!validRoles.includes(role)) {
-    console.error(`Error: Role must be one of: ${validRoles.join(', ')}`);
-    process.exit(1);
+// Function to prompt user
+function prompt(question) {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      resolve(answer);
+    });
+  });
+}
+
+async function collectInput() {
+  try {
+    console.log('=== Create New Admin User ===');
+    
+    // Get username
+    let username = '';
+    while (!username) {
+      username = await prompt('Enter username: ');
+      if (!username) console.log('Username is required.');
+    }
+    
+    // Get password
+    let password = '';
+    while (!password) {
+      password = await prompt('Enter password: ');
+      if (!password) console.log('Password is required.');
+      
+      if (password.length < 8) {
+        console.log('Password must be at least 8 characters long.');
+        password = '';
+      }
+    }
+    
+    // Get email
+    let email = '';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    while (!email || !emailRegex.test(email)) {
+      email = await prompt('Enter email: ');
+      if (!email) {
+        console.log('Email is required.');
+      } else if (!emailRegex.test(email)) {
+        console.log('Please enter a valid email address.');
+        email = '';
+      }
+    }
+    
+    // Get role
+    const validRoles = ['ADMIN', 'SUPER_ADMIN'];
+    let role = '';
+    while (!validRoles.includes(role)) {
+      role = await prompt(`Enter role (${validRoles.join('/')}): `);
+      if (!role) {
+        role = 'ADMIN'; // Default role
+        console.log(`No role specified, using default role: ${role}`);
+      } else if (!validRoles.includes(role)) {
+        console.log(`Invalid role. Choose from: ${validRoles.join(', ')}`);
+      }
+    }
+    
+    // Confirm information
+    console.log('\nPlease confirm the information:');
+    console.log(`Username: ${username}`);
+    console.log(`Password: ${'*'.repeat(password.length)}`);
+    console.log(`Email: ${email}`);
+    console.log(`Role: ${role}`);
+    
+    const confirm = await prompt('\nCreate admin with this information? (y/n): ');
+    
+    if (confirm.toLowerCase() === 'y' || confirm.toLowerCase() === 'yes') {
+      return { username, password, email, role };
+    } else {
+      console.log('Admin creation cancelled.');
+      process.exit(0);
+    }
+  } finally {
+    rl.close();
   }
+}
+
+async function createAdmin(userData) {
+  const { username, password, email, role } = userData;
 
   try {
     // Check if username or email already exists
@@ -58,7 +132,7 @@ async function createAdmin(username, password, email, role = 'ADMIN') {
     );
 
     const newAdmin = result.rows[0];
-    console.log('Admin created successfully:');
+    console.log('\nAdmin created successfully:');
     console.log(`ID: ${newAdmin.id}`);
     console.log(`Username: ${newAdmin.username}`);
     console.log(`Email: ${newAdmin.email}`);
@@ -85,7 +159,7 @@ async function createAdmin(username, password, email, role = 'ADMIN') {
 
     console.log('\nLogin credentials:');
     console.log(`Username: ${username}`);
-    console.log(`Password: ${password}`);
+    console.log(`Password: ${'*'.repeat(password.length)}`);
     console.log('\nYou can now log in to the Government Admin Portal with these credentials.');
 
   } catch (error) {
@@ -97,11 +171,11 @@ async function createAdmin(username, password, email, role = 'ADMIN') {
   }
 }
 
-// Get command line arguments
-const args = process.argv.slice(2);
-const username = args[0];
-const password = args[1];
-const email = args[2];
-const role = args[3] || 'ADMIN';
+// Main function
+async function main() {
+  const userData = await collectInput();
+  await createAdmin(userData);
+}
 
-createAdmin(username, password, email, role);
+// Run the main function
+main();

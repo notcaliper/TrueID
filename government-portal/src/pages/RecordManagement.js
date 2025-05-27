@@ -1,460 +1,660 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { FaUserEdit, FaUserCheck, FaTimesCircle, FaExclamationTriangle, 
-         FaSearch, FaFilter, FaSpinner, FaEllipsisH, FaChevronLeft, 
-         FaChevronRight, FaServer } from 'react-icons/fa';
 import ApiService from '../services/ApiService';
 import UserDetailModal from '../components/UserDetailModal';
+import { FaSearch, FaEye, FaEdit, FaUserCheck, FaUserTimes, FaUserClock, FaChevronLeft, FaChevronRight, FaDatabase } from 'react-icons/fa';
 
 const RecordManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [apiAvailable, setApiAvailable] = useState(false);
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState('name'); // 'name', 'id', or 'facehash'
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [showModal, setShowModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({
-    status: '',
-    sortBy: 'dateCreated',
-    sortOrder: 'desc'
-  });
-  const [apiCheckPerformed, setApiCheckPerformed] = useState(false);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const usersPerPage = 10;
 
   useEffect(() => {
-    const checkApiHealth = async () => {
-      // Check if endpoint exists before attempting to fetch data
-      const isHealthy = await ApiService.checkEndpointHealth('/admin/users');
-      setApiAvailable(isHealthy);
-      setApiCheckPerformed(true);
-      
-      if (isHealthy) {
-        fetchUsers();
-      } else {
-        setLoading(false);
-      }
-    };
-    
-    checkApiHealth();
-  }, [currentPage, filters]);
+    fetchUsers();
+  }, [currentPage]);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const result = await ApiService.getUsers(
-        currentPage,
-        10,
-        {
-          search: searchQuery,
-          status: filters.status,
-          sortBy: filters.sortBy,
-          sortOrder: filters.sortOrder
-        }
-      );
-      
-      if (result.success) {
-        // Map database fields to frontend display fields
-        const mappedUsers = (result.data.users || []).map(user => ({
-          id: user.id,
-          name: user.name || 'Unknown',
-          email: user.email || 'N/A',
-          uniqueId: user.government_id || 'N/A',
-          location: user.location || (user.wallet_address ? `Wallet: ${user.wallet_address}` : 'Unknown location'),
-          status: user.verification_status?.toLowerCase() || user.status || 'unknown',
-          createdAt: user.created_at || user.createdAt,
-          has_biometric: user.has_biometric
-        }));
-        
-        setUsers(mappedUsers);
-        setTotalPages(result.data.totalPages || result.data.pagination?.pages || 1);
-      } else {
-        console.error('Failed to fetch users:', result.error);
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    } finally {
+      const data = await ApiService.getUsers(currentPage, usersPerPage, searchQuery, searchType);
+      setUsers(data.users);
+      setTotalPages(Math.ceil(data.total / usersPerPage));
+      setTotalUsers(data.total);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError('Failed to load users. Please try again.');
       setLoading(false);
     }
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
-    setCurrentPage(1); // Reset to first page
+    setCurrentPage(1); // Reset to first page on new search
     fetchUsers();
   };
 
-  const handleFilterChange = (filterKey, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [filterKey]: value
-    }));
-    setCurrentPage(1); // Reset to first page
+  const handleViewUser = (user) => {
+    setSelectedUser(user);
+    setIsModalOpen(true);
   };
 
-  const handleUserSelect = async (userId) => {
-    setSelectedUser(userId);
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
     setSelectedUser(null);
-    // Refresh user list after modal is closed to reflect any changes
-    fetchUsers();
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'verified':
-        return (
-          <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">
-            Verified
-          </span>
-        );
-      case 'pending':
-        return (
-          <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 font-medium">
-            Pending
-          </span>
-        );
-      case 'rejected':
-        return (
-          <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium">
-            Rejected
-          </span>
-        );
-      case 'onchain':
-        return (
-          <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800 font-medium">
-            On Blockchain
-          </span>
-        );
-      default:
-        return (
-          <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 font-medium">
-            {status || 'Unknown'}
-          </span>
-        );
+  const handleUserUpdated = (updatedUser) => {
+    // Update the user in the list
+    setUsers(users.map(user => 
+      user.id === updatedUser.id ? updatedUser : user
+    ));
+    setIsModalOpen(false);
+    setSelectedUser(null);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusDisplay = (status) => {
+    if (!status) return 'Unknown';
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  // Define styles object for animations
+  const styles = {
+    '@keyframes spin': {
+      '0%': { transform: 'rotate(0deg)' },
+      '100%': { transform: 'rotate(360deg)' }
+    },
+    '@keyframes shake': {
+      '0%, 100%': { transform: 'translateX(0)' },
+      '25%': { transform: 'translateX(-5px)' },
+      '75%': { transform: 'translateX(5px)' }
     }
   };
 
-  // Loading state - show skeleton loader
-  if (loading && !apiCheckPerformed) {
-    return (
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">User Records</h1>
-        </div>
-        <div className="bg-white rounded-xl shadow-md p-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-10 bg-gray-200 rounded w-full"></div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="h-8 bg-gray-200 rounded"></div>
-              <div className="h-8 bg-gray-200 rounded"></div>
-              <div className="h-8 bg-gray-200 rounded"></div>
-            </div>
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-12 bg-gray-200 rounded"></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // API unavailable state
-  if (!apiAvailable && apiCheckPerformed) {
-    return (
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">User Records</h1>
-          <div className="flex items-center text-red-500">
-            <FaServer className="mr-2" />
-            <span>API Unavailable</span>
-          </div>
-        </div>
+  // Add animation styles to head
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+      }
+      
+      @media (max-width: 1024px) {
+        .record-management {
+          padding: 16px;
+        }
         
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-md p-6 border border-gray-100"
-        >
-          <div className="flex flex-col items-center justify-center p-6">
-            <FaExclamationTriangle className="text-red-500 text-5xl mb-4" />
-            <h2 className="text-xl font-semibold mb-2">User Management API is unavailable</h2>
-            <p className="text-gray-600 text-center mb-4">
-              We're unable to connect to the User Management service. The server might be
-              down or experiencing issues.
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center"
-            >
-              <FaSpinner className="mr-2" />
-              Retry Connection
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
+        .page-header {
+          margin-bottom: 24px;
+        }
+      }
+      
+      @media (max-width: 768px) {
+        .record-management form {
+          flex-direction: column;
+        }
+        
+        .record-management .form-group {
+          width: 100%;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">User Records</h1>
+    <div className="record-management" style={{
+      padding: '32px',
+      backgroundColor: '#1a1a1a',
+      minHeight: '100vh',
+      color: '#e0e0e0',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    }}>
+      <div className="page-header" style={{
+        marginBottom: '32px'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          marginBottom: '24px'
+        }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            backgroundColor: '#2d2d2d',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid #404040'
+          }}>
+            <FaDatabase style={{ color: '#6366f1', fontSize: '20px' }} />
+          </div>
+          <div>
+            <h1 style={{
+              fontSize: '28px',
+              fontWeight: '600',
+              margin: '0 0 4px 0',
+              color: '#fff',
+              letterSpacing: '-0.5px'
+            }}>User Records</h1>
+            <p style={{
+              color: '#a3a3a3',
+              fontSize: '14px',
+              margin: '0'
+            }}>Manage and monitor user identities in the system</p>
+          </div>
+        </div>
         
-        <div className="flex items-center">
-          <div className={`mr-4 flex items-center ${apiAvailable ? 'text-green-500' : 'text-red-500'}`}>
-            <FaServer className="mr-1" />
-            <span className="text-sm">{apiAvailable ? 'API Online' : 'API Offline'}</span>
+        <form onSubmit={handleSearch} style={{
+          backgroundColor: '#2d2d2d',
+          padding: '24px',
+          borderRadius: '16px',
+          border: '1px solid #404040'
+        }}>
+          <div style={{
+            display: 'flex',
+            gap: '16px',
+            marginBottom: '16px'
+          }}>
+            <div style={{
+              flex: '0 0 200px'
+            }}>
+              <select 
+                value={searchType} 
+                onChange={(e) => setSearchType(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  backgroundColor: '#1a1a1a',
+                  border: '1px solid #404040',
+                  borderRadius: '12px',
+                  color: '#e0e0e0',
+                  fontSize: '14px',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  appearance: 'none',
+                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%236b7280\'%3E%3Cpath d=\'M7 10l5 5 5-5z\'/%3E%3C/svg%3E")',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 12px center',
+                  backgroundSize: '20px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <option value="name">Search by Name</option>
+                <option value="id">Search by ID</option>
+                <option value="facehash">Search by Facemesh Hash</option>
+              </select>
+            </div>
+            
+            <div style={{
+              flex: '1',
+              position: 'relative'
+            }}>
+              <input
+                type="text"
+                placeholder={`Search by ${searchType}...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px 12px 40px',
+                  backgroundColor: '#1a1a1a',
+                  border: '1px solid #404040',
+                  borderRadius: '12px',
+                  color: '#e0e0e0',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              />
+              <FaSearch style={{
+                position: 'absolute',
+                left: '14px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#6b7280'
+              }} />
+            </div>
+            
+            <button
+              type="submit"
+              style={{
+                backgroundColor: '#6366f1',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '12px 24px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+                ':hover': {
+                  backgroundColor: '#4f46e5'
+                }
+              }}
+            >
+              <FaSearch />
+              Search Records
+            </button>
           </div>
           
-          <button
-            onClick={fetchUsers}
-            disabled={loading || !apiAvailable}
-            className={`px-4 py-2 rounded-lg flex items-center ${
-              loading || !apiAvailable
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-indigo-600 text-white hover:bg-indigo-700'
-            }`}
-          >
-            {loading ? (
-              <>
-                <FaSpinner className="animate-spin mr-2" />
-                Loading...
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-4 h-4 mr-2"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                Refresh
-              </>
-            )}
-          </button>
-        </div>
+          {!loading && (
+            <div style={{
+              color: '#a3a3a3',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#34d399'
+              }}></span>
+              Showing {users.length} of {totalUsers} total users
+            </div>
+          )}
+        </form>
       </div>
-      
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100"
-      >
-        {/* Search and Filters */}
-        <div className="p-4 border-b border-gray-100">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <form onSubmit={handleSearch} className="md:col-span-2">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search by name, ID, or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <FaSearch className="absolute left-3 top-3 text-gray-400" />
-                <button
-                  type="submit"
-                  className="absolute right-2 top-2 px-2 py-1 bg-indigo-600 text-white rounded text-xs"
-                >
-                  Search
-                </button>
-              </div>
-            </form>
-            
-            <div>
-              <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">All Statuses</option>
-                <option value="verified">Verified</option>
-                <option value="pending">Pending</option>
-                <option value="rejected">Rejected</option>
-                <option value="onchain">On Blockchain</option>
-              </select>
-            </div>
-            
-            <div>
-              <select
-                value={`${filters.sortBy}-${filters.sortOrder}`}
-                onChange={(e) => {
-                  const [sortBy, sortOrder] = e.target.value.split('-');
-                  handleFilterChange('sortBy', sortBy);
-                  handleFilterChange('sortOrder', sortOrder);
-                }}
-                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="dateCreated-desc">Newest First</option>
-                <option value="dateCreated-asc">Oldest First</option>
-                <option value="name-asc">Name (A-Z)</option>
-                <option value="name-desc">Name (Z-A)</option>
-                <option value="status-asc">Status (A-Z)</option>
-              </select>
-            </div>
-          </div>
+
+      {error && (
+        <div style={{
+          backgroundColor: '#2c1519',
+          color: '#f87171',
+          padding: '16px',
+          borderRadius: '12px',
+          marginBottom: '24px',
+          fontSize: '14px',
+          border: '1px solid #451a1a',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          animation: 'shake 0.5s'
+        }}>
+          <FaExclamationCircle />
+          {error}
         </div>
-        
-        {/* User Table */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ID/Location
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Registration Date
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+      )}
+
+      <div style={{
+        backgroundColor: '#2d2d2d',
+        borderRadius: '16px',
+        overflow: 'hidden',
+        border: '1px solid #404040',
+        marginBottom: '24px'
+      }}>
+        <div style={{
+          overflowX: 'auto'
+        }}>
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '14px'
+          }}>
+            <thead>
+              <tr style={{
+                backgroundColor: '#262626'
+              }}>
+                <th style={{
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  color: '#e0e0e0',
+                  borderBottom: '2px solid #404040',
+                  whiteSpace: 'nowrap'
+                }}>Serial No.</th>
+                <th style={{
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  color: '#e0e0e0',
+                  borderBottom: '2px solid #404040',
+                  whiteSpace: 'nowrap'
+                }}>Name</th>
+                <th style={{
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  color: '#e0e0e0',
+                  borderBottom: '2px solid #404040',
+                  whiteSpace: 'nowrap'
+                }}>Unique ID</th>
+                <th style={{
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  color: '#e0e0e0',
+                  borderBottom: '2px solid #404040',
+                  whiteSpace: 'nowrap'
+                }}>Status</th>
+                <th style={{
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  color: '#e0e0e0',
+                  borderBottom: '2px solid #404040',
+                  whiteSpace: 'nowrap'
+                }}>Last Updated</th>
+                <th style={{
+                  padding: '16px',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  color: '#e0e0e0',
+                  borderBottom: '2px solid #404040',
+                  whiteSpace: 'nowrap'
+                }}>Actions</th>
               </tr>
             </thead>
-            
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {loading ? (
-                [...Array(5)].map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="h-4 bg-gray-200 rounded w-1/4 ml-auto"></div>
-                    </td>
-                  </tr>
-                ))
-              ) : users.length > 0 ? (
-                users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-800 font-semibold">
-                          {user.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{user.uniqueId || 'N/A'}</div>
-                      <div className="text-sm text-gray-500">{user.location || 'Unknown location'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(user.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Not available'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleUserSelect(user.id)}
-                          className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100"
-                        >
-                          <FaUserEdit className="w-4 h-4" />
-                        </button>
-                        {user.status === 'pending' && (
-                          <button
-                            onClick={() => handleUserSelect(user.id)}
-                            className="px-2 py-1 bg-green-50 text-green-600 rounded hover:bg-green-100"
-                          >
-                            <FaUserCheck className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button className="px-2 py-1 bg-gray-50 text-gray-600 rounded hover:bg-gray-100">
-                          <FaEllipsisH className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
                 <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
-                    No users found matching your criteria.
+                  <td colSpan="6" style={{
+                    padding: '48px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '16px'
+                    }}>
+                      <div style={{
+                        width: '40px',
+                        height: '40px',
+                        border: '3px solid rgba(99,102,241,0.1)',
+                        borderTopColor: '#6366f1',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }}></div>
+                      <span style={{ color: '#a3a3a3' }}>Loading records...</span>
+                    </div>
                   </td>
                 </tr>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{
+                    padding: '48px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '16px',
+                      color: '#a3a3a3'
+                    }}>
+                      <FaDatabase style={{ fontSize: '32px', opacity: '0.5' }} />
+                      <span>No records found</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                users.map((user, index) => (
+                  <tr key={user?.id || index} style={{
+                    borderBottom: '1px solid #404040',
+                    backgroundColor: index % 2 === 0 ? '#262626' : '#2d2d2d',
+                    transition: 'background-color 0.2s ease',
+                    ':hover': {
+                      backgroundColor: '#323232'
+                    }
+                  }}>
+                    <td style={{
+                      padding: '16px',
+                      color: '#e0e0e0',
+                      whiteSpace: 'nowrap'
+                    }}>{(currentPage - 1) * usersPerPage + index + 1}</td>
+                    <td style={{
+                      padding: '16px',
+                      color: '#e0e0e0',
+                      whiteSpace: 'nowrap'
+                    }}>{user?.name || 'N/A'}</td>
+                    <td style={{
+                      padding: '16px',
+                      color: '#e0e0e0',
+                      fontFamily: 'monospace',
+                      whiteSpace: 'nowrap'
+                    }}>{user?.uniqueId || 'N/A'}</td>
+                    <td style={{
+                      padding: '16px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        backgroundColor: user?.status === 'verified' ? 'rgba(16, 185, 129, 0.1)' :
+                                       user?.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' :
+                                       'rgba(245, 158, 11, 0.1)',
+                        color: user?.status === 'verified' ? '#34d399' :
+                               user?.status === 'rejected' ? '#f87171' :
+                               '#fbbf24',
+                        border: `1px solid ${user?.status === 'verified' ? 'rgba(16, 185, 129, 0.2)' :
+                                           user?.status === 'rejected' ? 'rgba(239, 68, 68, 0.2)' :
+                                           'rgba(245, 158, 11, 0.2)'}`,
+                        transition: 'all 0.2s ease'
+                      }}>
+                        {user?.status === 'verified' && <FaUserCheck />}
+                        {user?.status === 'rejected' && <FaUserTimes />}
+                        {(!user?.status || user.status === 'pending') && <FaUserClock />}
+                        <span>{getStatusDisplay(user?.status || 'pending')}</span>
+                      </div>
+                    </td>
+                    <td style={{
+                      padding: '16px',
+                      color: '#a3a3a3',
+                      whiteSpace: 'nowrap'
+                    }}>{user?.lastUpdated ? formatDate(user.lastUpdated) : 'N/A'}</td>
+                    <td style={{
+                      padding: '16px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        gap: '8px'
+                      }}>
+                        <button
+                          onClick={() => handleViewUser(user)}
+                          style={{
+                            backgroundColor: '#374151',
+                            color: '#6366f1',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            ':hover': {
+                              backgroundColor: '#4b5563',
+                              transform: 'translateY(-1px)'
+                            }
+                          }}
+                          title="View Details"
+                        >
+                          <FaEye />
+                        </button>
+                        <button
+                          onClick={() => handleViewUser({...user, isEdit: true})}
+                          style={{
+                            backgroundColor: '#374151',
+                            color: '#6366f1',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            ':hover': {
+                              backgroundColor: '#4b5563',
+                              transform: 'translateY(-1px)'
+                            }
+                          }}
+                          title="Edit User"
+                        >
+                          <FaEdit />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
-        
-        {/* Pagination */}
-        {users.length > 0 && totalPages > 1 && (
-          <div className="p-4 border-t border-gray-100 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
-              Showing page {currentPage} of {totalPages}
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 rounded-md flex items-center ${
-                  currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <FaChevronLeft className="mr-1 w-3 h-3" />
-                Previous
-              </button>
-              
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 rounded-md flex items-center ${
-                  currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Next
-                <FaChevronRight className="ml-1 w-3 h-3" />
-              </button>
-            </div>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '20px',
+          backgroundColor: '#2d2d2d',
+          borderRadius: '16px',
+          border: '1px solid #404040'
+        }}>
+          <div style={{
+            color: '#a3a3a3',
+            fontSize: '14px'
+          }}>
+            Page {currentPage} of {totalPages}
           </div>
-        )}
-      </motion.div>
-      
+          
+          <div style={{
+            display: 'flex',
+            gap: '8px'
+          }}>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                backgroundColor: currentPage === 1 ? '#262626' : '#374151',
+                border: '1px solid #404040',
+                borderRadius: '12px',
+                color: currentPage === 1 ? '#6b7280' : '#e0e0e0',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                ':hover': currentPage !== 1 && {
+                  backgroundColor: '#4b5563',
+                  transform: 'translateY(-1px)'
+                }
+              }}
+            >
+              <FaChevronLeft />
+              <span>Previous</span>
+            </button>
+            
+            <div style={{
+              display: 'flex',
+              gap: '4px'
+            }}>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    style={{
+                      minWidth: '40px',
+                      padding: '10px',
+                      backgroundColor: currentPage === pageNum ? '#6366f1' : '#374151',
+                      border: '1px solid #404040',
+                      borderRadius: '12px',
+                      color: currentPage === pageNum ? '#fff' : '#e0e0e0',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      ':hover': currentPage !== pageNum && {
+                        backgroundColor: '#4b5563',
+                        transform: 'translateY(-1px)'
+                      }
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                backgroundColor: currentPage === totalPages ? '#262626' : '#374151',
+                border: '1px solid #404040',
+                borderRadius: '12px',
+                color: currentPage === totalPages ? '#6b7280' : '#e0e0e0',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                ':hover': currentPage !== totalPages && {
+                  backgroundColor: '#4b5563',
+                  transform: 'translateY(-1px)'
+                }
+              }}
+            >
+              <span>Next</span>
+              <FaChevronRight />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* User Detail Modal */}
-      {showModal && selectedUser && (
+      {isModalOpen && selectedUser && (
         <UserDetailModal
-          userId={selectedUser}
-          onClose={closeModal}
+          user={selectedUser}
+          onClose={handleCloseModal}
+          onUserUpdated={handleUserUpdated}
         />
       )}
     </div>
