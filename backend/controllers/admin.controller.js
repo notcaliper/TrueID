@@ -642,3 +642,415 @@ exports.createAdmin = async (req, res) => {
     res.status(500).json({ message: 'Server error while creating admin' });
   }
 };
+
+/**
+ * Get dashboard statistics
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getDashboardStats = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  
+  try {
+    // Get total users count
+    const usersCountResult = await db.query('SELECT COUNT(*) FROM users');
+    const totalUsers = parseInt(usersCountResult.rows[0].count);
+    
+    // Get verified users count
+    const verifiedUsersResult = await db.query(
+      "SELECT COUNT(*) FROM users WHERE verification_status = 'VERIFIED'"
+    );
+    const verifiedUsers = parseInt(verifiedUsersResult.rows[0].count);
+    
+    // Get pending users count
+    const pendingUsersResult = await db.query(
+      "SELECT COUNT(*) FROM users WHERE verification_status = 'PENDING'"
+    );
+    const pendingUsers = parseInt(pendingUsersResult.rows[0].count);
+    
+    // Get rejected users count
+    const rejectedUsersResult = await db.query(
+      "SELECT COUNT(*) FROM users WHERE verification_status = 'REJECTED'"
+    );
+    const rejectedUsers = parseInt(rejectedUsersResult.rows[0].count);
+    
+    // Get total biometric records count
+    const biometricResult = await db.query('SELECT COUNT(*) FROM biometric_data');
+    const totalBiometricRecords = parseInt(biometricResult.rows[0].count);
+    
+    // Get total professional records count
+    const professionalResult = await db.query('SELECT COUNT(*) FROM professional_records');
+    const totalProfessionalRecords = parseInt(professionalResult.rows[0].count);
+    
+    // Get total blockchain transactions count
+    const blockchainResult = await db.query('SELECT COUNT(*) FROM blockchain_transactions');
+    const totalBlockchainTransactions = parseInt(blockchainResult.rows[0].count);
+    
+    // Get recent activity (last 5 audit logs)
+    const recentActivityResult = await db.query(
+      `SELECT l.id, l.action, l.entity_type, l.created_at,
+              u.name as user_name, u.government_id,
+              a.username as admin_username
+       FROM audit_logs l
+       LEFT JOIN users u ON l.user_id = u.id
+       LEFT JOIN admins a ON l.admin_id = a.id
+       ORDER BY l.created_at DESC
+       LIMIT 5`
+    );
+    
+    // Get user registration trend (last 7 days)
+    const registrationTrendResult = await db.query(
+      `SELECT DATE(created_at) as date, COUNT(*) as count
+       FROM users
+       WHERE created_at >= NOW() - INTERVAL '7 days'
+       GROUP BY DATE(created_at)
+       ORDER BY date ASC`
+    );
+    
+    res.status(200).json({
+      userStats: {
+        total: totalUsers,
+        verified: verifiedUsers,
+        pending: pendingUsers,
+        rejected: rejectedUsers
+      },
+      recordStats: {
+        biometricRecords: totalBiometricRecords,
+        professionalRecords: totalProfessionalRecords,
+        blockchainTransactions: totalBlockchainTransactions
+      },
+      recentActivity: recentActivityResult.rows,
+      registrationTrend: registrationTrendResult.rows
+    });
+  } catch (error) {
+    logger.error('Get dashboard stats error:', error);
+    res.status(500).json({ message: 'Server error while retrieving dashboard statistics' });
+  }
+};
+
+/**
+ * Get admin profile
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getAdminProfile = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  
+  try {
+    const adminId = req.admin.id;
+    
+    // Get admin details
+    const adminResult = await db.query(
+      'SELECT id, username, email, role, is_active, last_login, created_at, updated_at FROM admins WHERE id = $1',
+      [adminId]
+    );
+    
+    if (adminResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+    
+    // Get admin activity count
+    const activityCountResult = await db.query(
+      'SELECT COUNT(*) FROM audit_logs WHERE admin_id = $1',
+      [adminId]
+    );
+    
+    const activityCount = parseInt(activityCountResult.rows[0].count);
+    
+    res.status(200).json({
+      admin: adminResult.rows[0],
+      activityCount
+    });
+  } catch (error) {
+    logger.error('Get admin profile error:', error);
+    res.status(500).json({ message: 'Server error while retrieving admin profile' });
+  }
+};
+
+/**
+ * Update admin profile
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.updateAdminProfile = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { email } = req.body;
+  
+  try {
+    const adminId = req.admin.id;
+    
+    // Check if admin exists
+    const adminResult = await db.query(
+      'SELECT email FROM admins WHERE id = $1',
+      [adminId]
+    );
+    
+    if (adminResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+    
+    // Check if email is already in use by another admin
+    if (email && email !== adminResult.rows[0].email) {
+      const emailCheckResult = await db.query(
+        'SELECT id FROM admins WHERE email = $1 AND id != $2',
+        [email, adminId]
+      );
+      
+      if (emailCheckResult.rows.length > 0) {
+        return res.status(409).json({ message: 'Email already in use by another admin' });
+      }
+    }
+    
+    // Update admin information
+    const updateResult = await db.query(
+      `UPDATE admins 
+       SET email = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, username, email, role, is_active, updated_at`,
+      [email || adminResult.rows[0].email, adminId]
+    );
+    
+    // Log the update action
+    await db.query(
+      `INSERT INTO audit_logs (admin_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        adminId,
+        'ADMIN_PROFILE_UPDATED',
+        'admins',
+        adminId,
+        JSON.stringify({
+          email: email !== adminResult.rows[0].email ? { from: adminResult.rows[0].email, to: email } : undefined
+        }),
+        req.ip
+      ]
+    );
+    
+    res.status(200).json({
+      message: 'Admin profile updated successfully',
+      admin: updateResult.rows[0]
+    });
+  } catch (error) {
+    logger.error('Update admin profile error:', error);
+    res.status(500).json({ message: 'Server error while updating admin profile' });
+  }
+};
+
+/**
+ * Change admin password
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.changeAdminPassword = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { currentPassword, newPassword } = req.body;
+  
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ message: 'Current password and new password are required' });
+  }
+  
+  if (newPassword.length < 8) {
+    return res.status(400).json({ message: 'New password must be at least 8 characters long' });
+  }
+  
+  try {
+    const adminId = req.admin.id;
+    
+    // Get admin details
+    const adminResult = await db.query(
+      'SELECT password FROM admins WHERE id = $1',
+      [adminId]
+    );
+    
+    if (adminResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+    
+    // Verify current password
+    const isPasswordValid = await argon2.verify(adminResult.rows[0].password, currentPassword);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+    
+    // Hash new password
+    const hashedPassword = await argon2.hash(newPassword);
+    
+    // Update password
+    await db.query(
+      'UPDATE admins SET password = $1, updated_at = NOW() WHERE id = $2',
+      [hashedPassword, adminId]
+    );
+    
+    // Log the password change
+    await db.query(
+      `INSERT INTO audit_logs (admin_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        adminId,
+        'ADMIN_PASSWORD_CHANGED',
+        'admins',
+        adminId,
+        JSON.stringify({}),
+        req.ip
+      ]
+    );
+    
+    // Invalidate all existing sessions except the current one
+    await db.query(
+      'DELETE FROM admin_sessions WHERE admin_id = $1 AND token != $2',
+      [adminId, req.token]
+    );
+    
+    res.status(200).json({
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    logger.error('Change admin password error:', error);
+    res.status(500).json({ message: 'Server error while changing password' });
+  }
+};
+
+/**
+ * Deactivate user
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.deactivateUser = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const userId = req.params.id;
+  const { reason } = req.body;
+  
+  try {
+    // Check if user exists
+    const userResult = await db.query(
+      'SELECT id, name, government_id, is_active FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // If user is already inactive
+    if (user.is_active === false) {
+      return res.status(400).json({ message: 'User is already inactive' });
+    }
+    
+    // Update user status
+    await db.query(
+      'UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1',
+      [userId]
+    );
+    
+    // Invalidate all user sessions
+    await db.query(
+      'DELETE FROM user_sessions WHERE user_id = $1',
+      [userId]
+    );
+    
+    // Log the deactivation
+    await db.query(
+      `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        req.admin.id,
+        userId,
+        'USER_DEACTIVATED',
+        'users',
+        userId,
+        JSON.stringify({
+          reason: reason || 'No reason provided',
+          governmentId: user.government_id
+        }),
+        req.ip
+      ]
+    );
+    
+    res.status(200).json({
+      message: 'User deactivated successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        governmentId: user.government_id,
+        isActive: false
+      }
+    });
+  } catch (error) {
+    logger.error('Deactivate user error:', error);
+    res.status(500).json({ message: 'Server error while deactivating user' });
+  }
+};
+
+/**
+ * Reactivate user
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.reactivateUser = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const userId = req.params.id;
+  
+  try {
+    // Check if user exists
+    const userResult = await db.query(
+      'SELECT id, name, government_id, is_active FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // If user is already active
+    if (user.is_active === true) {
+      return res.status(400).json({ message: 'User is already active' });
+    }
+    
+    // Update user status
+    await db.query(
+      'UPDATE users SET is_active = true, updated_at = NOW() WHERE id = $1',
+      [userId]
+    );
+    
+    // Log the reactivation
+    await db.query(
+      `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        req.admin.id,
+        userId,
+        'USER_REACTIVATED',
+        'users',
+        userId,
+        JSON.stringify({
+          governmentId: user.government_id
+        }),
+        req.ip
+      ]
+    );
+    
+    res.status(200).json({
+      message: 'User reactivated successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        governmentId: user.government_id,
+        isActive: true
+      }
+    });
+  } catch (error) {
+    logger.error('Reactivate user error:', error);
+    res.status(500).json({ message: 'Server error while reactivating user' });
+  }
+};

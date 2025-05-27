@@ -38,71 +38,60 @@ const Dashboard = () => {
     return () => clearInterval(refreshInterval);
   }, []);
 
-  // Mock data for dashboard
-  const mockData = {
-    totalUsers: 1248,
-    verifiedUsers: 876,
-    pendingUsers: 289,
-    rejectedUsers: 83,
-    lastUpdated: new Date(),
-    trends: {
-      totalChange: 42,
-      verifiedChange: 28,
-      pendingChange: -15,
-      rejectedChange: -3
+  // Initial empty state for dashboard data
+  const initialDashboardState = {
+    userStats: {
+      total: 0,
+      verified: 0,
+      pending: 0,
+      rejected: 0
     },
-    recentActivities: [
-      {
-        id: 1,
-        action: 'User Verified',
-        timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-        userName: 'Rahul Sharma',
-        userId: 'ID-78945612',
-        adminName: 'Admin Singh',
-        txHash: '0x7d5c9b6c8f4a3d2e1b0a7c6b5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e'
-      },
-      {
-        id: 2,
-        action: 'Biometric Updated',
-        timestamp: new Date(Date.now() - 1000 * 60 * 120), // 2 hours ago
-        userName: 'Priya Patel',
-        userId: 'ID-45678912',
-        adminName: 'Admin Singh',
-        txHash: '0x3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2'
-      },
-      {
-        id: 3,
-        action: 'User Rejected',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
-        userName: 'Amit Kumar',
-        userId: 'ID-12345678',
-        adminName: 'Supervisor Gupta',
-        txHash: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2'
-      },
-      {
-        id: 4,
-        action: 'User Verified',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-        userName: 'Neha Verma',
-        userId: 'ID-98765432',
-        adminName: 'Supervisor Gupta',
-        txHash: '0x5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4'
-      }
-    ]
+    recordStats: {
+      biometricRecords: 0,
+      professionalRecords: 0,
+      blockchainTransactions: 0
+    },
+    recentActivity: [],
+    registrationTrend: [],
+    lastUpdated: new Date()
   };
 
   const fetchDashboardData = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Get dashboard statistics from API
+      const response = await ApiService.getDashboardStats();
+      const data = response.data || response;
       
-      // Use mock data instead of API call
-      // const data = await ApiService.getDashboardStats();
-      const data = {...mockData, lastUpdated: new Date()};
+      console.log('Dashboard data received:', data);
       
-      setStats(data);
+      // Transform API data to match our state structure
+      // Handle both possible response formats
+      const transformedData = {
+        totalUsers: data.userStats?.total || 0,
+        verifiedUsers: data.userStats?.verified || 0,
+        pendingUsers: data.userStats?.pending || 0,
+        rejectedUsers: data.userStats?.rejected || 0,
+        lastUpdated: new Date(),
+        trends: {
+          totalChange: 0, // We'll calculate this when we have previous data
+          verifiedChange: 0,
+          pendingChange: 0,
+          rejectedChange: 0
+        },
+        recentActivities: (data.recentActivity || []).map(activity => ({
+          id: activity.id || Math.random().toString(36).substr(2, 9),
+          action: activity.action,
+          timestamp: new Date(activity.created_at || activity.timestamp || Date.now()),
+          userName: activity.user_name || activity.userName || 'Unknown User',
+          userId: activity.government_id || activity.userId || '-',
+          adminName: activity.admin_username || activity.adminName || currentUser?.username || 'System',
+          txHash: activity.details?.transactionHash || activity.txHash
+        }))
+      };
+      
+      setStats(transformedData);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -116,74 +105,75 @@ const Dashboard = () => {
       // Silent refresh doesn't show loading indicator
       setRefreshing(true);
       try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // Get fresh data from API
+        const response = await ApiService.getDashboardStats();
+        const data = response.data || response;
         
-        // Use mock data with slight variations to simulate changes
-        const updatedMockData = {
-          ...mockData,
-          totalUsers: mockData.totalUsers + Math.floor(Math.random() * 5),
-          verifiedUsers: mockData.verifiedUsers + Math.floor(Math.random() * 3),
-          pendingUsers: Math.max(0, mockData.pendingUsers - Math.floor(Math.random() * 2)),
+        // Transform API data to match our state structure
+        const transformedData = {
+          totalUsers: data.userStats?.total || 0,
+          verifiedUsers: data.userStats?.verified || 0,
+          pendingUsers: data.userStats?.pending || 0,
+          rejectedUsers: data.userStats?.rejected || 0,
           lastUpdated: new Date(),
           trends: {
-            ...mockData.trends,
-            totalChange: mockData.trends.totalChange + Math.floor(Math.random() * 3) - 1
-          }
+            totalChange: (data.userStats?.total || 0) - stats.totalUsers,
+            verifiedChange: (data.userStats?.verified || 0) - stats.verifiedUsers,
+            pendingChange: (data.userStats?.pending || 0) - stats.pendingUsers,
+            rejectedChange: (data.userStats?.rejected || 0) - stats.rejectedUsers
+          },
+          recentActivities: (data.recentActivity || []).map(activity => ({
+            id: activity.id || Math.random().toString(36).substr(2, 9),
+            action: activity.action,
+            timestamp: new Date(activity.created_at || activity.timestamp || Date.now()),
+            userName: activity.user_name || activity.userName || 'Unknown User',
+            userId: activity.government_id || activity.userId || '-',
+            adminName: activity.admin_username || activity.adminName || currentUser?.username || 'System',
+            txHash: activity.details?.transactionHash || activity.txHash
+          }))
         };
         
-        setStats(updatedMockData);
+        setStats(transformedData);
       } catch (err) {
-        console.error('Error refreshing dashboard data:', err);
-        // Don't show error for silent refresh
+        // Silent refresh doesn't show errors
+        console.error('Error during silent refresh:', err);
       } finally {
         setRefreshing(false);
       }
     } else {
-      // Regular refresh with loading indicator
+      // Regular refresh shows loading state
       setRefreshing(true);
       setLoading(true);
       try {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        // Get fresh data from API
+        const response = await ApiService.getDashboardStats();
+        const data = response.data || response;
         
-        // Use mock data with variations to simulate changes
-        const updatedMockData = {
-          ...mockData,
-          totalUsers: mockData.totalUsers + Math.floor(Math.random() * 10),
-          verifiedUsers: mockData.verifiedUsers + Math.floor(Math.random() * 7),
-          pendingUsers: Math.max(0, mockData.pendingUsers - Math.floor(Math.random() * 5)),
-          rejectedUsers: mockData.rejectedUsers + Math.floor(Math.random() * 2),
+        // Transform API data to match our state structure
+        const transformedData = {
+          totalUsers: data.userStats?.total || 0,
+          verifiedUsers: data.userStats?.verified || 0,
+          pendingUsers: data.userStats?.pending || 0,
+          rejectedUsers: data.userStats?.rejected || 0,
           lastUpdated: new Date(),
           trends: {
-            totalChange: mockData.trends.totalChange + Math.floor(Math.random() * 5) - 2,
-            verifiedChange: mockData.trends.verifiedChange + Math.floor(Math.random() * 4) - 1,
-            pendingChange: mockData.trends.pendingChange - Math.floor(Math.random() * 3),
-            rejectedChange: mockData.trends.rejectedChange + Math.floor(Math.random() * 2) - 1
-          }
+            totalChange: (data.userStats?.total || 0) - stats.totalUsers,
+            verifiedChange: (data.userStats?.verified || 0) - stats.verifiedUsers,
+            pendingChange: (data.userStats?.pending || 0) - stats.pendingUsers,
+            rejectedChange: (data.userStats?.rejected || 0) - stats.rejectedUsers
+          },
+          recentActivities: (data.recentActivity || []).map(activity => ({
+            id: activity.id || Math.random().toString(36).substr(2, 9),
+            action: activity.action,
+            timestamp: new Date(activity.created_at || activity.timestamp || Date.now()),
+            userName: activity.user_name || activity.userName || 'Unknown User',
+            userId: activity.government_id || activity.userId || '-',
+            adminName: activity.admin_username || activity.adminName || currentUser?.username || 'System',
+            txHash: activity.details?.transactionHash || activity.txHash
+          }))
         };
         
-        // Add a new activity item occasionally
-        if (Math.random() > 0.6) {
-          const actions = ['User Verified', 'Biometric Updated', 'User Rejected'];
-          const names = ['Vikram Mehta', 'Anjali Desai', 'Sanjay Patel', 'Meera Kapoor'];
-          const admins = ['Admin Singh', 'Supervisor Gupta'];
-          
-          updatedMockData.recentActivities.unshift({
-            id: Date.now(),
-            action: actions[Math.floor(Math.random() * actions.length)],
-            timestamp: new Date(),
-            userName: names[Math.floor(Math.random() * names.length)],
-            userId: `ID-${Math.floor(10000000 + Math.random() * 90000000)}`,
-            adminName: admins[Math.floor(Math.random() * admins.length)],
-            txHash: `0x${Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`
-          });
-          
-          // Keep only the most recent 5 activities
-          updatedMockData.recentActivities = updatedMockData.recentActivities.slice(0, 5);
-        }
-        
-        setStats(updatedMockData);
+        setStats(transformedData);
         setError(null);
       } catch (err) {
         console.error('Error refreshing dashboard data:', err);

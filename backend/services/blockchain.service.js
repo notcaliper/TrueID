@@ -83,20 +83,8 @@ const initBlockchain = () => {
       throw new Error('ADMIN_PRIVATE_KEY is not defined in environment variables');
     }
     
-<<<<<<< HEAD
-    // Create provider with explicit network configuration
-    const provider = new ethers.providers.JsonRpcProvider(
-      rpcUrl,
-      {
-        name: networkName,
-        chainId: chainId,
-        ensAddress: null
-      }
-    );
-=======
     // Create provider
     const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
->>>>>>> parent of 645e0af (Merge pull request #4 from notcaliper/blockchain)
     
     // Create wallet
     const wallet = new ethers.Wallet(privateKey, provider);

@@ -1,8 +1,4 @@
 import axios from 'axios';
-import MockDataService from './MockDataService';
-
-// Flag to determine if we should use mock data or real API
-const USE_MOCK_DATA = true;
 
 class ApiService {
   constructor() {
@@ -24,20 +20,45 @@ class ApiService {
       }
     );
     
-    // Log that we're using mock data
-    if (USE_MOCK_DATA) {
-      console.log('%c🔶 Using MOCK DATA for all API calls 🔶', 'background: #FFA500; color: #000; padding: 4px; border-radius: 4px; font-weight: bold;');
+    // Log that we're using real API
+    console.log('%c🔵 Using REAL API for all calls 🔵', 'background: #0066cc; color: #fff; padding: 4px; border-radius: 4px; font-weight: bold;');
+  }
+
+  // Authentication
+  async login(username, password) {
+    try {
+      const response = await this.api.post('/admin/login', { username, password });
+      return response.data;
+    } catch (error) {
+      console.error('Error logging in:', error);
+      throw error;
     }
   }
 
+  // Set auth token for API calls
+  setAuthToken(token) {
+    if (token) {
+      localStorage.setItem('authToken', token);
+    } else {
+      localStorage.removeItem('authToken');
+    }
+  }
+
+  // Get current user profile
+  async getCurrentUser() {
+    try {
+      const response = await this.api.get('/admin/profile');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+      throw error;
+    }
+  }
+  
   // User management
   async getUsers(page = 1, limit = 10, search = '', searchType = 'name') {
     try {
-      if (USE_MOCK_DATA) {
-        return await MockDataService.getUsers(page, limit, search, searchType);
-      }
-      
-      const response = await this.api.get('/users', {
+      const response = await this.api.get('/admin/users', {
         params: { page, limit, search, searchType }
       });
       return response.data;
@@ -49,11 +70,7 @@ class ApiService {
 
   async getUserById(userId) {
     try {
-      if (USE_MOCK_DATA) {
-        return await MockDataService.getUserById(userId);
-      }
-      
-      const response = await this.api.get(`/users/${userId}`);
+      const response = await this.api.get(`/admin/users/${userId}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching user ${userId}:`, error);
@@ -63,13 +80,6 @@ class ApiService {
 
   async getUserByAddress(address) {
     try {
-      if (USE_MOCK_DATA) {
-        // Find user with matching wallet address in mock data
-        const users = await MockDataService.getUsers(1, 50);
-        const user = users.users.find(u => u.walletAddress === address);
-        if (!user) throw new Error('User not found');
-        return user;
-      }
       
       const response = await this.api.get(`/users/address/${address}`);
       return response.data;
@@ -82,9 +92,6 @@ class ApiService {
   // Biometric data management
   async updateBiometricData(userId, biometricHash) {
     try {
-      if (USE_MOCK_DATA) {
-        return await MockDataService.updateBiometricData(userId, biometricHash);
-      }
       
       const response = await this.api.put(`/users/${userId}/biometric`, {
         biometricHash
@@ -99,11 +106,10 @@ class ApiService {
   // Identity verification
   async verifyIdentity(userId) {
     try {
-      if (USE_MOCK_DATA) {
-        return await MockDataService.verifyIdentity(userId, true);
-      }
       
-      const response = await this.api.post(`/users/${userId}/verify`);
+      const response = await this.api.put(`/admin/users/${userId}/verify`, {
+        verificationStatus: 'VERIFIED'
+      });
       return response.data;
     } catch (error) {
       console.error(`Error verifying identity for user ${userId}:`, error);
@@ -113,11 +119,11 @@ class ApiService {
 
   async rejectIdentity(userId, reason) {
     try {
-      if (USE_MOCK_DATA) {
-        return await MockDataService.verifyIdentity(userId, false);
-      }
       
-      const response = await this.api.post(`/users/${userId}/reject`, { reason });
+      const response = await this.api.put(`/admin/users/${userId}/verify`, {
+        verificationStatus: 'REJECTED',
+        verificationNotes: reason
+      });
       return response.data;
     } catch (error) {
       console.error(`Error rejecting identity for user ${userId}:`, error);
@@ -128,11 +134,8 @@ class ApiService {
   // Activity logs
   async getActivityLogs(page = 1, limit = 20, filters = {}) {
     try {
-      if (USE_MOCK_DATA) {
-        return await MockDataService.getActivityLogs(page, limit, filters);
-      }
       
-      const response = await this.api.get('/activity-logs', {
+      const response = await this.api.get('/admin/logs', {
         params: {
           page,
           limit,
@@ -149,9 +152,6 @@ class ApiService {
   // Professional records
   async getProfessionalRecords(userId) {
     try {
-      if (USE_MOCK_DATA) {
-        return await MockDataService.getProfessionalRecords(userId);
-      }
       
       const response = await this.api.get(`/users/${userId}/professional-records`);
       return response.data;
@@ -163,13 +163,6 @@ class ApiService {
 
   async verifyProfessionalRecord(userId, recordId) {
     try {
-      if (USE_MOCK_DATA) {
-        // For mock purposes, just return success with a transaction hash
-        return {
-          success: true,
-          txHash: `0x${Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`
-        };
-      }
       
       const response = await this.api.post(`/users/${userId}/professional-records/${recordId}/verify`);
       return response.data;
@@ -182,17 +175,6 @@ class ApiService {
   // Admin management
   async getAdminProfile() {
     try {
-      if (USE_MOCK_DATA) {
-        // Return mock admin profile
-        return {
-          id: 'admin-001',
-          name: 'Admin Singh',
-          email: 'admin.singh@gov.in',
-          role: 'Senior Administrator',
-          department: 'Identity Management',
-          lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 3) // 3 hours ago
-        };
-      }
       
       const response = await this.api.get('/admin/profile');
       return response.data;
@@ -204,19 +186,6 @@ class ApiService {
 
   async updateAdminProfile(profileData) {
     try {
-      if (USE_MOCK_DATA) {
-        // Return success with updated profile data
-        return {
-          success: true,
-          profile: {
-            ...profileData,
-            id: 'admin-001',
-            role: 'Senior Administrator',
-            department: 'Identity Management',
-            lastUpdated: new Date()
-          }
-        };
-      }
       
       const response = await this.api.put('/admin/profile', profileData);
       return response.data;
@@ -228,16 +197,8 @@ class ApiService {
 
   async changePassword(currentPassword, newPassword) {
     try {
-      if (USE_MOCK_DATA) {
-        // Simulate password validation
-        if (currentPassword === 'admin123') {
-          return { success: true, message: 'Password changed successfully' };
-        } else {
-          throw new Error('Current password is incorrect');
-        }
-      }
       
-      const response = await this.api.post('/admin/change-password', {
+      const response = await this.api.put('/admin/change-password', {
         currentPassword,
         newPassword
       });
@@ -251,14 +212,31 @@ class ApiService {
   // Dashboard statistics
   async getDashboardStats() {
     try {
-      if (USE_MOCK_DATA) {
-        return await MockDataService.getDashboardStats();
+      // Ensure we have the auth token
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.warn('No auth token found when fetching dashboard stats');
       }
       
-      const response = await this.api.get('/dashboard/stats');
+      // Log the request for debugging
+      console.log('Fetching dashboard stats from:', `${this.api.defaults.baseURL}/admin/dashboard`);
+      
+      // Make the API request
+      const response = await this.api.get('/admin/dashboard');
+      console.log('Dashboard API response:', response);
+      
       return response.data;
     } catch (error) {
-      console.error('Error fetching dashboard statistics:', error);
+      console.error('Error fetching dashboard statistics:', error.response?.data || error.message || error);
+      
+      // For debugging - log the full error
+      if (error.response) {
+        console.log('Error response status:', error.response.status);
+        console.log('Error response data:', error.response.data);
+      } else if (error.request) {
+        console.log('No response received:', error.request);
+      }
+      
       throw error;
     }
   }
@@ -266,22 +244,6 @@ class ApiService {
   // Export data
   async exportUsers(filters = {}) {
     try {
-      if (USE_MOCK_DATA) {
-        // Create a mock CSV blob
-        const header = 'ID,Name,Email,Phone,Registration Date,Verification Status\n';
-        const rows = [];
-        
-        // Get users from mock service
-        const users = await MockDataService.getUsers(1, 100, '');
-        
-        // Create CSV rows
-        users.users.forEach(user => {
-          rows.push(`${user.id},${user.name},${user.email},${user.phone},${user.registrationDate.toISOString()},${user.verificationStatus}`);
-        });
-        
-        // Return as blob
-        return new Blob([header + rows.join('\n')], { type: 'text/csv' });
-      }
       
       const response = await this.api.get('/export/users', {
         params: filters,
@@ -296,9 +258,6 @@ class ApiService {
 
   async exportActivityLogs(filters = {}) {
     try {
-      if (USE_MOCK_DATA) {
-        return await MockDataService.exportActivityLogs(filters);
-      }
       
       const response = await this.api.get('/export/activity-logs', {
         params: filters,
@@ -307,6 +266,52 @@ class ApiService {
       return response.data;
     } catch (error) {
       console.error('Error exporting activity logs:', error);
+      throw error;
+    }
+  }
+  // Deactivate user
+  async deactivateUser(userId, reason) {
+    try {
+      
+      const response = await this.api.put(`/admin/users/${userId}/deactivate`, { reason });
+      return response.data;
+    } catch (error) {
+      console.error(`Error deactivating user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  // Reactivate user
+  async reactivateUser(userId) {
+    try {
+      
+      const response = await this.api.put(`/admin/users/${userId}/reactivate`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error reactivating user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  // Update user information
+  async updateUser(userId, userData) {
+    try {
+      
+      const response = await this.api.put(`/admin/users/${userId}/update`, userData);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  // Create new admin user (Super Admin only)
+  async createAdmin(adminData) {
+    try {
+      const response = await this.api.post('/admin/create', adminData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating admin user:', error);
       throw error;
     }
   }

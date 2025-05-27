@@ -1,17 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
-import { FaUser, FaLock, FaEye, FaEyeSlash, FaExclamationCircle, FaShieldAlt, FaCode, FaToggleOn, FaToggleOff } from 'react-icons/fa';
+import { FaUser, FaLock, FaEye, FaEyeSlash, FaExclamationCircle, FaShieldAlt } from 'react-icons/fa';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showDevOptions, setShowDevOptions] = useState(false);
-  const [devClickCount, setDevClickCount] = useState(0);
-  const { login, currentUser, devMode, toggleDevMode, enableDevMode } = useAuth();
+  const { login, currentUser } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already logged in
@@ -21,41 +19,19 @@ const Login = () => {
     }
   }, [currentUser, navigate]);
 
-  // Reset dev click count after 3 seconds of inactivity
-  useEffect(() => {
-    if (devClickCount > 0) {
-      const timer = setTimeout(() => {
-        setDevClickCount(0);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [devClickCount]);
-
-  // Check for dev mode activation (5 rapid clicks on the logo)
-  const handleLogoClick = () => {
-    setDevClickCount(prevCount => {
-      const newCount = prevCount + 1;
-      if (newCount >= 5) {
-        setShowDevOptions(true);
-        return 0;
-      }
-      return newCount;
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    if (!email || !password) {
-      setError('Please enter both email and password');
+    if (!username || !password) {
+      setError('Please enter both username and password');
       setIsLoading(false);
       return;
     }
 
     try {
-      const result = await login(email, password);
+      const result = await login(username, password);
       if (result.success) {
         navigate('/dashboard');
       } else {
@@ -71,11 +47,6 @@ const Login = () => {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
-  };
-
-  const handleDevModeActivate = () => {
-    enableDevMode();
-    navigate('/dashboard');
   };
 
   // Add animation styles to head
@@ -175,151 +146,208 @@ const Login = () => {
           }
         }}>
           <div style={{
-            marginBottom: '32px',
-            textAlign: 'center'
+            backgroundColor: '#2d2d2d',
+            borderRadius: '24px',
+            padding: '40px',
+            border: '1px solid #404040',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
             <div style={{
-              width: '120px',
-              height: '120px',
-              margin: '0 auto 24px',
-              position: 'relative'
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(0,0,0,0) 100%)',
+              zIndex: '0'
+            }}></div>
+            
+            <div style={{
+              position: 'relative',
+              zIndex: '1'
             }}>
               <div style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: '24px',
-                backgroundColor: '#2d2d2d',
-                transform: 'rotate(45deg)',
-                position: 'absolute',
-                border: '2px solid #404040'
-              }}></div>
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                color: '#6366f1',
-                fontSize: '48px',
-                fontWeight: '700'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                marginBottom: '40px'
               }}>
-                DBIS
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '16px',
+                  backgroundColor: '#374151',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid #6366f1'
+                }}>
+                  <span style={{
+                    color: '#fff',
+                    fontSize: '24px',
+                    fontWeight: '700',
+                    letterSpacing: '2px'
+                  }}>DBIS</span>
+                </div>
+                <div>
+                  <h2 style={{
+                    color: '#fff',
+                    fontSize: '24px',
+                    fontWeight: '600',
+                    margin: '0 0 4px 0',
+                    letterSpacing: '-0.5px'
+                  }}>Digital Biometric<br />Identity System</h2>
+                  <p style={{
+                    color: '#a3a3a3',
+                    fontSize: '14px',
+                    margin: '0'
+                  }}>Government of India</p>
+                </div>
+              </div>
+              
+              <h1 style={{
+                color: '#fff',
+                fontSize: '32px',
+                fontWeight: '700',
+                margin: '0 0 16px 0',
+                letterSpacing: '-0.5px'
+              }}>Secure Identity<br />Management Portal</h1>
+              
+              <p style={{
+                color: '#e0e0e0',
+                fontSize: '16px',
+                lineHeight: '1.6',
+                margin: '0 0 24px 0'
+              }}>Welcome to the official government portal for digital identity verification and management.</p>
+              
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
+                    backgroundColor: 'rgba(99,102,241,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid rgba(99,102,241,0.2)'
+                  }}>
+                    <span style={{
+                      fontSize: '20px'
+                    }}>🔐</span>
+                  </div>
+                  <div>
+                    <h3 style={{
+                      color: '#fff',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      margin: '0 0 2px 0'
+                    }}>Secure Authentication</h3>
+                    <p style={{
+                      color: '#a3a3a3',
+                      fontSize: '14px',
+                      margin: '0'
+                    }}>Multi-factor security protocols</p>
+                  </div>
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
+                    backgroundColor: 'rgba(99,102,241,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid rgba(99,102,241,0.2)'
+                  }}>
+                    <span style={{
+                      fontSize: '20px'
+                    }}>📊</span>
+                  </div>
+                  <div>
+                    <h3 style={{
+                      color: '#fff',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      margin: '0 0 2px 0'
+                    }}>Real-time Analytics</h3>
+                    <p style={{
+                      color: '#a3a3a3',
+                      fontSize: '14px',
+                      margin: '0'
+                    }}>Comprehensive dashboard insights</p>
+                  </div>
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
+                    backgroundColor: 'rgba(99,102,241,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid rgba(99,102,241,0.2)'
+                  }}>
+                    <span style={{
+                      fontSize: '20px'
+                    }}>⛓️</span>
+                  </div>
+                  <div>
+                    <h3 style={{
+                      color: '#fff',
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      margin: '0 0 2px 0'
+                    }}>Blockchain Verification</h3>
+                    <p style={{
+                      color: '#a3a3a3',
+                      fontSize: '14px',
+                      margin: '0'
+                    }}>Immutable identity records</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <h1 style={{
-              fontSize: '32px',
-              fontWeight: '700',
-              color: '#fff',
-              marginBottom: '16px',
-              letterSpacing: '-0.5px'
-            }}>
-              Government of India
-            </h1>
-            <p style={{
-              fontSize: '18px',
-              color: '#a3a3a3',
-              lineHeight: '1.6'
-            }}>
-              Decentralized Biometric Identity System Portal
-            </p>
-          </div>
-
-          <div style={{
-            padding: '32px',
-            backgroundColor: '#2d2d2d',
-            borderRadius: '16px',
-            border: '1px solid #404040'
-          }}>
-            <h2 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              color: '#fff',
-              marginBottom: '16px'
-            }}>Secure Government Access</h2>
-            <ul style={{
-              listStyle: 'none',
-              padding: '0',
-              margin: '0',
-              color: '#a3a3a3'
-            }}>
-              <li style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '12px',
-                fontSize: '14px'
-              }}>
-                <div style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(99,102,241,0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6366f1'
-                }}>1</div>
-                End-to-end encrypted data transmission
-              </li>
-              <li style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '12px',
-                fontSize: '14px'
-              }}>
-                <div style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(99,102,241,0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6366f1'
-                }}>2</div>
-                Multi-factor authentication
-              </li>
-              <li style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '12px',
-                fontSize: '14px'
-              }}>
-                <div style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(99,102,241,0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6366f1'
-                }}>3</div>
-                Blockchain-based identity verification
-              </li>
-            </ul>
           </div>
         </div>
-
+        
         {/* Right Side - Login Form */}
-        <div className="login-card" style={{
+        <div className="login-form-container" style={{
+          flex: '1',
+          maxWidth: '450px',
           backgroundColor: '#2d2d2d',
           borderRadius: '24px',
-          padding: '48px',
-          width: '100%',
-          maxWidth: '480px',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          position: 'relative',
-          border: '1px solid #404040'
+          padding: '40px',
+          border: '1px solid #404040',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
         }}>
           <div className="login-header" style={{
             textAlign: 'center',
             marginBottom: '40px'
           }}>
-            <div className="login-logo-container" onClick={handleLogoClick} style={{
-              marginBottom: '24px',
-              cursor: 'pointer'
+            <div className="login-logo-container" style={{
+              marginBottom: '24px'
             }}>
               <div className="login-logo-circle" style={{
                 width: '80px',
@@ -393,29 +421,23 @@ const Login = () => {
               flexDirection: 'column',
               gap: '8px'
             }}>
-              <label htmlFor="email" style={{
-                color: '#a3a3a3',
+              <label style={{
+                display: 'block',
+                marginBottom: '8px',
                 fontSize: '14px',
                 fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
+                color: '#e2e2e2'
               }}>
-                <FaUser style={{ color: '#6366f1' }} />
-                Email Address
+                Username
               </label>
               <div style={{
                 position: 'relative'
               }}>
                 <input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="Enter your government email"
-                  autoComplete="email"
-                  required
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your username"
                   style={{
                     backgroundColor: '#1a1a1a',
                     border: '1px solid #404040',
@@ -588,30 +610,7 @@ const Login = () => {
                 }}>Secure Access</span>
               </div>
               
-              {showDevOptions && (
-                <button 
-                  type="button" 
-                  onClick={handleDevModeActivate}
-                  style={{
-                    backgroundColor: '#374151',
-                    color: '#e0e0e0',
-                    border: '1px solid #404040',
-                    borderRadius: '12px',
-                    padding: '14px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <FaCode />
-                  <span>Developer Access</span>
-                </button>
-              )}
+
             </div>
           </form>
           

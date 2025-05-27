@@ -112,3 +112,16 @@ government-portal/yarn-debug.log*
 government-portal/yarn-error.log*
 Username
 government-portal/Untitled-1.c
+
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.bz2
+*.xz
+*.exe
+*.deb
+*.rpm
+.cursor/
+.cursor/

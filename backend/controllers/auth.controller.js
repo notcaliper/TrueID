@@ -58,7 +58,10 @@ const generateUserToken = (user) => {
 exports.registerUser = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
-  const { name, governmentId, email, phone, facemeshData, walletAddress } = req.body;
+  const { username, name, governmentId, email, phone, facemeshData, walletAddress } = req.body;
+  
+  // If username is not provided, generate one from the government ID
+  const userUsername = username || `user_${governmentId.replace(/[^a-zA-Z0-9]/g, '')}`;
 
   try {
     // Check if user already exists
@@ -92,10 +95,10 @@ exports.registerUser = async (req, res) => {
 
       // Insert user
       const userResult = await client.query(
-        `INSERT INTO users (name, government_id, email, phone, wallet_address, verification_status)
-         VALUES ($1, $2, $3, $4, $5, 'PENDING')
-         RETURNING id, government_id, name, email, phone, wallet_address, verification_status, created_at`,
-        [name, governmentId, email, phone, walletAddress]
+        `INSERT INTO users (username, name, government_id, email, phone, wallet_address, verification_status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')
+         RETURNING id, username, government_id, name, email, phone, wallet_address, verification_status, created_at`,
+        [userUsername, name, governmentId, email, phone, walletAddress]
       );
 
       const user = userResult.rows[0];
