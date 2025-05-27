@@ -1,6 +1,6 @@
 /**
  * Hardhat configuration for DBIS
- * Configured for Avalanche Fuji Testnet (AVAX Testnet)
+ * Supports both local development and Polygon Mumbai testnet
  */
 require('@nomiclabs/hardhat-waffle');
 require('@nomiclabs/hardhat-ethers');
@@ -33,11 +33,16 @@ module.exports = {
     hardhat: {
       chainId: 31337
     },
-    // Avalanche Fuji Testnet - main deployment target
-    avalanche_fuji: {
-      url: process.env.AVALANCHE_FUJI_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc",
+    // Local development network
+    localhost: {
+      url: "http://127.0.0.1:8545",
+      chainId: 31337
+    },
+    // Polygon Mumbai testnet
+    polygon_mumbai: {
+      url: process.env.POLYGON_RPC_URL || "https://rpc-mumbai.maticvigil.com",
       accounts: [PRIVATE_KEY],
-      chainId: 43113
+      chainId: 80001
     }
   },
   // Contract verification is done manually through the Snowtrace interface
