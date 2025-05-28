@@ -72,30 +72,20 @@
               </div>
             </div>
 
-            <!-- Network Switch Form -->
+            <!-- Network Information -->
             <div class="card mb-4">
               <div class="card-header">
-                <h5 class="mb-0">Switch Network</h5>
+                <h5 class="mb-0">Network Information</h5>
               </div>
               <div class="card-body">
-                <form id="network-switch-form">
-                  <div class="mb-3">
-                    <label class="form-label">Select Network</label>
-                    <div class="form-check">
-                      <input class="form-check-input" type="radio" name="network" id="network-local" value="local">
-                      <label class="form-check-label" for="network-local">
-                        Local Hardhat Network
-                      </label>
-                    </div>
-                    <div class="form-check">
-                      <input class="form-check-input" type="radio" name="network" id="network-polygon" value="polygon">
-                      <label class="form-check-label" for="network-polygon">
-                        Polygon Mumbai Testnet
-                      </label>
-                    </div>
-                  </div>
-                  <button type="submit" class="btn btn-primary">Switch Network</button>
-                </form>
+                <div class="alert alert-info">
+                  <strong>Note:</strong> This system is configured to use Avalanche Fuji Testnet exclusively.
+                </div>
+                <p>
+                  <strong>Network:</strong> Avalanche Fuji Testnet<br>
+                  <strong>Chain ID:</strong> 43113<br>
+                  <strong>Explorer:</strong> <a href="https://testnet.snowtrace.io/" target="_blank">Snowtrace Testnet</a>
+                </p>
               </div>
             </div>
           </div>
@@ -123,13 +113,12 @@
                 <h5 class="mb-0">Deployment Actions</h5>
               </div>
               <div class="card-body">
-                <p class="card-text">Deploy the smart contract to the selected network.</p>
+                <p class="card-text">Deploy the smart contract to Avalanche Fuji Testnet.</p>
                 <div class="alert alert-warning">
-                  <strong>Note:</strong> Deployment to Polygon Mumbai requires MATIC tokens in your wallet.
+                  <strong>Note:</strong> Deployment to Avalanche Fuji requires AVAX tokens in your wallet.
                 </div>
                 <div class="d-grid gap-2">
-                  <button id="deploy-local-btn" class="btn btn-info">Deploy to Local Network</button>
-                  <button id="deploy-polygon-btn" class="btn btn-warning">Deploy to Polygon Mumbai</button>
+                  <button id="deploy-avalanche-btn" class="btn btn-warning">Deploy to Avalanche Fuji</button>
                 </div>
               </div>
             </div>
@@ -148,18 +137,9 @@
     document.addEventListener('DOMContentLoaded', () => {
       feather.replace();
       
-      // Add event listeners for deployment buttons
-      document.getElementById('deploy-local-btn').addEventListener('click', async () => {
-        // First switch to local network
-        await switchToNetwork('local');
-        // Then deploy contract
-        deployContract();
-      });
-      
-      document.getElementById('deploy-polygon-btn').addEventListener('click', async () => {
-        // First switch to polygon network
-        await switchToNetwork('polygon');
-        // Then deploy contract
+      // Add event listener for deployment button
+      document.getElementById('deploy-avalanche-btn').addEventListener('click', async () => {
+        // Deploy contract to Avalanche Fuji
         deployContract();
       });
     });

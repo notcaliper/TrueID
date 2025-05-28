@@ -25,16 +25,12 @@ async function main() {
   
   console.log(`IdentityManagement contract deployed to: ${identityManagement.address}`);
   
-  // Determine which .env variable to update based on network
-  let envVarName = '';
-  let blockchainNetwork = '';
-  if (networkName === 'localhost' || networkName === 'hardhat') {
-    envVarName = 'LOCAL_CONTRACT_ADDRESS';
-    blockchainNetwork = 'local';
-  } else if (networkName === 'polygon_mumbai') {
-    envVarName = 'POLYGON_CONTRACT_ADDRESS';
-    blockchainNetwork = 'polygon';
-  }
+  // Always use Avalanche Fuji Testnet regardless of the network we're deploying to
+  let envVarName = 'AVALANCHE_FUJI_CONTRACT_ADDRESS';
+  let blockchainNetwork = 'avalanche';
+  
+  // Force the network name to be avalanche_fuji for consistency
+  networkName = 'avalanche_fuji';
   
   // Update .env file with contract address and network
   if (envVarName) {

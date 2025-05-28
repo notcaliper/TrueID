@@ -6,6 +6,13 @@ class ApiService {
       baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3001/api'
     });
     
+    // Cache for API responses
+    this.cache = {
+      profile: null,
+      profileTimestamp: null,
+      profilePromise: null
+    };
+    
     // Add request interceptor to include auth token in all requests
     this.api.interceptors.request.use(
       (config) => {
@@ -41,16 +48,50 @@ class ApiService {
       localStorage.setItem('authToken', token);
     } else {
       localStorage.removeItem('authToken');
+      // Clear the cache when logging out
+      this.cache.profile = null;
+      this.cache.profileTimestamp = null;
+      this.cache.profilePromise = null;
     }
   }
 
-  // Get current user profile
+  // Get current user profile with caching
   async getCurrentUser() {
     try {
-      const response = await this.api.get('/admin/profile');
-      return response.data;
+      // If we have a cached profile and it's less than 5 minutes old, return it
+      const now = Date.now();
+      if (this.cache.profile && (now - this.cache.profileTimestamp < 5 * 60 * 1000)) {
+        console.log('Using cached profile data');
+        return this.cache.profile;
+      }
+      
+      // If there's already a request in progress, return that promise
+      if (this.cache.profilePromise) {
+        console.log('Using existing profile request');
+        return this.cache.profilePromise;
+      }
+      
+      // Create a new promise for the profile request
+      this.cache.profilePromise = new Promise(async (resolve, reject) => {
+        try {
+          const response = await this.api.get('/admin/profile');
+          this.cache.profile = response.data;
+          this.cache.profileTimestamp = now;
+          resolve(response.data);
+        } catch (error) {
+          console.error('Error fetching current user:', error);
+          reject(error);
+        } finally {
+          // Clear the promise after it resolves or rejects
+          setTimeout(() => {
+            this.cache.profilePromise = null;
+          }, 0);
+        }
+      });
+      
+      return this.cache.profilePromise;
     } catch (error) {
-      console.error('Error fetching current user:', error);
+      console.error('Error in getCurrentUser:', error);
       throw error;
     }
   }
@@ -106,7 +147,13 @@ class ApiService {
   // Identity verification
   async verifyIdentity(userId) {
     try {
+      // Validate userId to prevent errors
+      if (!userId) {
+        console.error('Error: Attempted to verify user with undefined userId');
+        throw new Error('User ID is required for verification');
+      }
       
+      console.log(`Verifying user with ID: ${userId}`);
       const response = await this.api.put(`/admin/users/${userId}/verify`, {
         verificationStatus: 'VERIFIED'
       });
@@ -152,12 +199,13 @@ class ApiService {
   // Professional records
   async getProfessionalRecords(userId) {
     try {
-      
-      const response = await this.api.get(`/users/${userId}/professional-records`);
+      // Updated endpoint to match backend API structure
+      const response = await this.api.get(`/admin/users/${userId}/professional-records`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching professional records for user ${userId}:`, error);
-      throw error;
+      // Return empty array instead of throwing error to prevent UI from breaking
+      return { records: [] };
     }
   }
 
@@ -172,16 +220,9 @@ class ApiService {
     }
   }
 
-  // Admin management
+  // Admin management - use the cached getCurrentUser method
   async getAdminProfile() {
-    try {
-      
-      const response = await this.api.get('/admin/profile');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching admin profile:', error);
-      throw error;
-    }
+    return this.getCurrentUser();
   }
 
   async updateAdminProfile(profileData) {

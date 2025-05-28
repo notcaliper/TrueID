@@ -1,6 +1,6 @@
 /**
  * Network Manager Component for DBIS Admin Dashboard
- * Allows switching between local Hardhat and Polygon networks
+ * Allows switching between local Hardhat and Avalanche Fuji networks
  */
 
 // Network Manager Component
@@ -92,11 +92,11 @@ class NetworkManager {
   
   /**
    * Switch network
-   * @param {String} network - Network to switch to ('local' or 'polygon')
+   * @param {String} network - Network to switch to ('local' or 'avalanche')
    */
   async switchNetwork(network) {
     try {
-      this.showLoading(`Switching to ${network === 'local' ? 'Local Hardhat' : 'Polygon Mumbai'} network...`);
+      this.showLoading(`Switching to ${network === 'local' ? 'Local Hardhat' : 'Avalanche Fuji Testnet'} network...`);
       
       const response = await fetch(`${this.apiBaseUrl}/switch`, {
         method: 'POST',
@@ -150,7 +150,7 @@ class NetworkManager {
           <div class="mb-3">
             <strong>Contract Address:</strong> 
             ${contractAddress ? 
-              `<a href="${network === 'polygon' ? 'https://mumbai.polygonscan.com/address/' + contractAddress : '#'}" 
+              `<a href="${network === 'avalanche' ? 'https://testnet.snowtrace.io/address/' + contractAddress : '#'}" 
                 target="_blank" class="text-break">${contractAddress}</a>` : 
               '<span class="text-danger">Not deployed</span>'}
           </div>
