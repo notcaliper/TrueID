@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [devMode, setDevMode] = useState(false);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -65,12 +66,18 @@ export function AuthProvider({ children }) {
     setCurrentUser(null);
   };
 
+  const toggleDevMode = () => {
+    setDevMode(prev => !prev);
+  };
+
   const value = {
     currentUser,
     login,
     logout,
     error,
-    loading
+    loading,
+    devMode,
+    toggleDevMode
   };
 
   return (

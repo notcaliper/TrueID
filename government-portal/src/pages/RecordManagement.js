@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ApiService from '../services/ApiService';
 import UserDetailModal from '../components/UserDetailModal';
-import { FaSearch, FaEye, FaEdit, FaUserCheck, FaUserTimes, FaUserClock, FaChevronLeft, FaChevronRight, FaDatabase } from 'react-icons/fa';
+import { FaSearch, FaEye, FaEdit, FaUserCheck, FaUserTimes, FaUserClock, FaChevronLeft, FaChevronRight, FaDatabase, FaExclamationCircle } from 'react-icons/fa';
 
 const RecordManagement = () => {
   const [users, setUsers] = useState([]);
@@ -14,25 +14,63 @@ const RecordManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [refreshInterval, setRefreshInterval] = useState(10000); // 10 seconds refresh by default
+  const [lastRefreshed, setLastRefreshed] = useState(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const refreshTimerRef = useRef(null);
   const usersPerPage = 10;
 
-  useEffect(() => {
-    fetchUsers();
-  }, [currentPage]);
-
-  const fetchUsers = async () => {
+  // Memoize fetchUsers to avoid recreation on each render
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const data = await ApiService.getUsers(currentPage, usersPerPage, searchQuery, searchType);
       setUsers(data.users);
       setTotalPages(Math.ceil(data.total / usersPerPage));
       setTotalUsers(data.total);
+      setLastRefreshed(new Date());
       setLoading(false);
     } catch (err) {
       console.error('Error fetching users:', err);
       setError('Failed to load users. Please try again.');
       setLoading(false);
     }
+  }, [currentPage, usersPerPage, searchQuery, searchType]);
+
+  // Initial data load
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+  
+  // Set up polling for real-time updates
+  useEffect(() => {
+    if (autoRefresh) {
+      refreshTimerRef.current = setInterval(() => {
+        fetchUsers();
+      }, refreshInterval);
+    }
+    
+    return () => {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+      }
+    };
+  }, [fetchUsers, refreshInterval, autoRefresh]);
+
+  // Manual refresh function
+  const handleManualRefresh = () => {
+    fetchUsers();
+  };
+
+  // Toggle auto-refresh
+  const toggleAutoRefresh = () => {
+    setAutoRefresh(!autoRefresh);
+  };
+
+  // Change refresh interval
+  const handleRefreshIntervalChange = (e) => {
+    const value = parseInt(e.target.value, 10);
+    setRefreshInterval(value);
   };
 
   const handleSearch = (e) => {
@@ -42,7 +80,15 @@ const RecordManagement = () => {
   };
 
   const handleViewUser = (user) => {
-    setSelectedUser(user);
+    // Ensure the user object has the correct ID property
+    // The API returns 'id' but the modal expects 'id'
+    const userWithProperID = {
+      ...user,
+      // Make sure id is defined and properly set
+      id: user.id
+    };
+    
+    setSelectedUser(userWithProperID);
     setIsModalOpen(true);
   };
 
@@ -72,21 +118,13 @@ const RecordManagement = () => {
 
   const getStatusDisplay = (status) => {
     if (!status) return 'Unknown';
-    return status.charAt(0).toUpperCase() + status.slice(1);
+    
+    // API returns status in uppercase (e.g., 'PENDING', 'VERIFIED', 'REJECTED')
+    // Convert to title case for display (e.g., 'Pending', 'Verified', 'Rejected')
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   };
 
-  // Define styles object for animations
-  const styles = {
-    '@keyframes spin': {
-      '0%': { transform: 'rotate(0deg)' },
-      '100%': { transform: 'rotate(360deg)' }
-    },
-    '@keyframes shake': {
-      '0%, 100%': { transform: 'translateX(0)' },
-      '25%': { transform: 'translateX(-5px)' },
-      '75%': { transform: 'translateX(5px)' }
-    }
-  };
+  // Animation styles are defined in the CSS injected below
 
   // Add animation styles to head
   useEffect(() => {
@@ -444,7 +482,7 @@ const RecordManagement = () => {
                       color: '#e0e0e0',
                       fontFamily: 'monospace',
                       whiteSpace: 'nowrap'
-                    }}>{user?.uniqueId || 'N/A'}</td>
+                    }}>{user?.government_id || 'N/A'}</td>
                     <td style={{
                       padding: '16px',
                       whiteSpace: 'nowrap'
@@ -457,28 +495,28 @@ const RecordManagement = () => {
                         borderRadius: '20px',
                         fontSize: '13px',
                         fontWeight: '500',
-                        backgroundColor: user?.status === 'verified' ? 'rgba(16, 185, 129, 0.1)' :
-                                       user?.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' :
+                        backgroundColor: user?.verification_status === 'VERIFIED' ? 'rgba(16, 185, 129, 0.1)' :
+                                       user?.verification_status === 'REJECTED' ? 'rgba(239, 68, 68, 0.1)' :
                                        'rgba(245, 158, 11, 0.1)',
-                        color: user?.status === 'verified' ? '#34d399' :
-                               user?.status === 'rejected' ? '#f87171' :
+                        color: user?.verification_status === 'VERIFIED' ? '#34d399' :
+                               user?.verification_status === 'REJECTED' ? '#f87171' :
                                '#fbbf24',
-                        border: `1px solid ${user?.status === 'verified' ? 'rgba(16, 185, 129, 0.2)' :
-                                           user?.status === 'rejected' ? 'rgba(239, 68, 68, 0.2)' :
+                        border: `1px solid ${user?.verification_status === 'VERIFIED' ? 'rgba(16, 185, 129, 0.2)' :
+                                           user?.verification_status === 'REJECTED' ? 'rgba(239, 68, 68, 0.2)' :
                                            'rgba(245, 158, 11, 0.2)'}`,
                         transition: 'all 0.2s ease'
                       }}>
-                        {user?.status === 'verified' && <FaUserCheck />}
-                        {user?.status === 'rejected' && <FaUserTimes />}
-                        {(!user?.status || user.status === 'pending') && <FaUserClock />}
-                        <span>{getStatusDisplay(user?.status || 'pending')}</span>
+                        {user?.verification_status === 'VERIFIED' && <FaUserCheck />}
+                        {user?.verification_status === 'REJECTED' && <FaUserTimes />}
+                        {(!user?.verification_status || user.verification_status === 'PENDING') && <FaUserClock />}
+                        <span>{getStatusDisplay(user?.verification_status || 'PENDING')}</span>
                       </div>
                     </td>
                     <td style={{
                       padding: '16px',
                       color: '#a3a3a3',
                       whiteSpace: 'nowrap'
-                    }}>{user?.lastUpdated ? formatDate(user.lastUpdated) : 'N/A'}</td>
+                    }}>{user?.updated_at ? formatDate(user.updated_at) : 'N/A'}</td>
                     <td style={{
                       padding: '16px',
                       whiteSpace: 'nowrap'
@@ -541,18 +579,99 @@ const RecordManagement = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '20px',
-          backgroundColor: '#2d2d2d',
-          borderRadius: '16px',
+          marginTop: '16px',
+          padding: '12px',
+          backgroundColor: '#262626',
+          borderRadius: '12px',
           border: '1px solid #404040'
         }}>
           <div style={{
-            color: '#a3a3a3',
-            fontSize: '14px'
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px'
           }}>
-            Page {currentPage} of {totalPages}
+            <div style={{
+              color: '#a3a3a3',
+              fontSize: '14px'
+            }}>
+              Page {currentPage} of {totalPages}
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <button
+                onClick={handleManualRefresh}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '36px',
+                  height: '36px',
+                  backgroundColor: '#374151',
+                  border: '1px solid #404040',
+                  borderRadius: '12px',
+                  color: '#e0e0e0',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                title="Refresh data"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style={{
+                  animation: loading ? 'spin 1s linear infinite' : 'none'
+                }}>
+                  <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                  <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                </svg>
+              </button>
+              
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <input
+                  type="checkbox"
+                  id="autoRefresh"
+                  checked={autoRefresh}
+                  onChange={toggleAutoRefresh}
+                  style={{
+                    accentColor: '#6366f1'
+                  }}
+                />
+                <label htmlFor="autoRefresh" style={{ fontSize: '14px', color: '#a3a3a3' }}>
+                  Auto-refresh
+                </label>
+              </div>
+              
+              {autoRefresh && (
+                <select
+                  value={refreshInterval}
+                  onChange={handleRefreshIntervalChange}
+                  style={{
+                    padding: '4px 8px',
+                    backgroundColor: '#374151',
+                    border: '1px solid #404040',
+                    borderRadius: '8px',
+                    color: '#e0e0e0',
+                    fontSize: '14px'
+                  }}
+                >
+                  <option value="5000">5s</option>
+                  <option value="10000">10s</option>
+                  <option value="30000">30s</option>
+                  <option value="60000">1m</option>
+                </select>
+              )}
+              
+              <div style={{ fontSize: '12px', color: '#a3a3a3' }}>
+                Last updated: {lastRefreshed.toLocaleTimeString()}
+              </div>
+            </div>
           </div>
-          
+        
           <div style={{
             display: 'flex',
             gap: '8px'

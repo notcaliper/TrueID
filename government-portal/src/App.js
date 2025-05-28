@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './utils/AuthContext';
+import { ThemeProvider } from './utils/ThemeContext';
 
 // Pages
 import Login from './pages/Login';
@@ -36,7 +37,8 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <ThemeProvider>
+        <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
           
@@ -83,7 +85,8 @@ function App() {
           {/* Redirect any unknown routes to Dashboard */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
-      </Router>
+        </Router>
+      </ThemeProvider>
     </AuthProvider>
   );
 }

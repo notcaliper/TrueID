@@ -188,7 +188,7 @@ const Login = () => {
                     fontSize: '24px',
                     fontWeight: '700',
                     letterSpacing: '2px'
-                  }}>DBIS</span>
+                  }}>TrueID</span>
                 </div>
                 <div>
                   <h2 style={{
@@ -197,7 +197,7 @@ const Login = () => {
                     fontWeight: '600',
                     margin: '0 0 4px 0',
                     letterSpacing: '-0.5px'
-                  }}>Digital Biometric<br />Identity System</h2>
+                  }}>Trusted Decentralized<br />Identity System</h2>
                   <p style={{
                     color: '#a3a3a3',
                     fontSize: '14px',
@@ -375,7 +375,7 @@ const Login = () => {
                   fontWeight: '700',
                   letterSpacing: '2px',
                   position: 'relative'
-                }}>DBIS</span>
+                }}>TrueID</span>
               </div>
             </div>
             <h1 className="login-title" style={{

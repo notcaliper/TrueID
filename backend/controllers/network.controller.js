@@ -47,8 +47,9 @@ exports.switchNetwork = async (req, res) => {
     return res.status(400).json({ message: 'Network parameter is required' });
   }
   
-  if (network !== 'local' && network !== 'polygon') {
-    return res.status(400).json({ message: 'Invalid network. Must be "local" or "polygon"' });
+  // Force Avalanche Fuji Testnet regardless of requested network
+  if (network !== 'avalanche') {
+    network = 'avalanche';
   }
   
   try {
@@ -72,7 +73,7 @@ exports.switchNetwork = async (req, res) => {
         'system',
         null,
         JSON.stringify({
-          previousNetwork: network === 'local' ? 'polygon' : 'local',
+          previousNetwork: 'avalanche',
           newNetwork: network,
           timestamp: new Date().toISOString()
         }),
@@ -81,7 +82,7 @@ exports.switchNetwork = async (req, res) => {
     );
     
     res.status(200).json({
-      message: `Switched to ${network === 'local' ? 'Local Hardhat' : 'Polygon Mumbai'} network successfully`,
+      message: `Using Avalanche Fuji Testnet network`,
       network: networkInfo
     });
   } catch (error) {
@@ -140,15 +141,8 @@ exports.deployContract = async (req, res) => {
     const networkInfo = blockchainService.getNetworkInfo();
     const { network } = networkInfo;
     
-    // Determine which script to run
-    let deployScript;
-    if (network === 'local') {
-      deployScript = 'npm run blockchain:deploy-local';
-    } else if (network === 'polygon') {
-      deployScript = 'npm run blockchain:deploy-polygon';
-    } else {
-      return res.status(400).json({ message: 'Invalid network for deployment' });
-    }
+    // Always deploy to Avalanche Fuji
+    const deployScript = 'npm run blockchain:deploy:fuji';
     
     // Start deployment process
     const rootDir = path.resolve(__dirname, '..');

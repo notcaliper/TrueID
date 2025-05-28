@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
+import { useTheme } from '../utils/ThemeContext';
 import { FaChevronLeft, FaChevronRight, FaTachometerAlt, FaUsers, 
          FaHistory, FaCog, FaSignOutAlt, FaCode, FaToggleOn, FaToggleOff,
-         FaShieldAlt, FaBell, FaUserShield, FaFingerprint, FaIdCard } from 'react-icons/fa';
+         FaShieldAlt, FaBell, FaUserShield, FaFingerprint, FaIdCard,
+         FaSun, FaMoon } from 'react-icons/fa';
 
 const MainLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showDevControls, setShowDevControls] = useState(false);
   const { currentUser, logout, devMode, toggleDevMode } = useAuth();
+  const { theme, toggleTheme, isDarkMode } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -26,13 +29,13 @@ const MainLayout = ({ children }) => {
   };
 
   return (
-    <div className="main-layout">
+    <div className={`main-layout ${isDarkMode ? 'dark-mode' : ''}`}>
       {/* Sidebar */}
       <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
           <h2 className="sidebar-title">
             <FaShieldAlt className="logo-icon" />
-            DBIS Admin
+            TrueID Admin
           </h2>
           {devMode && sidebarOpen && <span className="dev-badge"><FaCode /> DEV</span>}
           <button 
@@ -120,11 +123,16 @@ const MainLayout = ({ children }) => {
           <div className="header-left">
             <h1>
               <FaUserShield className="header-icon" />
-              DBIS Government Portal
+              TrueID Government Portal
             </h1>
           </div>
           
           <div className="header-right">
+            {/* Theme Toggle Button */}
+            <div className="header-icon-button theme-toggle" onClick={toggleTheme} title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+              {isDarkMode ? <FaSun /> : <FaMoon />}
+            </div>
+            
             {/* Notification Icon */}
             <div className="header-icon-button">
               <FaBell />
