@@ -1,8 +1,5 @@
 import axios from 'axios';
 
-// Development mode flag - set to false to use actual API calls
-const DEV_MODE = false;
-
 // Create an axios instance with default config
 const API = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',  // Updated to use port 5001
@@ -75,136 +72,36 @@ API.interceptors.response.use(
   }
 );
 
-// Mock data for development
-const mockData = {
-  user: {
-    id: 'mock-user-id',
-    username: 'testuser',
-    email: 'test@example.com',
-    name: 'Test User',
-    walletAddress: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
-    verified: true,
-    createdAt: new Date().toISOString()
-  },
-  tokens: {
-    accessToken: 'mock-access-token',
-    refreshToken: 'mock-refresh-token'
-  },
-  verificationStatus: {
-    status: 'VERIFIED',
-    updatedAt: new Date().toISOString()
-  },
-  blockchainStatus: {
-    isOnBlockchain: true,
-    transactionHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-    contractAddress: '0x266B577380aE3De838A66DEf28fffD5e75c5816E',
-    transferredAt: new Date().toISOString()
-  },
-  professionalRecords: [
-    {
-      id: 'record-1',
-      title: 'Medical License',
-      organization: 'Medical Council',
-      description: 'General Practitioner License',
-      issuedDate: '2023-01-15',
-      expiryDate: '2028-01-15',
-      verified: true,
-      on_blockchain: true,
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'record-2',
-      title: 'Specialist Certification',
-      organization: 'Medical Board',
-      description: 'Cardiology Specialist',
-      issuedDate: '2023-03-20',
-      expiryDate: '2028-03-20',
-      verified: true,
-      on_blockchain: false,
-      createdAt: new Date().toISOString()
-    }
-  ],
-  walletBalance: '10.5',
-  biometricStatus: {
-    verified: true,
-    lastVerified: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-    facemeshExists: true,
-    facialMatchScore: 0.92,
-    livenessScore: 0.95
-  },
-  transactions: [
-    {
-      id: 'tx-1',
-      hash: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      type: 'IDENTITY_TRANSFER',
-      status: 'CONFIRMED',
-      timestamp: new Date().toISOString()
-    }
-  ]
-};
-
-// Helper function for mock responses
-const mockResponse = (data, delay = 500) => {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      resolve({ data });
-    }, delay);
-  });
-};
-
 // Auth API calls
 export const authAPI = {
   register: (userData) => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock registration', userData);
-      return mockResponse({ user: mockData.user, tokens: mockData.tokens });
-    }
     return API.post('/user/register', userData);
   },
   login: (credentials) => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock login', credentials);
-      return mockResponse({ user: mockData.user, tokens: mockData.tokens });
-    }
     return API.post('/user/login', credentials);
   },
   refreshToken: (refreshToken) => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock refresh token');
-      return mockResponse({ tokens: mockData.tokens });
-    }
     return API.post('/user/refresh-token', { refreshToken });
   },
   verifyBiometric: (verificationData) => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock biometric verification', verificationData);
-      return mockResponse({ verified: true, message: 'Biometric verification successful' });
-    }
     return API.post('/user/verify-biometric', verificationData);
   },
 };
 
 // User API calls
 export const userAPI = {
-  getProfile: () => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock get profile');
-      return mockResponse(mockData.user);
-    }
-    return API.get('/users/profile');
+  getProfile: async () => {
+    const response = await API.get('/users/profile');
+    // Extract user data and ensure wallet address is properly set
+    const userData = response.data.user;
+    userData.walletAddress = userData.walletAddress || userData.avaxAddress;
+    response.data.user = userData;
+    return response;
   },
   updateProfile: (profileData) => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock update profile', profileData);
-      return mockResponse({ ...mockData.user, ...profileData });
-    }
     return API.put('/users/profile', profileData);
   },
   getVerificationStatus: async () => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock verification status');
-      return mockResponse(mockData.verificationStatus);
-    }
     try {
       const response = await API.get('/users/verification-status');
       console.log('API response for verification status:', response);
@@ -215,49 +112,15 @@ export const userAPI = {
     }
   },
   addProfessionalRecord: (recordData) => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock add professional record', recordData);
-      const newRecord = {
-        id: `record-${Date.now()}`,
-        ...recordData,
-        verified: false,
-        on_blockchain: false,
-        createdAt: new Date().toISOString()
-      };
-      return mockResponse(newRecord);
-    }
     return API.post('/users/professional-record', recordData);
   },
   getProfessionalRecords: () => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock get professional records');
-      return mockResponse({ records: mockData.professionalRecords });
-    }
     return API.get('/users/professional-records');
   },
   updateFacemesh: (facemeshData) => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock update facemesh', facemeshData);
-      return mockResponse({ success: true });
-    }
     return API.put('/users/update-facemesh', { facemeshData });
   },
-  getBlockchainStatus: () => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock blockchain status');
-      return mockResponse(mockData.blockchainStatus);
-    }
-    return API.get('/blockchain/status');
-  },
   getBiometricStatus: async () => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock biometric status');
-      return mockResponse({
-        verified: Math.random() > 0.5, // randomly return verified or not for testing
-        lastVerified: new Date().toISOString(),
-        facemeshExists: true
-      });
-    }
     try {
       const response = await API.get('/users/biometric-status');
       console.log('API response for biometric status:', response);
@@ -268,50 +131,45 @@ export const userAPI = {
     }
   },
   transferToBlockchain: () => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock transfer to blockchain');
-      return mockResponse({
-        success: true,
-        transactionHash: mockData.blockchainStatus.transactionHash
-      });
-    }
-    return API.post('/blockchain/record');
+    return API.post('/users/transfer-to-blockchain');
   },
 };
 
 // Blockchain API calls
 export const blockchainAPI = {
   getUserTransactions: () => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock get user transactions');
-      return mockResponse({ transactions: mockData.transactions });
-    }
     return API.get('/blockchain/transactions');
   },
   getBlockchainStatus: () => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock blockchain status');
-      return mockResponse(mockData.blockchainStatus);
-    }
     return API.get('/blockchain/status');
   },
+  recordIdentityOnBlockchain: () => {
+    return API.post('/blockchain/record');
+  },
+  getTransactionStatus: (txHash) => {
+    return API.get(`/blockchain/transaction/${txHash}`);
+  },
   verifyDocumentHash: (hash) => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock verify document hash', hash);
-      return mockResponse({ verified: true, timestamp: new Date().toISOString() });
-    }
     return API.get(`/blockchain/verify/${hash}`);
   },
 };
 
 // Wallet API service
 export const walletAPI = {
-  getWalletBalance: (address) => {
-    if (DEV_MODE) {
-      console.log('DEV MODE: Mock get wallet balance', address);
-      return mockResponse({ balance: mockData.walletBalance });
+  // Get wallet balance from blockchain service
+  getWalletBalance: async (address) => {
+    // First get blockchain status to check if wallet exists
+    const status = await blockchainAPI.getBlockchainStatus();
+    if (!status.data.walletAddress) {
+      throw new Error('No wallet address found');
     }
-    return API.get(`/blockchain/wallet/balance/${address}`);
+    // Return mock balance for now until backend endpoint is implemented
+    return Promise.resolve({
+      data: {
+        balance: '0.00',
+        address: status.data.walletAddress
+      }
+    });
   },
 };
 

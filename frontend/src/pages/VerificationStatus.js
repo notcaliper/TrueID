@@ -20,7 +20,7 @@ import {
   Pending as PendingIcon,
   Error as ErrorIcon,
   Refresh as RefreshIcon,
-  AutorenewRounded as AutorenewIcon
+  Autorenew as AutorenewIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { userAPI } from '../services/api.service';
@@ -52,8 +52,9 @@ const VerificationStatus = () => {
       const response = await userAPI.getVerificationStatus();
       console.log('Verification status response:', response);
       
-      // Check if we have the expected data structure
-      if (!response.data) {
+      // Extract verification data from response
+      const verificationData = response.data.data;
+      if (!verificationData) {
         throw new Error('Invalid response format from API');
       }
       
@@ -63,30 +64,31 @@ const VerificationStatus = () => {
           label: 'Registration Submitted',
           description: 'Your registration has been submitted successfully.',
           completed: true,
-          date: response.data.submittedAt
+          date: verificationData.submittedAt
         },
         {
           label: 'Identity Verification',
-          description: response.data.status === 'REJECTED' 
-            ? `Your identity verification was rejected. Reason: ${response.data.rejectionReason || 'Not specified'}`
+          description: verificationData.status === 'REJECTED' 
+            ? `Your identity verification was rejected. Reason: ${verificationData.rejectionReason || 'Not specified'}`
             : 'Your identity is being verified by government authorities.',
-          completed: response.data.status !== 'PENDING',
-          date: response.data.verifiedAt,
-          status: response.data.status
+          completed: verificationData.status !== 'PENDING',
+          date: verificationData.verifiedAt,
+          status: verificationData.status
         },
         {
           label: 'Wallet Activation',
           description: 'Your Avalanche wallet will be activated once your identity is verified.',
-          completed: response.data.status === 'VERIFIED',
-          date: response.data.status === 'VERIFIED' ? response.data.verifiedAt : null
+          completed: verificationData.status === 'VERIFIED',
+          date: verificationData.status === 'VERIFIED' ? verificationData.verifiedAt : null
         }
       ];
       
       setVerificationData({
-        status: response.data.status,
-        submittedAt: response.data.submittedAt,
-        verifiedAt: response.data.verifiedAt,
-        rejectionReason: response.data.rejectionReason,
+        status: verificationData.status,
+        submittedAt: verificationData.submittedAt,
+        verifiedAt: verificationData.verifiedAt,
+        rejectionReason: verificationData.rejectionReason,
+        verifiedBy: verificationData.verifiedBy,
         verificationSteps: steps,
         lastUpdated: new Date() // Add timestamp for last update
       });
@@ -103,10 +105,10 @@ const VerificationStatus = () => {
   useEffect(() => {
     fetchVerificationStatus();
     
-    // Set up polling every 30 seconds to check for status updates
+    // Set up polling every 15 seconds to check for status updates
     const pollingInterval = setInterval(() => {
       fetchVerificationStatus();
-    }, 30000); // 30 seconds
+    }, 15000); // 15 seconds
     
     // Clean up interval on component unmount
     return () => clearInterval(pollingInterval);
@@ -196,7 +198,10 @@ const VerificationStatus = () => {
         {verificationData.lastUpdated && (
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
             Last updated: {formatDate(verificationData.lastUpdated.toISOString())}
-            <span style={{ fontStyle: 'italic', marginLeft: '8px' }}>(Updates automatically every 30 seconds)</span>
+            <span style={{ fontStyle: 'italic', marginLeft: '8px' }}>
+              {refreshing ? '(Updating...)' : '(Updates automatically every 15 seconds)'}
+              {refreshing && <AutorenewIcon sx={{ fontSize: 14, ml: 0.5, animation: 'spin 1s linear infinite' }} />}
+            </span>
           </Typography>
         )}
         
@@ -228,6 +233,17 @@ const VerificationStatus = () => {
               </Typography>
               <Typography variant="body1" color="error">
                 {verificationData.rejectionReason || 'No reason provided'}
+              </Typography>
+            </Grid>
+          )}
+          
+          {verificationData.status === 'VERIFIED' && verificationData.verifiedBy && (
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Verified By
+              </Typography>
+              <Typography variant="body1">
+                {verificationData.verifiedBy}
               </Typography>
             </Grid>
           )}

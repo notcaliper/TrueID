@@ -17,7 +17,6 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
-import DevLogin from '../components/DevLogin';
 
 const Login = () => {
   const { login, isAuthenticated, loading, error } = useAuth();
@@ -168,7 +167,6 @@ const Login = () => {
             <Divider sx={{ my: 3 }} />
             
             {/* Development Login Bypass */}
-            <DevLogin />
           </Box>
         </Paper>
       </Box>

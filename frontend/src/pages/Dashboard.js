@@ -25,7 +25,8 @@ import {
   Security as BlockchainIcon,
   Fingerprint as BiometricIcon,
   Refresh as RefreshIcon,
-  Sync as SyncIcon
+  Sync as SyncIcon,
+  Autorenew as AutorenewIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { userAPI, blockchainAPI, walletAPI } from '../services/api.service';
@@ -48,7 +49,7 @@ const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState({
     verificationStatus: 'PENDING',
     verificationDetails: null,
-    walletBalance: '0',
+    walletBalance: null,
     blockchainStatus: false,
     blockchainDetails: null,
     professionalRecords: 0,
@@ -123,23 +124,20 @@ const Dashboard = () => {
       // 1. Verification Status - with detailed information
       const verificationStatusPromise = userAPI.getVerificationStatus()
         .then(response => {
-          console.log('Verification status response:', response);
-          // Extract and format verification details
-          const verificationData = response.data || { status: 'PENDING' };
+          console.log('Raw verification response:', response);
+          // Extract verification details from response
+          const verificationData = response.data.data;
+          console.log('Verification status from API:', verificationData.status);
           
-          // Ensure we have a properly formatted verification details object
-          const verificationDetails = {
-            status: verificationData.status || 'PENDING',
-            submittedAt: verificationData.submittedAt || null,
-            lastUpdated: verificationData.lastUpdated || verificationData.updatedAt || null,
-            reviewer: verificationData.reviewer || null,
-            rejectionReason: verificationData.rejectionReason || null,
-            documentCount: verificationData.documents?.length || 0,
-            notes: verificationData.notes || null
-          };
-          
+          // Return the data in the same format as the check-verification.js script
           return {
-            data: verificationDetails,
+            data: {
+              status: verificationData.status,
+              submittedAt: verificationData.submittedAt,
+              verifiedAt: verificationData.verifiedAt,
+              verifiedBy: verificationData.verifiedBy,
+              rejectionReason: verificationData.rejectionReason
+            },
             success: true
           };
         })
@@ -154,20 +152,20 @@ const Dashboard = () => {
       promises.push(verificationStatusPromise);
       
       // 2. Blockchain Status - with transaction details
-      const blockchainStatusPromise = userAPI.getBlockchainStatus()
+      const blockchainStatusPromise = blockchainAPI.getBlockchainStatus()
         .then(response => {
           console.log('Blockchain status response:', response);
           // Extract and format blockchain details
-          const blockchainData = response.data || { isOnBlockchain: false };
+          const blockchainData = response.data || { isRegistered: false };
           
           // Ensure we have a properly formatted blockchain details object
           const blockchainDetails = {
-            isOnBlockchain: blockchainData.isOnBlockchain || false,
-            contractAddress: blockchainData.contractAddress || '0x266B577380aE3De838A66DEf28fffD5e75c5816E',
-            transactionHash: blockchainData.transactionHash || null,
-            timestamp: blockchainData.timestamp || blockchainData.recordedAt || null,
-            network: blockchainData.network || 'Avalanche Fuji Testnet',
-            status: blockchainData.status || (blockchainData.isOnBlockchain ? 'CONFIRMED' : 'NOT_RECORDED')
+            isOnBlockchain: blockchainData.isRegistered,
+            contractAddress: blockchainData.contractAddress,
+            transactionHash: blockchainData.transactionHash,
+            timestamp: blockchainData.registrationTimestamp,
+            network: blockchainData.network,
+            status: blockchainData.status
           };
           
           return {
@@ -177,7 +175,7 @@ const Dashboard = () => {
         })
         .catch(err => {
           console.error('Error fetching blockchain status:', err);
-          errorMap.blockchain = err.message || 'Failed to fetch blockchain status';
+          errorMap.blockchain = err.message;
           return { 
             data: { isOnBlockchain: false },
             success: false
@@ -218,7 +216,7 @@ const Dashboard = () => {
         })
         .catch(err => {
           console.error('Error fetching professional records:', err);
-          errorMap.records = err.message || 'Failed to fetch professional records';
+          errorMap.records = err.message;
           return { 
             data: { records: [] },
             success: false
@@ -226,22 +224,29 @@ const Dashboard = () => {
         });
       promises.push(professionalRecordsPromise);
       
-      // 4. Wallet Balance - using wallet service for better caching and retry
+      // 4. Wallet Balance - always force refresh to get real-time balance
       let walletBalancePromise = Promise.resolve({ data: '0', success: true });
-      if (user && user.walletAddress) {
-        walletBalancePromise = walletService.getBalance(user.walletAddress, isRefreshing)
+      if (user?.walletAddress) {
+        console.log('Fetching balance for wallet:', user.walletAddress);
+        walletBalancePromise = walletService.getBalance(user.walletAddress, true) // Always force refresh
+          .then(balance => {
+            console.log('Received balance:', balance);
+            // Convert balance to a number and ensure it's valid
+            const numBalance = parseFloat(balance);
+            if (isNaN(numBalance)) {
+              console.error('Invalid balance received:', balance);
+              return '0';
+            }
+            return numBalance.toString();
+          })
+          .catch(error => {
+            console.error('Error fetching wallet balance:', error);
+            return '0';
+          })
           .then(balance => ({
             data: balance,
             success: true
-          }))
-          .catch(err => {
-            console.error('Error fetching wallet balance:', err);
-            errorMap.wallet = err.message || 'Failed to fetch wallet balance';
-            return { 
-              data: '0',
-              success: false
-            };
-          });
+          }));
       }
       promises.push(walletBalancePromise);
       
@@ -256,7 +261,7 @@ const Dashboard = () => {
         })
         .catch(err => {
           console.error('Error fetching transactions:', err);
-          errorMap.transactions = err.message || 'Failed to fetch transaction history';
+          errorMap.transactions = err.message;
           return { 
             data: [],
             success: false
@@ -281,7 +286,7 @@ const Dashboard = () => {
         })
         .catch(err => {
           console.error('Error fetching biometric status:', err);
-          errorMap.biometric = err.message || 'Failed to fetch biometric status';
+          errorMap.biometric = err.message;
           return { 
             data: {
               verified: false,
@@ -323,8 +328,12 @@ const Dashboard = () => {
       // Update dashboard data with whatever we could successfully fetch
       setDashboardData(prev => {
         // Process verification data
+        const verificationData = verificationResponse.success ? verificationResponse.data.data : null;
+        console.log('Verification data:', verificationData);
         const verificationStatus = verificationResponse.success ? verificationResponse.data.status : prev.verificationStatus;
+        console.log('Setting verification status to:', verificationStatus);
         const verificationDetails = verificationResponse.success ? verificationResponse.data : prev.verificationDetails;
+        console.log('Setting verification details:', verificationDetails);
         
         // Process blockchain data
         const blockchainStatus = blockchainResponse.success ? blockchainResponse.data.isOnBlockchain : prev.blockchainStatus;
@@ -335,7 +344,7 @@ const Dashboard = () => {
         const professionalRecords = recordsList.length;
         
         // Process wallet and transaction data
-        const walletBalance = walletBalance.success ? walletBalance.data : prev.walletBalance;
+        const newWalletBalance = walletBalance.success ? walletBalance.data : prev.walletBalance;
         const transactions = transactionsResponse.success ? transactionsResponse.data : prev.transactions;
         
         // Process biometric status
@@ -403,17 +412,16 @@ const Dashboard = () => {
     // Initial fetch
     fetchDashboardData();
     
-    // Set up polling interval (every 15 seconds) if polling is active
-    let intervalId = null;
-    if (pollingActive) {
-      intervalId = setInterval(() => {
+    // Start polling for updates every 15 seconds when component mounts
+    const pollingInterval = setInterval(() => {
+      if (pollingActive && document.visibilityState === 'visible') {
         fetchDashboardData(true);
-      }, 15000); // 15 seconds
-    }
+      }
+    }, 15000); // 15 seconds
     
     // Clean up interval on unmount or when polling is toggled off
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      if (pollingInterval) clearInterval(pollingInterval);
     };
   }, [fetchDashboardData, pollingActive]);
   
@@ -471,7 +479,7 @@ const Dashboard = () => {
   }
 
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
       {/* Backend connection status */}
       <Box sx={{ mb: 3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -515,8 +523,11 @@ const Dashboard = () => {
           </Alert>
         )}
         {lastUpdated && (
-          <Typography variant="caption" color="text.secondary">
-            Last updated: {lastUpdated.toLocaleString()}
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            Last updated: {lastUpdated ? new Date(lastUpdated).toLocaleString() : 'Never'}
+            <span style={{ fontStyle: 'italic', marginLeft: '8px' }}>
+              (Updates automatically every 15 seconds)
+            </span>
           </Typography>
         )}
       </Box>
@@ -546,9 +557,17 @@ const Dashboard = () => {
       
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
             Identity Status
           </Typography>
+          {refreshing && (
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <AutorenewIcon sx={{ fontSize: 16, mr: 0.5, animation: 'spin 1s linear infinite' }} />
+              <Typography variant="caption" color="text.secondary">
+                Updating...
+              </Typography>
+            </Box>
+          )}
           {apiErrors.verification && (
             <Tooltip title={apiErrors.verification}>
               <Chip label="API Error" color="error" size="small" />
@@ -588,50 +607,20 @@ const Dashboard = () => {
               </Typography>
             )}
           </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ bgcolor: 'background.default', p: 2, borderRadius: 1 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Verification Details
-              </Typography>
-              <Typography variant="body2" component="div">
-                <Box component="span" sx={{ display: 'block', mb: 0.5 }}>
-                  <strong>Submitted:</strong> {dashboardData.verificationDetails?.submittedAt 
-                    ? new Date(dashboardData.verificationDetails.submittedAt).toLocaleString() 
-                    : 'Not submitted'}
-                </Box>
-                {dashboardData.verificationDetails?.reviewedAt && (
-                  <Box component="span" sx={{ display: 'block', mb: 0.5 }}>
-                    <strong>Reviewed:</strong> {new Date(dashboardData.verificationDetails.reviewedAt).toLocaleString()}
-                  </Box>
-                )}
-                {dashboardData.verificationDetails?.reviewer && (
-                  <Box component="span" sx={{ display: 'block', mb: 0.5 }}>
-                    <strong>Reviewer:</strong> {dashboardData.verificationDetails.reviewer}
-                  </Box>
-                )}
-                {dashboardData.verificationDetails?.documents && (
-                  <Box component="span" sx={{ display: 'block' }}>
-                    <strong>Documents:</strong> {dashboardData.verificationDetails.documents.length} submitted
-                  </Box>
-                )}
-              </Typography>
-            </Box>
+          <Grid item xs={12}>
+            <Button
+              size="small" 
+              component={RouterLink} 
+              to="/verification-status"
+              endIcon={<VerifiedUserIcon />}
+            >
+              View Full Verification Details
+            </Button>
           </Grid>
         </Grid>
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-          <Button 
-            size="small" 
-            component={RouterLink} 
-            to="/verification-status"
-            endIcon={<VerifiedUserIcon />}
-          >
-            View Full Verification Details
-          </Button>
-        </Box>
       </Paper>
       
       <Grid container spacing={3}>
-        
         <Grid item xs={12} md={6} lg={4}>
           <Card>
             <CardContent>
@@ -648,7 +637,10 @@ const Dashboard = () => {
               </Box>
               <Box sx={{ position: 'relative' }}>
                 <Typography variant="h4" sx={{ mb: 1 }}>
-                  {parseFloat(dashboardData.walletBalance || '0').toFixed(4)} AVAX
+                  {(() => {
+                    const balance = parseFloat(dashboardData.walletBalance || '0');
+                    return isNaN(balance) ? '0.0000' : balance.toFixed(4);
+                  })()} AVAX
                 </Typography>
                 {refreshing && (
                   <Box sx={{ position: 'absolute', top: 0, right: 0, display: 'flex', alignItems: 'center' }}>
@@ -743,16 +735,29 @@ const Dashboard = () => {
               
               {dashboardData.verificationDetails && (
                 <Box sx={{ mt: 1.5, bgcolor: 'background.default', p: 1.5, borderRadius: 1 }}>
-                  {dashboardData.verificationDetails.submittedAt && (
-                    <Typography variant="caption" component="div">
-                      <strong>Submitted:</strong> {new Date(dashboardData.verificationDetails.submittedAt).toLocaleDateString()}
-                    </Typography>
-                  )}
-                  {dashboardData.verificationDetails.lastUpdated && (
-                    <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-                      <strong>Last updated:</strong> {new Date(dashboardData.verificationDetails.lastUpdated).toLocaleString()}
-                    </Typography>
-                  )}
+                  <Typography variant="subtitle2" gutterBottom>
+                    Verification Details
+                  </Typography>
+                  <Typography variant="body2" component="div">
+                    <Box component="span" sx={{ display: 'block', mb: 0.5 }}>
+                      <strong>Submitted:</strong> {dashboardData.verificationDetails.submittedAt 
+                        ? new Date(dashboardData.verificationDetails.submittedAt).toLocaleString() 
+                        : 'Not submitted'}
+                    </Box>
+                    <Box component="span" sx={{ display: 'block', mb: 0.5 }}>
+                      <strong>Verified At:</strong> {dashboardData.verificationDetails.verifiedAt 
+                        ? new Date(dashboardData.verificationDetails.verifiedAt).toLocaleString() 
+                        : 'Not verified'}
+                    </Box>
+                    <Box component="span" sx={{ display: 'block', mb: 0.5 }}>
+                      <strong>Verified By:</strong> {dashboardData.verificationDetails.verifiedBy || 'N/A'}
+                    </Box>
+                    {dashboardData.verificationDetails.rejectionReason && (
+                      <Box component="span" sx={{ display: 'block', mb: 0.5 }}>
+                        <strong>Rejection Reason:</strong> {dashboardData.verificationDetails.rejectionReason}
+                      </Box>
+                    )}
+                  </Typography>
                 </Box>
               )}
             </CardContent>

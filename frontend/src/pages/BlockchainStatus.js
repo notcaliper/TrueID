@@ -6,25 +6,23 @@ import {
   Button,
   Alert,
   CircularProgress,
-  Divider,
+  IconButton,
   Grid,
-  Card,
-  CardContent,
-  Chip,
-  Link,
   Stepper,
   Step,
   StepLabel,
   StepContent
 } from '@mui/material';
 import {
-  Security as BlockchainIcon,
-  CheckCircle as CheckCircleIcon,
-  Pending as PendingIcon,
   OpenInNew as ExternalLinkIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { userAPI, blockchainAPI } from '../services/api.service';
+
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  return new Date(dateString).toLocaleString();
+};
 
 const BlockchainStatus = () => {
   const { user } = useAuth();
@@ -33,40 +31,82 @@ const BlockchainStatus = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [blockchainData, setBlockchainData] = useState({
-    isOnBlockchain: false,
+    isRegistered: false,
     transactionHash: null,
-    contractAddress: '0x266B577380aE3De838A66DEf28fffD5e75c5816E', // From memory
-    transferredAt: null,
-    verificationStatus: 'PENDING'
+    contractAddress: '0x266B577380aE3De838A66DEf28fffD5e75c5816E',
+    registrationTimestamp: null,
+    verificationStatus: 'PENDING',
+    confirmations: 0,
+    network: 'Avalanche Fuji Testnet',
+    chainId: 43113
   });
+  const [pollingActive, setPollingActive] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  const getActiveStep = () => {
+    if (blockchainData.isRegistered) return 4;
+    if (blockchainData.verificationStatus === 'VERIFIED') return 2;
+    return 1;
+  };
 
+  // Set up polling for blockchain status
   useEffect(() => {
+    // Initial fetch
     fetchBlockchainStatus();
-  }, []);
+    
+    // Start polling every 15 seconds
+    const pollingInterval = setInterval(() => {
+      if (pollingActive && document.visibilityState === 'visible') {
+        fetchBlockchainStatus(true);
+      }
+    }, 15000);
+    
+    return () => clearInterval(pollingInterval);
+  }, [pollingActive]);
 
-  const fetchBlockchainStatus = async () => {
-    setLoading(true);
+  const fetchBlockchainStatus = async (isRefreshing = false) => {
+    if (!isRefreshing) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     setError(null);
     
     try {
-      // Fetch blockchain status
-      const blockchainResponse = await userAPI.getBlockchainStatus();
+      // Fetch blockchain status from blockchain API
+      const blockchainResponse = await blockchainAPI.getBlockchainStatus();
       
       // Fetch verification status
       const verificationResponse = await userAPI.getVerificationStatus();
       
-      setBlockchainData({
-        ...blockchainData,
-        isOnBlockchain: blockchainResponse.data.isOnBlockchain,
-        transactionHash: blockchainResponse.data.transactionHash,
-        transferredAt: blockchainResponse.data.transferredAt,
-        verificationStatus: verificationResponse.data.status
-      });
+      // Get status data from response
+      const { status: blockchainStatus } = blockchainResponse.data;
+      
+      // If there's a transaction hash, get its status
+      let confirmations = 0;
+      if (blockchainStatus?.registrationTxHash) {
+        try {
+          const txStatus = await blockchainAPI.getTransactionStatus(blockchainStatus.registrationTxHash);
+          confirmations = txStatus.data.confirmations || 0;
+        } catch (txErr) {
+          console.error('Error fetching transaction status:', txErr);
+        }
+      }
+      
+      setBlockchainData(prev => ({
+        ...prev,
+        isRegistered: blockchainStatus?.isRegistered || false,
+        transactionHash: blockchainStatus?.registrationTxHash || null,
+        registrationTimestamp: blockchainStatus?.registrationTimestamp || null,
+        verificationStatus: verificationResponse.data.data.status,
+        confirmations
+      }));
     } catch (err) {
       console.error('Error fetching blockchain status:', err);
       setError('Failed to load blockchain status. Please try again later.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -81,17 +121,44 @@ const BlockchainStatus = () => {
         throw new Error('Your identity must be verified before transferring to blockchain');
       }
       
-      // Transfer to blockchain
+      // Transfer to blockchain using user API
       const response = await userAPI.transferToBlockchain();
       
-      setBlockchainData({
-        ...blockchainData,
-        isOnBlockchain: true,
+      setBlockchainData(prev => ({
+        ...prev,
+        isRegistered: true,
         transactionHash: response.data.transactionHash,
-        transferredAt: new Date().toISOString()
-      });
+        registrationTimestamp: new Date().toISOString(),
+        confirmations: 0
+      }));
       
-      setSuccess('Your identity has been successfully transferred to the blockchain');
+      setSuccess('Your identity is being transferred to the blockchain. This process may take a few minutes.');
+      
+      // Start monitoring the transaction
+      const monitorTransaction = async () => {
+        try {
+          const txStatus = await blockchainAPI.getTransactionStatus(response.data.transactionHash);
+          const confirmations = txStatus.data.confirmations || 0;
+          
+          setBlockchainData(prev => ({
+            ...prev,
+            confirmations
+          }));
+          
+          if (confirmations >= 3) {
+            setSuccess('Your identity has been successfully transferred to the blockchain and confirmed!');
+            return;
+          }
+          
+          // Continue monitoring until we get enough confirmations
+          setTimeout(monitorTransaction, 5000); // Check every 5 seconds
+        } catch (err) {
+          console.error('Error monitoring transaction:', err);
+        }
+      };
+      
+      // Start monitoring after a short delay
+      setTimeout(monitorTransaction, 5000);
     } catch (err) {
       console.error('Error transferring to blockchain:', err);
       setError(err.message || 'Failed to transfer identity to blockchain. Please try again later.');
@@ -135,110 +202,131 @@ const BlockchainStatus = () => {
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <BlockchainIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6">
-                Blockchain Status
-              </Typography>
-            </Box>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-              <Chip 
-                label={blockchainData.isOnBlockchain ? "On Blockchain" : "Not on Blockchain"} 
-                color={blockchainData.isOnBlockchain ? "success" : "default"} 
-                icon={blockchainData.isOnBlockchain ? <CheckCircleIcon /> : <PendingIcon />}
-              />
-            </Box>
-            
-            <Divider sx={{ my: 2 }} />
-            
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Smart Contract Address
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle1">
+                  Blockchain Status
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', mt: 0.5 }}>
-                  {blockchainData.contractAddress}
-                </Typography>
-              </Grid>
-              
-              {blockchainData.isOnBlockchain && (
-                <>
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Transaction Hash
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                        {blockchainData.transactionHash}
-                      </Typography>
-                      <Button
-                        size="small"
-                        component={Link}
-                        href={`https://testnet.snowtrace.io/tx/${blockchainData.transactionHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        endIcon={<ExternalLinkIcon />}
-                        sx={{ ml: 1 }}
-                      >
-                        View
-                      </Button>
-                    </Box>
-                  </Grid>
-                  
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Transferred At
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 0.5 }}>
-                      {formatDate(blockchainData.transferredAt)}
-                    </Typography>
-                  </Grid>
-                </>
+              </Box>
+              {refreshing && (
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CircularProgress size={16} sx={{ mr: 0.5 }} />
+                  <Typography variant="caption" color="text.secondary">
+                    Updating...
+                  </Typography>
+                </Box>
               )}
-            </Grid>
+            </Box>
             
-            {!blockchainData.isOnBlockchain && blockchainData.verificationStatus === 'VERIFIED' && (
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={transferToBlockchain}
-                disabled={transferring}
-                sx={{ mt: 3 }}
-                fullWidth
-              >
-                {transferring ? (
-                  <CircularProgress size={24} />
-                ) : (
-                  'Transfer Identity to Blockchain'
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <Box>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Status
+                    </Typography>
+                    <Typography variant="body1">
+                      {blockchainData.isRegistered ? 'Registered' : 'Not Registered'}
+                    </Typography>
+                    {blockchainData.registrationTimestamp && (
+                      <Typography variant="body2" color="text.secondary">
+                        Registered on: {formatDate(blockchainData.registrationTimestamp)}
+                      </Typography>
+                    )}
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Smart Contract
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontFamily: 'monospace', display: 'flex', alignItems: 'center' }}>
+                      {blockchainData.contractAddress}
+                      <IconButton
+                        size="small"
+                        onClick={() => window.open(`https://testnet.snowtrace.io/address/${blockchainData.contractAddress}`, '_blank')}
+                      >
+                        <ExternalLinkIcon fontSize="small" />
+                      </IconButton>
+                    </Typography>
+                  </Grid>
+
+                  {blockchainData.transactionHash && (
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle1" gutterBottom>
+                        Transaction Details
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', display: 'flex', alignItems: 'center' }}>
+                        {blockchainData.transactionHash}
+                        <IconButton
+                          size="small"
+                          onClick={() => window.open(`https://testnet.snowtrace.io/tx/${blockchainData.transactionHash}`, '_blank')}
+                        >
+                          <ExternalLinkIcon fontSize="small" />
+                        </IconButton>
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Confirmations: {blockchainData.confirmations}
+                        {blockchainData.confirmations >= 3 && ' (Confirmed)'}
+                      </Typography>
+                    </Grid>
+                  )}
+                </Grid>
+
+                {!blockchainData.isRegistered && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      {blockchainData.verificationStatus === 'VERIFIED'
+                        ? 'Your identity is verified. You can now register it on the blockchain.'
+                        : 'Your identity must be verified before it can be registered on the blockchain.'}
+                    </Typography>
+
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={transferToBlockchain}
+                      disabled={
+                        transferring ||
+                        blockchainData.isRegistered ||
+                        blockchainData.verificationStatus !== 'VERIFIED'
+                      }
+                      sx={{ mt: 2 }}
+                    >
+                      {transferring ? (
+                        <>
+                          <CircularProgress size={24} sx={{ mr: 1 }} />
+                          Registering on Blockchain...
+                        </>
+                      ) : (
+                        'Register on Blockchain'
+                      )}
+                    </Button>
+                  </Box>
                 )}
-              </Button>
-            )}
-            
-            {!blockchainData.isOnBlockchain && blockchainData.verificationStatus !== 'VERIFIED' && (
-              <Alert severity="info" sx={{ mt: 3 }}>
-                Your identity must be verified before it can be transferred to the blockchain.
-              </Alert>
+              </Box>
             )}
           </Paper>
         </Grid>
-        
-        <Grid item xs={12} md={6}>
+
+        <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
               Blockchain Identity Process
             </Typography>
-            
-            <Stepper orientation="vertical" activeStep={blockchainData.isOnBlockchain ? 3 : blockchainData.verificationStatus === 'VERIFIED' ? 2 : 1}>
+
+            <Stepper orientation="vertical" activeStep={getActiveStep()}>
               <Step>
                 <StepLabel>Registration</StepLabel>
                 <StepContent>
                   <Typography variant="body2">
-                    Your identity has been registered in the TrueID system.
+                    Your identity information has been registered in the TrueID system.
                   </Typography>
                 </StepContent>
               </Step>
-              
+
               <Step>
                 <StepLabel>Identity Verification</StepLabel>
                 <StepContent>
@@ -251,89 +339,27 @@ const BlockchainStatus = () => {
                   </Typography>
                 </StepContent>
               </Step>
-              
+
               <Step>
-                <StepLabel>Blockchain Transfer</StepLabel>
+                <StepLabel>Blockchain Registration</StepLabel>
                 <StepContent>
                   <Typography variant="body2">
-                    {blockchainData.isOnBlockchain
-                      ? 'Your identity has been transferred to the Avalanche blockchain.'
-                      : 'Your identity will be transferred to the Avalanche blockchain.'}
+                    {blockchainData.isRegistered
+                      ? 'Your identity has been registered on the Avalanche blockchain.'
+                      : 'Your identity will be registered on the Avalanche blockchain once verified.'}
                   </Typography>
                 </StepContent>
               </Step>
-              
+
               <Step>
                 <StepLabel>Blockchain Verification</StepLabel>
                 <StepContent>
                   <Typography variant="body2">
-                    Your identity is now securely stored on the blockchain and can be verified by authorized parties.
+                    Your identity can now be verified by authorized parties using the Avalanche blockchain.
                   </Typography>
                 </StepContent>
               </Step>
             </Stepper>
-          </Paper>
-        </Grid>
-        
-        <Grid item xs={12}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              About Blockchain Identity
-            </Typography>
-            
-            <Typography variant="body1" paragraph>
-              Storing your identity on the Avalanche blockchain provides several benefits:
-            </Typography>
-            
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Security
-                    </Typography>
-                    <Typography variant="body2">
-                      Your identity is cryptographically secured on the blockchain, making it tamper-proof and resistant to fraud.
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} md={4}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Portability
-                    </Typography>
-                    <Typography variant="body2">
-                      Your blockchain identity can be accessed and verified from anywhere in the world without requiring centralized servers.
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} md={4}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Control
-                    </Typography>
-                    <Typography variant="body2">
-                      You maintain control over your identity and can selectively share verification proofs without revealing sensitive information.
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-            
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Technical Details
-              </Typography>
-              <Typography variant="body2">
-                Your identity is stored on the Avalanche C-Chain using a smart contract deployed at address {blockchainData.contractAddress}. The TrueID system uses the Avalanche Fuji Testnet for all blockchain operations.
-              </Typography>
-            </Box>
           </Paper>
         </Grid>
       </Grid>

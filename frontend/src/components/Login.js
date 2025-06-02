@@ -13,7 +13,6 @@ import {
   CircularProgress,
   Divider
 } from '@mui/material';
-import DevLogin from './DevLogin';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -170,7 +169,6 @@ const Login = () => {
         
         {/* Development mode login button */}
         <Box sx={{ mt: 4 }}>
-          <DevLogin />
         </Box>
       </Paper>
     </Container>

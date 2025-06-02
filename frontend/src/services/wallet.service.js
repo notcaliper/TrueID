@@ -19,22 +19,40 @@ class WalletService {
   /**
    * Initialize connection to Avalanche Fuji Testnet
    */
-  initProvider() {
+  async initProvider() {
     try {
       // Default Avalanche Fuji Testnet RPC URL
       const rpcUrl = process.env.REACT_APP_AVALANCHE_FUJI_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc';
+      console.log('Connecting to RPC URL:', rpcUrl);
+      
       this.provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+      
+      // Test the connection by getting the network
+      const network = await this.provider.ready;
+      console.log('Provider ready, getting network details...');
+      
+      const networkInfo = await this.provider.getNetwork();
+      console.log('Connected to network:', networkInfo);
+      
+      if (networkInfo && networkInfo.chainId !== 43113) {
+        console.warn(`Connected to chain ID ${networkInfo.chainId}, expected Avalanche Fuji Testnet (43113)`);
+      }
       
       // Add event listeners for provider
       this.provider.on('error', (error) => {
         console.error('Provider error:', error);
         // Try to reinitialize provider after error
+        this.provider = null;
         setTimeout(() => this.initProvider(), this.retryDelayMs);
       });
+      
+      return true;
     } catch (error) {
       console.error('Error initializing provider:', error);
       // Try to reinitialize provider after error
+      this.provider = null;
       setTimeout(() => this.initProvider(), this.retryDelayMs);
+      return false;
     }
   }
 
@@ -68,12 +86,32 @@ class WalletService {
     while (attempts < this.retryAttempts) {
       try {
         if (!this.provider) {
-          this.initProvider();
+          const initialized = await this.initProvider();
+          if (!initialized) {
+            throw new Error('Failed to initialize provider');
+          }
         }
         
+        // Wait for provider to be ready
+        await this.provider.ready;
+        
+        console.log('Fetching balance for address:', address);
         const balance = await this.provider.getBalance(address);
+        console.log('Raw balance:', balance.toString());
+        
+        if (!balance) {
+          throw new Error('Received null or undefined balance from provider');
+        }
+        
         // Convert from wei to AVAX (18 decimals)
         const formattedBalance = ethers.utils.formatEther(balance);
+        console.log('Formatted balance:', formattedBalance);
+        
+        // Validate the formatted balance
+        const numBalance = parseFloat(formattedBalance);
+        if (isNaN(numBalance)) {
+          throw new Error('Invalid balance received from provider');
+        }
         
         // Update cache
         this.balanceCache.set(address, {
@@ -91,6 +129,8 @@ class WalletService {
         if (attempts < this.retryAttempts) {
           // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
+          // Reset provider on error
+          this.provider = null;
         }
       }
     }
@@ -152,9 +192,11 @@ class WalletService {
       
       // Get the network information
       const network = await provider.getNetwork();
+      console.log('Connected to network:', network);
       
-      // Check if connected to Avalanche Fuji Testnet (Chain ID: 43113)
+      // Check if we're on the correct network
       if (network.chainId !== 43113) {
+        console.warn(`Connected to chain ID ${network.chainId}, expected Avalanche Fuji Testnet (43113)`);
         try {
           // Try to switch to Avalanche Fuji Testnet
           await window.ethereum.request({

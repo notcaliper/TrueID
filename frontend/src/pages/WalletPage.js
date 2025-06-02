@@ -40,13 +40,12 @@ const WalletPage = () => {
 
   useEffect(() => {
     const fetchWalletData = async () => {
-      setLoading(true);
       setError(null);
       
       try {
         // Fetch user profile to get wallet address
         const profileResponse = await userAPI.getProfile();
-        const walletAddress = profileResponse.data.avax_address || profileResponse.data.wallet_address;
+        const walletAddress = profileResponse.data.user.walletAddress;
         
         if (!walletAddress) {
           setError('No wallet address found for your account.');
@@ -54,8 +53,8 @@ const WalletPage = () => {
           return;
         }
         
-        // Fetch wallet balance
-        const balance = await walletService.getBalance(walletAddress);
+        // Fetch wallet balance with force refresh to bypass cache
+        const balance = await walletService.getBalance(walletAddress, true);
         
         // Fetch blockchain status and transactions
         const blockchainStatusResponse = await blockchainAPI.getBlockchainStatus();
@@ -86,7 +85,15 @@ const WalletPage = () => {
       }
     };
     
+    // Initial fetch
+    setLoading(true);
     fetchWalletData();
+
+    // Set up polling every 15 seconds
+    const pollInterval = setInterval(fetchWalletData, 15000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(pollInterval);
   }, []);
 
   const copyToClipboard = (text) => {
