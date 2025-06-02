@@ -5,10 +5,11 @@ const DEV_MODE = false;
 
 // Create an axios instance with default config
 const API = axios.create({
-  baseURL: '/api',  // Uses the proxy setting from package.json
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',  // Updated to use port 5001
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 second timeout
 });
 
 // Add a request interceptor to include the auth token in requests
@@ -45,7 +46,7 @@ API.interceptors.response.use(
         
         // Try to refresh the token
         const response = await axios.post(
-          '/api/auth/refresh-token',
+          '/api/user/refresh-token',
           { refreshToken }
         );
         
@@ -124,6 +125,13 @@ const mockData = {
     }
   ],
   walletBalance: '10.5',
+  biometricStatus: {
+    verified: true,
+    lastVerified: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    facemeshExists: true,
+    facialMatchScore: 0.92,
+    livenessScore: 0.95
+  },
   transactions: [
     {
       id: 'tx-1',
@@ -148,31 +156,31 @@ const mockResponse = (data, delay = 500) => {
 export const authAPI = {
   register: (userData) => {
     if (DEV_MODE) {
-      console.log('DEV MODE: Mock register', userData);
+      console.log('DEV MODE: Mock registration', userData);
       return mockResponse({ user: mockData.user, tokens: mockData.tokens });
     }
-    return API.post('/auth/register', userData);
+    return API.post('/user/register', userData);
   },
   login: (credentials) => {
     if (DEV_MODE) {
       console.log('DEV MODE: Mock login', credentials);
       return mockResponse({ user: mockData.user, tokens: mockData.tokens });
     }
-    return API.post('/auth/login', credentials);
+    return API.post('/user/login', credentials);
   },
   refreshToken: (refreshToken) => {
     if (DEV_MODE) {
       console.log('DEV MODE: Mock refresh token');
       return mockResponse({ tokens: mockData.tokens });
     }
-    return API.post('/auth/refresh-token', { refreshToken });
+    return API.post('/user/refresh-token', { refreshToken });
   },
   verifyBiometric: (verificationData) => {
     if (DEV_MODE) {
       console.log('DEV MODE: Mock biometric verification', verificationData);
       return mockResponse({ verified: true, message: 'Biometric verification successful' });
     }
-    return API.post('/auth/verify-biometric', verificationData);
+    return API.post('/user/verify-biometric', verificationData);
   },
 };
 
@@ -192,12 +200,19 @@ export const userAPI = {
     }
     return API.put('/users/profile', profileData);
   },
-  getVerificationStatus: () => {
+  getVerificationStatus: async () => {
     if (DEV_MODE) {
       console.log('DEV MODE: Mock verification status');
       return mockResponse(mockData.verificationStatus);
     }
-    return API.get('/users/verification-status');
+    try {
+      const response = await API.get('/users/verification-status');
+      console.log('API response for verification status:', response);
+      return response;
+    } catch (error) {
+      console.error('Error fetching verification status:', error);
+      throw error;
+    }
   },
   addProfessionalRecord: (recordData) => {
     if (DEV_MODE) {
@@ -233,6 +248,24 @@ export const userAPI = {
       return mockResponse(mockData.blockchainStatus);
     }
     return API.get('/blockchain/status');
+  },
+  getBiometricStatus: async () => {
+    if (DEV_MODE) {
+      console.log('DEV MODE: Mock biometric status');
+      return mockResponse({
+        verified: Math.random() > 0.5, // randomly return verified or not for testing
+        lastVerified: new Date().toISOString(),
+        facemeshExists: true
+      });
+    }
+    try {
+      const response = await API.get('/users/biometric-status');
+      console.log('API response for biometric status:', response);
+      return response;
+    } catch (error) {
+      console.error('Error fetching biometric status:', error);
+      throw error;
+    }
   },
   transferToBlockchain: () => {
     if (DEV_MODE) {

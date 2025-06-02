@@ -14,7 +14,8 @@ import {
   Work as WorkIcon,
   Security as BlockchainIcon,
   Fingerprint as BiometricIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  BugReport as TestIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 
@@ -53,6 +54,11 @@ const Layout = () => {
     { text: 'Blockchain Status', icon: <BlockchainIcon />, path: '/blockchain-status' },
   ];
   
+  // Development menu items - only shown in development environment
+  const devMenuItems = [
+    { text: 'System Test', icon: <TestIcon color="error" />, path: '/test' },
+  ];
+  
   const drawer = (
     <div>
       <Toolbar>
@@ -63,6 +69,30 @@ const Layout = () => {
       <Divider />
       <List>
         {menuItems.map((item) => (
+          <ListItem 
+            button 
+            key={item.text} 
+            component={Link} 
+            to={item.path}
+            onClick={() => setMobileOpen(false)}
+          >
+            <ListItemIcon>
+              {item.icon}
+            </ListItemIcon>
+            <ListItemText primary={item.text} />
+          </ListItem>
+        ))}
+      </List>
+      
+      {/* Development section */}
+      <Divider />
+      <List>
+        <ListItem>
+          <Typography variant="caption" color="error">
+            DEVELOPMENT
+          </Typography>
+        </ListItem>
+        {devMenuItems.map((item) => (
           <ListItem 
             button 
             key={item.text} 

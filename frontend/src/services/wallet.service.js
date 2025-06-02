@@ -7,6 +7,12 @@ import { ethers } from 'ethers';
 class WalletService {
   constructor() {
     this.provider = null;
+    this.balanceCache = new Map();
+    this.lastCacheUpdate = null;
+    this.cacheExpiryMs = 30000; // 30 seconds
+    this.retryAttempts = 3;
+    this.retryDelayMs = 1000;
+    this.lastError = null;
     this.initProvider();
   }
 
@@ -14,29 +20,97 @@ class WalletService {
    * Initialize connection to Avalanche Fuji Testnet
    */
   initProvider() {
-    // Default Avalanche Fuji Testnet RPC URL
-    const rpcUrl = process.env.REACT_APP_AVALANCHE_FUJI_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc';
-    this.provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    try {
+      // Default Avalanche Fuji Testnet RPC URL
+      const rpcUrl = process.env.REACT_APP_AVALANCHE_FUJI_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc';
+      this.provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+      
+      // Add event listeners for provider
+      this.provider.on('error', (error) => {
+        console.error('Provider error:', error);
+        // Try to reinitialize provider after error
+        setTimeout(() => this.initProvider(), this.retryDelayMs);
+      });
+    } catch (error) {
+      console.error('Error initializing provider:', error);
+      // Try to reinitialize provider after error
+      setTimeout(() => this.initProvider(), this.retryDelayMs);
+    }
   }
 
   /**
-   * Get wallet balance
+   * Get wallet balance with caching and retry logic
    * @param {String} address - Wallet address
+   * @param {Boolean} forceRefresh - Force refresh from network
    * @returns {Promise<String>} Balance in AVAX
    */
-  async getBalance(address) {
-    try {
-      if (!this.provider) {
-        this.initProvider();
-      }
-      
-      const balance = await this.provider.getBalance(address);
-      // Convert from wei to AVAX (18 decimals)
-      return ethers.utils.formatEther(balance);
-    } catch (error) {
-      console.error('Error getting wallet balance:', error);
-      throw new Error('Failed to get wallet balance');
+  async getBalance(address, forceRefresh = false) {
+    // Validate address
+    if (!this.isValidAddress(address)) {
+      console.error('Invalid wallet address:', address);
+      return '0';
     }
+    
+    // Check cache if not forcing refresh
+    if (!forceRefresh && this.balanceCache.has(address)) {
+      const cachedData = this.balanceCache.get(address);
+      const now = Date.now();
+      
+      // Return cached balance if not expired
+      if (now - cachedData.timestamp < this.cacheExpiryMs) {
+        return cachedData.balance;
+      }
+    }
+    
+    // Implement retry logic
+    let attempts = 0;
+    
+    while (attempts < this.retryAttempts) {
+      try {
+        if (!this.provider) {
+          this.initProvider();
+        }
+        
+        const balance = await this.provider.getBalance(address);
+        // Convert from wei to AVAX (18 decimals)
+        const formattedBalance = ethers.utils.formatEther(balance);
+        
+        // Update cache
+        this.balanceCache.set(address, {
+          balance: formattedBalance,
+          timestamp: Date.now()
+        });
+        this.lastCacheUpdate = Date.now();
+        
+        return formattedBalance;
+      } catch (error) {
+        this.lastError = error;
+        console.error(`Error getting wallet balance (attempt ${attempts + 1}/${this.retryAttempts}):`, error);
+        attempts++;
+        
+        if (attempts < this.retryAttempts) {
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
+        }
+      }
+    }
+    
+    // After all retries failed, check if we have a cached value to return as fallback
+    if (this.balanceCache.has(address)) {
+      console.warn('Using cached balance after failed refresh attempts');
+      return this.balanceCache.get(address).balance;
+    }
+    
+    console.error('Failed to get wallet balance after multiple attempts');
+    return '0'; // Return 0 as fallback instead of throwing
+  }
+  
+  /**
+   * Clear the balance cache
+   */
+  clearCache() {
+    this.balanceCache.clear();
+    this.lastCacheUpdate = null;
   }
 
   /**
@@ -152,4 +226,6 @@ class WalletService {
   }
 }
 
-export default new WalletService();
+// Create a singleton instance
+const walletServiceInstance = new WalletService();
+export default walletServiceInstance;

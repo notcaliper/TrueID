@@ -12,12 +12,15 @@ import {
   CircularProgress,
   Chip,
   Divider,
-  Grid
+  Grid,
+  Badge
 } from '@mui/material';
 import { 
   CheckCircle as CheckCircleIcon, 
   Pending as PendingIcon,
-  Error as ErrorIcon 
+  Error as ErrorIcon,
+  Refresh as RefreshIcon,
+  AutorenewRounded as AutorenewIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { userAPI } from '../services/api.service';
@@ -34,56 +37,86 @@ const VerificationStatus = () => {
     verificationSteps: []
   });
 
-  useEffect(() => {
-    const fetchVerificationStatus = async () => {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const response = await userAPI.getVerificationStatus();
-        
-        // Format verification steps based on status
-        const steps = [
-          {
-            label: 'Registration Submitted',
-            description: 'Your registration has been submitted successfully.',
-            completed: true,
-            date: response.data.submittedAt
-          },
-          {
-            label: 'Identity Verification',
-            description: response.data.status === 'REJECTED' 
-              ? `Your identity verification was rejected. Reason: ${response.data.rejectionReason || 'Not specified'}`
-              : 'Your identity is being verified by government authorities.',
-            completed: response.data.status !== 'PENDING',
-            date: response.data.verifiedAt,
-            status: response.data.status
-          },
-          {
-            label: 'Wallet Activation',
-            description: 'Your Avalanche wallet will be activated once your identity is verified.',
-            completed: response.data.status === 'VERIFIED',
-            date: response.data.status === 'VERIFIED' ? response.data.verifiedAt : null
-          }
-        ];
-        
-        setVerificationData({
-          status: response.data.status,
-          submittedAt: response.data.submittedAt,
-          verifiedAt: response.data.verifiedAt,
-          rejectionReason: response.data.rejectionReason,
-          verificationSteps: steps
-        });
-      } catch (err) {
-        console.error('Error fetching verification status:', err);
-        setError('Failed to load verification status. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchVerificationStatus = async () => {
+    setError(null);
+    setRefreshing(true);
     
+    try {
+      // Only show loading indicator on initial load, not during refresh
+      if (loading) {
+        setLoading(true);
+      }
+      
+      const response = await userAPI.getVerificationStatus();
+      console.log('Verification status response:', response);
+      
+      // Check if we have the expected data structure
+      if (!response.data) {
+        throw new Error('Invalid response format from API');
+      }
+      
+      // Format verification steps based on status
+      const steps = [
+        {
+          label: 'Registration Submitted',
+          description: 'Your registration has been submitted successfully.',
+          completed: true,
+          date: response.data.submittedAt
+        },
+        {
+          label: 'Identity Verification',
+          description: response.data.status === 'REJECTED' 
+            ? `Your identity verification was rejected. Reason: ${response.data.rejectionReason || 'Not specified'}`
+            : 'Your identity is being verified by government authorities.',
+          completed: response.data.status !== 'PENDING',
+          date: response.data.verifiedAt,
+          status: response.data.status
+        },
+        {
+          label: 'Wallet Activation',
+          description: 'Your Avalanche wallet will be activated once your identity is verified.',
+          completed: response.data.status === 'VERIFIED',
+          date: response.data.status === 'VERIFIED' ? response.data.verifiedAt : null
+        }
+      ];
+      
+      setVerificationData({
+        status: response.data.status,
+        submittedAt: response.data.submittedAt,
+        verifiedAt: response.data.verifiedAt,
+        rejectionReason: response.data.rejectionReason,
+        verificationSteps: steps,
+        lastUpdated: new Date() // Add timestamp for last update
+      });
+    } catch (err) {
+      console.error('Error fetching verification status:', err);
+      setError('Failed to load verification status. Please try again later.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+  
+  // Initial fetch when component mounts
+  useEffect(() => {
     fetchVerificationStatus();
+    
+    // Set up polling every 30 seconds to check for status updates
+    const pollingInterval = setInterval(() => {
+      fetchVerificationStatus();
+    }, 30000); // 30 seconds
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(pollingInterval);
   }, []);
+  
+  // Debug function to help diagnose status issues
+  const debugStatus = () => {
+    console.log('Current verification data:', verificationData);
+    return null;
+  }
 
   const getStatusIcon = (step) => {
     if (step.completed) {
@@ -139,6 +172,16 @@ const VerificationStatus = () => {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             Current Status
           </Typography>
+          <Button 
+            variant="outlined" 
+            size="small" 
+            onClick={fetchVerificationStatus} 
+            sx={{ mr: 2 }}
+            startIcon={refreshing ? <CircularProgress size={16} /> : <RefreshIcon />}
+            disabled={refreshing}
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
           <Chip 
             label={verificationData.status} 
             color={getStatusColor(verificationData.status)} 
@@ -149,6 +192,13 @@ const VerificationStatus = () => {
             }
           />
         </Box>
+        
+        {verificationData.lastUpdated && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+            Last updated: {formatDate(verificationData.lastUpdated.toISOString())}
+            <span style={{ fontStyle: 'italic', marginLeft: '8px' }}>(Updates automatically every 30 seconds)</span>
+          </Typography>
+        )}
         
         <Divider sx={{ my: 2 }} />
         

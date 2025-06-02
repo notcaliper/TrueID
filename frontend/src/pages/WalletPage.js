@@ -21,17 +21,18 @@ import {
 } from '@mui/material';
 import { ContentCopy as CopyIcon, OpenInNew as ExternalLinkIcon } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
-import { userAPI } from '../services/api.service';
+import { userAPI, blockchainAPI } from '../services/api.service';
 import walletService from '../services/wallet.service';
 
 const WalletPage = () => {
-  const { user } = useAuth();
+  const { } = useAuth(); // We'll use auth context but don't need the user object directly
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [walletData, setWalletData] = useState({
     address: '',
     balance: '0',
-    transactions: []
+    transactions: [],
+    blockchainStatus: {}
   });
   const [copied, setCopied] = useState(false);
   const [connectingWallet, setConnectingWallet] = useState(false);
@@ -45,7 +46,7 @@ const WalletPage = () => {
       try {
         // Fetch user profile to get wallet address
         const profileResponse = await userAPI.getProfile();
-        const walletAddress = profileResponse.data.avax_address;
+        const walletAddress = profileResponse.data.avax_address || profileResponse.data.wallet_address;
         
         if (!walletAddress) {
           setError('No wallet address found for your account.');
@@ -56,27 +57,26 @@ const WalletPage = () => {
         // Fetch wallet balance
         const balance = await walletService.getBalance(walletAddress);
         
-        // Fetch transactions (simplified for demo)
-        // In a real app, you would fetch this from the backend
-        const mockTransactions = [
-          {
-            hash: '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''),
-            timestamp: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-            type: 'IDENTITY_VERIFICATION',
-            status: 'CONFIRMED'
-          },
-          {
-            hash: '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''),
-            timestamp: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-            type: 'RECORD_ADDED',
-            status: 'CONFIRMED'
-          }
-        ];
+        // Fetch blockchain status and transactions
+        const blockchainStatusResponse = await blockchainAPI.getBlockchainStatus();
+        
+        // Get transactions from the blockchain status response
+        const transactions = blockchainStatusResponse.data.recentTransactions || [];
+        
+        // Map transactions to a consistent format
+        const formattedTransactions = transactions.map(tx => ({
+          hash: tx.transaction_hash || tx.tx_hash || tx.hash,
+          timestamp: tx.created_at || tx.timestamp,
+          type: tx.transaction_type || tx.tx_type || tx.type,
+          status: tx.status || 'CONFIRMED',
+          network: tx.network || 'Avalanche Fuji Testnet'
+        }));
         
         setWalletData({
           address: walletAddress,
           balance,
-          transactions: mockTransactions
+          transactions: formattedTransactions,
+          blockchainStatus: blockchainStatusResponse.data.status || {}
         });
       } catch (err) {
         console.error('Error fetching wallet data:', err);
@@ -146,58 +146,78 @@ const WalletPage = () => {
                 Wallet Address
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    fontFamily: 'monospace', 
-                    bgcolor: 'background.paper', 
-                    p: 1, 
-                    borderRadius: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    maxWidth: '80%'
-                  }}
-                >
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', mr: 1 }}>
                   {walletData.address}
                 </Typography>
-                <Button 
-                  size="small" 
-                  startIcon={<CopyIcon />} 
+                <Button
+                  size="small"
+                  variant="outlined"
                   onClick={() => copyToClipboard(walletData.address)}
-                  sx={{ ml: 1 }}
+                  startIcon={<CopyIcon />}
                 >
                   {copied ? 'Copied!' : 'Copy'}
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  component={Link}
+                  href={`https://testnet.snowtrace.io/address/${walletData.address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  startIcon={<ExternalLinkIcon />}
+                  sx={{ ml: 1 }}
+                >
+                  View
                 </Button>
               </Box>
             </Box>
             
             <Divider sx={{ my: 2 }} />
             
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                Balance
-              </Typography>
-              <Typography variant="h4" sx={{ mt: 1 }}>
-                {walletData.balance} AVAX
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                on Avalanche Fuji Testnet
-              </Typography>
-            </Box>
+            <Typography variant="subtitle2" color="text.secondary">
+              Balance
+            </Typography>
+            <Typography variant="h5" sx={{ mt: 1 }}>
+              {walletData.balance} AVAX
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Avalanche Fuji Testnet
+            </Typography>
             
-            <Box sx={{ mt: 3 }}>
-              <Button 
-                variant="outlined" 
-                color="primary"
-                component={Link}
-                href={`https://testnet.snowtrace.io/address/${walletData.address}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                endIcon={<ExternalLinkIcon />}
-              >
-                View on Snowtrace
-              </Button>
-            </Box>
+            <Divider sx={{ my: 2 }} />
+            
+            <Typography variant="subtitle2" color="text.secondary">
+              Blockchain Identity Status
+            </Typography>
+            {walletData.blockchainStatus && (
+              <Box sx={{ mt: 1 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Registration Status
+                    </Typography>
+                    <Chip 
+                      label={walletData.blockchainStatus.identityStatus || 'NOT_REGISTERED'} 
+                      color={
+                        walletData.blockchainStatus.identityStatus === 'VERIFIED' ? 'success' :
+                        walletData.blockchainStatus.identityStatus === 'REGISTERED' ? 'primary' :
+                        'default'
+                      }
+                      size="small"
+                      sx={{ mt: 0.5 }}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Network
+                    </Typography>
+                    <Typography variant="body2">
+                      {walletData.blockchainStatus.network || 'Avalanche Fuji Testnet'}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
           </Paper>
         </Grid>
         
