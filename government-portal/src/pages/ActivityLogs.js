@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ApiService from '../services/ApiService';
 import { FaSearch, FaDownload, FaCalendarAlt, FaFilter, 
          FaCheckCircle, FaTimesCircle, FaEdit, FaClock, 
-         FaLink, FaChevronLeft, FaChevronRight, FaHistory } from 'react-icons/fa';
+         FaChevronLeft, FaChevronRight, FaHistory } from 'react-icons/fa';
 
 const ActivityLogs = () => {
   const [logs, setLogs] = useState([]);
@@ -18,11 +18,8 @@ const ActivityLogs = () => {
   const [actionFilter, setActionFilter] = useState('all');
   const logsPerPage = 15;
 
-  useEffect(() => {
-    fetchActivityLogs();
-  }, [currentPage, actionFilter]);
-
-  const fetchActivityLogs = async () => {
+  // Memoize fetchActivityLogs to avoid recreation on each render
+  const fetchActivityLogs = useCallback(async () => {
     setLoading(true);
     try {
       const filters = {
@@ -41,7 +38,13 @@ const ActivityLogs = () => {
       setError('Failed to load activity logs. Please try again.');
       setLoading(false);
     }
-  };
+  }, [currentPage, logsPerPage, searchQuery, actionFilter, dateRange]);
+
+  useEffect(() => {
+    fetchActivityLogs();
+  }, [fetchActivityLogs]);
+
+
 
   const handleSearch = (e) => {
     e.preventDefault();

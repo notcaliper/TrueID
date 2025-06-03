@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import ApiService from '../services/ApiService';
 import BlockchainService from '../services/BlockchainService';
 import { FaUserCheck, FaUserTimes, FaUserClock, FaFingerprint, FaHistory, 
-         FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaTimes, 
+         FaCheckCircle, FaTimesCircle, FaTimes, 
          FaEdit, FaLink } from 'react-icons/fa';
 
 const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [userData, setUserData] = useState(user);
   const [newFacemeshHash, setNewFacemeshHash] = useState('');
   const [versionHistory, setVersionHistory] = useState([]);
@@ -69,71 +70,61 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
     try {
       console.log('Verifying user with ID:', userData.id);
       
-      // Skip blockchain verification if no wallet address (for development/testing)
-      let blockchainSuccess = true;
+      // First attempt blockchain verification
+      setBlockchainLoading(true);
       let txHash = null;
       
-      // If wallet address exists, attempt blockchain verification
-      if (userData.wallet_address) {
-        setBlockchainLoading(true);
-        try {
-          // Initialize blockchain service if needed
-          if (!BlockchainService.initialized) {
-            await BlockchainService.initialize();
-          }
-          
-          const blockchainResult = await BlockchainService.verifyIdentity(userData.wallet_address);
-          
-          if (blockchainResult.success) {
-            setBlockchainSuccess('Identity verified on blockchain successfully.');
-            txHash = blockchainResult.txHash;
-          } else {
-            setBlockchainError('Blockchain verification failed: ' + (blockchainResult.error || 'Unknown error'));
-            blockchainSuccess = false;
-          }
-        } catch (blockchainErr) {
-          console.error('Blockchain verification error:', blockchainErr);
-          setBlockchainError('Blockchain error: ' + blockchainErr.message);
-          // Continue with API verification even if blockchain fails
-        } finally {
-          setBlockchainLoading(false);
+      try {
+        // Initialize blockchain service if needed
+        if (!BlockchainService.initialized) {
+          await BlockchainService.initialize();
         }
-      } else {
-        console.warn('No wallet address provided, skipping blockchain verification');
+        
+        const blockchainResult = await BlockchainService.verifyIdentity(userData.id);
+        
+        if (blockchainResult.success) {
+          setBlockchainSuccess('Identity verified successfully.');
+          txHash = blockchainResult.txHash;
+        } else {
+          setBlockchainError('Verification failed: ' + (blockchainResult.error || 'Unknown error'));
+        }
+      } catch (blockchainErr) {
+        console.error('Blockchain verification error:', blockchainErr);
+        setBlockchainError('Blockchain error: ' + blockchainErr.message);
+      } finally {
+        setBlockchainLoading(false);
       }
       
-      // Proceed with API verification regardless of blockchain result
-      // This allows verification to work even in development environments
-      try {
-        console.log('Calling API to verify user:', userData.id);
-        const apiResult = await ApiService.verifyIdentity(userData.id);
-        console.log('API verification result:', apiResult);
+      // Now call the API to verify the user
+      console.log('Calling API to verify user:', userData.id);
+      const apiResult = await ApiService.verifyIdentity(userData.id);
+      console.log('API verification result:', apiResult);
         
-        // Create updated user object with new verification status
-        const updatedUser = {
-          ...userData,
-          verification_status: 'VERIFIED',
-          updated_at: new Date().toISOString()
-        };
+      // Create updated user object with new verification status
+      const updatedUser = {
+        ...userData,
+        verification_status: 'VERIFIED',
+        updated_at: new Date().toISOString()
+      };
         
         if (txHash) {
           updatedUser.txHash = txHash;
         }
         
-        // Update UI and notify parent component
+        // Update local state
         setUserData(updatedUser);
+        
+        // Notify parent component
         if (onUserUpdated) {
-          console.log('Notifying parent of user update:', updatedUser);
           onUserUpdated(updatedUser);
         }
-      } catch (apiErr) {
-        console.error('API verification error:', apiErr);
-        setError('API error: ' + apiErr.message);
-        throw apiErr; // Re-throw to be caught by outer catch
-      }
-    } catch (err) {
-      console.error('Error in verification process:', err);
-      setError('Failed to verify user: ' + err.message);
+        
+        // Show success message
+        setError(null);
+        setSuccess('User verified successfully' + (txHash ? ' and recorded on blockchain.' : '.'));
+    } catch (error) {
+      console.error('Verification error:', error);
+      setError('Failed to verify user: ' + error.message);
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../utils/AuthContext';
 import ApiService from '../services/ApiService';
-import { FaUser, FaLock, FaBell, FaShieldAlt, FaExclamationTriangle, FaCheckCircle, FaSave } from 'react-icons/fa';
+import { FaUser, FaBell, FaShieldAlt, FaExclamationTriangle, FaCheckCircle, FaSave } from 'react-icons/fa';
 
 const Settings = () => {
   const { currentUser } = useAuth();

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ApiService from '../services/ApiService';
 import UserDetailModal from '../components/UserDetailModal';
-import { FaSearch, FaEye, FaEdit, FaUserCheck, FaUserTimes, FaUserClock, FaChevronLeft, FaChevronRight, FaDatabase, FaExclamationCircle } from 'react-icons/fa';
+import { FaSearch, FaEye, FaUserCheck, FaUserTimes, FaUserClock, FaChevronLeft, FaChevronRight, FaDatabase, FaExclamationCircle, FaEdit } from 'react-icons/fa';
 
 const RecordManagement = () => {
   const [users, setUsers] = useState([]);
@@ -14,9 +14,9 @@ const RecordManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
-  const [refreshInterval, setRefreshInterval] = useState(10000); // 10 seconds refresh by default
+  const [refreshInterval, setRefreshInterval] = useState(60000); // 60 seconds refresh by default
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false); // Disabled by default
   const refreshTimerRef = useRef(null);
   const usersPerPage = 10;
 

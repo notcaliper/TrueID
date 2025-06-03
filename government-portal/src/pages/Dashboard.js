@@ -7,6 +7,7 @@ import { FaUsers, FaUserCheck, FaUserClock, FaUserTimes,
          FaChartLine, FaShieldAlt, FaIdCard, FaArrowUp, 
          FaArrowDown, FaSync, FaExclamationTriangle, FaUserShield } from 'react-icons/fa';
 import { useAuth } from '../utils/AuthContext';
+import './Dashboard.css';
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
@@ -36,9 +37,11 @@ const Dashboard = () => {
     }, 300000);
     
     return () => clearInterval(refreshInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Initial empty state for dashboard data
+  // Initial empty state for dashboard data - used as reference for data structure
+  // eslint-disable-next-line no-unused-vars
   const initialDashboardState = {
     userStats: {
       total: 0,
@@ -210,486 +213,210 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="dashboard" style={{
-      padding: '24px',
-      backgroundColor: '#1a1a1a',
-      minHeight: '100vh',
-      color: '#e0e0e0',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    }}>
-      <div className="dashboard-header" style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '24px',
-        padding: '0 0 16px 0',
-        borderBottom: '1px solid #333'
-      }}>
-        <div className="header-left">
-          <h1 className="page-title" style={{
-            fontSize: '28px',
-            fontWeight: '600',
-            margin: '0',
-            display: 'flex',
-            alignItems: 'center',
-            color: '#fff',
-            letterSpacing: '-0.5px'
-          }}>
-            <FaChartLine style={{
-              marginRight: '12px',
-              color: '#6366f1'
-            }} />
-            Dashboard
-          </h1>
+    <div className="dashboard-container">
+      {/* Dashboard Header */}
+      <div className="dashboard-header">
+        <h1 className="dashboard-title">
+          <FaChartLine className="title-icon" />
+          Government Identity Dashboard
+        </h1>
+        <div className="dashboard-actions">
+          <button 
+            className={`refresh-button ${refreshing ? 'refreshing' : ''}`}
+            onClick={() => handleRefresh(false)} 
+            disabled={loading || refreshing}
+          >
+            <FaSync className="refresh-icon" />
+            {refreshing ? 'Refreshing...' : 'Refresh Data'}
+          </button>
           {stats.lastUpdated && (
-            <div className="last-updated" style={{
-              color: '#a3a3a3',
-              fontSize: '14px',
-              marginTop: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
+            <div className="last-updated">
               Last updated: {formatDate(stats.lastUpdated)}
-              {refreshing && <FaSync className="refresh-icon spinning" style={{ color: '#6366f1' }} />}
             </div>
           )}
         </div>
-        <button 
-          className="refresh-button" 
-          onClick={() => handleRefresh()}
-          disabled={loading || refreshing}
-          style={{
-            backgroundColor: '#2d2d2d',
-            color: '#fff',
-            border: '1px solid #404040',
-            borderRadius: '8px',
-            padding: '10px 16px',
-            fontSize: '14px',
-            fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? '0.7' : '1',
-            transition: 'all 0.2s ease',
-            gap: '8px'
-          }}
-        >
-          <FaSync className={refreshing ? 'spinning' : ''} />
-          Refresh Data
-        </button>
       </div>
-      
-      {error && (
-        <div className="error-message" style={{
-          backgroundColor: '#2c1519',
-          color: '#f87171',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          border: '1px solid #451a1a',
-          fontSize: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <FaExclamationTriangle />
-          {error}
+
+      {/* Loading State */}
+      {loading && !error && (
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
         </div>
       )}
-      
-      {/* Stats Cards */}
-      <div className="stats-grid" style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '24px',
-        marginBottom: '32px'
-      }}>
-        <div className="stats-card total" style={{
-          backgroundColor: '#2d2d2d',
-          borderRadius: '12px',
-          padding: '24px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          border: '1px solid #404040'
-        }}>
-          <div className="stats-icon-container" style={{
-            backgroundColor: '#374151',
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '16px'
-          }}>
-            <FaIdCard style={{ fontSize: '24px', color: '#6366f1' }} />
+
+      {/* Error Message */}
+      {error && (
+        <div className="error-message">
+          <FaExclamationTriangle /> {error}
+        </div>
+      )}
+
+      {/* Dashboard Content */}
+      <div className="dashboard-content">
+        {/* Stats Overview */}
+        <div className="section stats-section">
+          <div className="section-header">
+            <h2 className="section-title">
+              <FaChartLine className="section-icon" /> Statistics Overview
+            </h2>
+            <p className="section-subtitle">Current system statistics and trends</p>
           </div>
-          <div className="stats-info">
-            <h3 style={{
-              margin: '0 0 8px 0',
-              color: '#a3a3a3',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}>Total Users</h3>
-            <p style={{
-              margin: '0 0 8px 0',
-              fontSize: '28px',
-              fontWeight: '600',
-              color: '#fff'
-            }}>
-              {loading ? <span className="loading-dots">...</span> : stats.totalUsers.toLocaleString()}
-            </p>
-            <p style={{
-              margin: '0',
-              fontSize: '14px',
-              color: '#a3a3a3'
-            }}>Registered identities in the system</p>
-            {!loading && stats.trends.totalChange !== 0 && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '12px',
-                color: stats.trends.totalChange > 0 ? '#34d399' : '#f87171',
-                fontSize: '14px'
-              }}>
+          
+          <div className="stats-grid">
+            <div className="stat-card total">
+              <div className="stat-header">
+                <h3 className="stat-title">Total Users</h3>
+                <FaUsers className="stat-icon total" />
+              </div>
+              <p className="stat-value">{stats.totalUsers}</p>
+              <div className={`stat-trend ${stats.trends.totalChange > 0 ? 'trend-up' : stats.trends.totalChange < 0 ? 'trend-down' : 'trend-neutral'}`}>
                 {stats.trends.totalChange > 0 ? (
                   <>
-                    <FaArrowUp />
-                    <span>+{stats.trends.totalChange} since last week</span>
+                    <FaArrowUp className="trend-icon" /> +{stats.trends.totalChange} from last period
+                  </>
+                ) : stats.trends.totalChange < 0 ? (
+                  <>
+                    <FaArrowDown className="trend-icon" /> {stats.trends.totalChange} from last period
                   </>
                 ) : (
-                  <>
-                    <FaArrowDown />
-                    <span>{stats.trends.totalChange} since last week</span>
-                  </>
+                  <>No change from last period</>
                 )}
               </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="stats-card verified" style={{
-          backgroundColor: '#2d2d2d',
-          borderRadius: '12px',
-          padding: '24px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          border: '1px solid #404040'
-        }}>
-          <div className="stats-icon-container" style={{
-            backgroundColor: '#374151',
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '16px'
-          }}>
-            <FaUserCheck style={{ fontSize: '24px', color: '#6366f1' }} />
-          </div>
-          <div className="stats-info">
-            <h3 style={{
-              margin: '0 0 8px 0',
-              color: '#a3a3a3',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}>Verified Users</h3>
-            <p style={{
-              margin: '0 0 8px 0',
-              fontSize: '28px',
-              fontWeight: '600',
-              color: '#fff'
-            }}>
-              {loading ? <span className="loading-dots">...</span> : stats.verifiedUsers.toLocaleString()}
-            </p>
-            <div className="stats-meta">
-              <p style={{
-                margin: '0',
-                fontSize: '14px',
-                color: '#a3a3a3'
-              }}>Confirmed identities</p>
-              <div className="stats-percentage">
-                {loading ? '' : `${Math.round((stats.verifiedUsers / (stats.totalUsers || 1)) * 100)}%`}
-              </div>
             </div>
-            {!loading && stats.trends.verifiedChange !== 0 && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '12px',
-                color: stats.trends.verifiedChange > 0 ? '#34d399' : '#f87171',
-                fontSize: '14px'
-              }}>
+            
+            <div className="stat-card verified">
+              <div className="stat-header">
+                <h3 className="stat-title">Verified Users</h3>
+                <FaUserCheck className="stat-icon verified" />
+              </div>
+              <p className="stat-value">{stats.verifiedUsers}</p>
+              <div className={`stat-trend ${stats.trends.verifiedChange > 0 ? 'trend-up' : stats.trends.verifiedChange < 0 ? 'trend-down' : 'trend-neutral'}`}>
                 {stats.trends.verifiedChange > 0 ? (
                   <>
-                    <FaArrowUp />
-                    <span>+{stats.trends.verifiedChange} since last week</span>
+                    <FaArrowUp className="trend-icon" /> +{stats.trends.verifiedChange} from last period
+                  </>
+                ) : stats.trends.verifiedChange < 0 ? (
+                  <>
+                    <FaArrowDown className="trend-icon" /> {stats.trends.verifiedChange} from last period
                   </>
                 ) : (
-                  <>
-                    <FaArrowDown />
-                    <span>{stats.trends.verifiedChange} since last week</span>
-                  </>
+                  <>No change from last period</>
                 )}
               </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="stats-card pending" style={{
-          backgroundColor: '#2d2d2d',
-          borderRadius: '12px',
-          padding: '24px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          border: '1px solid #404040'
-        }}>
-          <div className="stats-icon-container" style={{
-            backgroundColor: '#374151',
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '16px'
-          }}>
-            <FaUserClock style={{ fontSize: '24px', color: '#6366f1' }} />
-          </div>
-          <div className="stats-info">
-            <h3 style={{
-              margin: '0 0 8px 0',
-              color: '#a3a3a3',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}>Pending Users</h3>
-            <p style={{
-              margin: '0 0 8px 0',
-              fontSize: '28px',
-              fontWeight: '600',
-              color: '#fff'
-            }}>
-              {loading ? <span className="loading-dots">...</span> : stats.pendingUsers.toLocaleString()}
-            </p>
-            <div className="stats-meta">
-              <p style={{
-                margin: '0',
-                fontSize: '14px',
-                color: '#a3a3a3'
-              }}>Awaiting verification</p>
-              <div className="stats-percentage">
-                {loading ? '' : `${Math.round((stats.pendingUsers / (stats.totalUsers || 1)) * 100)}%`}
-              </div>
             </div>
-            {!loading && stats.trends.pendingChange !== 0 && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '12px',
-                color: stats.trends.pendingChange > 0 ? '#34d399' : '#f87171',
-                fontSize: '14px'
-              }}>
+            
+            <div className="stat-card pending">
+              <div className="stat-header">
+                <h3 className="stat-title">Pending Verification</h3>
+                <FaUserClock className="stat-icon pending" />
+              </div>
+              <p className="stat-value">{stats.pendingUsers}</p>
+              <div className={`stat-trend ${stats.trends.pendingChange > 0 ? 'trend-up' : stats.trends.pendingChange < 0 ? 'trend-down' : 'trend-neutral'}`}>
                 {stats.trends.pendingChange > 0 ? (
                   <>
-                    <FaArrowUp />
-                    <span>+{stats.trends.pendingChange} since last week</span>
+                    <FaArrowUp className="trend-icon" /> +{stats.trends.pendingChange} from last period
+                  </>
+                ) : stats.trends.pendingChange < 0 ? (
+                  <>
+                    <FaArrowDown className="trend-icon" /> {stats.trends.pendingChange} from last period
                   </>
                 ) : (
-                  <>
-                    <FaArrowDown />
-                    <span>{Math.abs(stats.trends.pendingChange)} fewer since last week</span>
-                  </>
+                  <>No change from last period</>
                 )}
               </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="stats-card rejected" style={{
-          backgroundColor: '#2d2d2d',
-          borderRadius: '12px',
-          padding: '24px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          border: '1px solid #404040'
-        }}>
-          <div className="stats-icon-container" style={{
-            backgroundColor: '#374151',
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '16px'
-          }}>
-            <FaUserTimes style={{ fontSize: '24px', color: '#6366f1' }} />
-          </div>
-          <div className="stats-info">
-            <h3 style={{
-              margin: '0 0 8px 0',
-              color: '#a3a3a3',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}>Rejected Users</h3>
-            <p style={{
-              margin: '0 0 8px 0',
-              fontSize: '28px',
-              fontWeight: '600',
-              color: '#fff'
-            }}>
-              {loading ? <span className="loading-dots">...</span> : stats.rejectedUsers.toLocaleString()}
-            </p>
-            <div className="stats-meta">
-              <p style={{
-                margin: '0',
-                fontSize: '14px',
-                color: '#a3a3a3'
-              }}>Failed verification</p>
-              <div className="stats-percentage">
-                {loading ? '' : `${Math.round((stats.rejectedUsers / (stats.totalUsers || 1)) * 100)}%`}
-              </div>
             </div>
-            {!loading && stats.trends.rejectedChange !== 0 && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '12px',
-                color: stats.trends.rejectedChange > 0 ? '#34d399' : '#f87171',
-                fontSize: '14px'
-              }}>
+            
+            <div className="stat-card rejected">
+              <div className="stat-header">
+                <h3 className="stat-title">Rejected Users</h3>
+                <FaUserTimes className="stat-icon rejected" />
+              </div>
+              <p className="stat-value">{stats.rejectedUsers}</p>
+              <div className={`stat-trend ${stats.trends.rejectedChange > 0 ? 'trend-up' : stats.trends.rejectedChange < 0 ? 'trend-down' : 'trend-neutral'}`}>
                 {stats.trends.rejectedChange > 0 ? (
                   <>
-                    <FaArrowUp />
-                    <span>+{stats.trends.rejectedChange} since last week</span>
+                    <FaArrowUp className="trend-icon" /> +{stats.trends.rejectedChange} from last period
+                  </>
+                ) : stats.trends.rejectedChange < 0 ? (
+                  <>
+                    <FaArrowDown className="trend-icon" /> {stats.trends.rejectedChange} from last period
                   </>
                 ) : (
-                  <>
-                    <FaArrowDown />
-                    <span>{Math.abs(stats.trends.rejectedChange)} fewer since last week</span>
-                  </>
+                  <>No change from last period</>
                 )}
               </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
-      
-      {/* Recent Activity */}
-      <div className="activity-section" style={{
-        backgroundColor: '#2d2d2d',
-        borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '32px',
-        border: '1px solid #404040'
-      }}>
-        <div className="section-header" style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '24px'
-        }}>
-          <h2 style={{
-            margin: '0',
-            fontSize: '20px',
-            fontWeight: '600',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <FaHistory style={{ color: '#6366f1' }} />
-            Recent Activity
-          </h2>
-          <Link to="/activity-logs" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: '#6366f1',
-            textDecoration: 'none',
-            fontSize: '14px',
-            fontWeight: '500'
-          }}>
-            View All
-            <FaChevronRight />
-          </Link>
-        </div>
         
-        <div className="activity-cards" style={{
-          display: 'grid',
-          gap: '16px'
-        }}>
-          {loading ? (
-            <div className="loading-container">
-              <div className="loading-spinner"></div>
-              <p className="loading-text">Loading recent activity...</p>
-            </div>
-          ) : stats.recentActivities.length === 0 ? (
-            <div className="empty-state">
-              <FaHistory className="empty-icon" />
-              <p className="empty-text">No recent activity found.</p>
-              <p className="empty-subtext">Activities will appear here as users are verified or updated.</p>
-            </div>
-          ) : (
-            <div className="activity-cards">
-              {stats.recentActivities.map((activity) => (
-                <div key={activity.id} className="activity-card">
-                  <div className="activity-header">
-                    <div className="activity-action">
-                      {getActionIcon(activity.action)}
-                      <span className="action-text">{activity.action}</span>
-                    </div>
-                    <div className="activity-time">
-                      <FaHistory className="time-icon" />
-                      {formatDate(activity.timestamp)}
-                    </div>
-                  </div>
-                  
-                  <div className="activity-body">
-                    <div className="activity-user">
-                      <div className="user-avatar">
-                        {activity.userName.charAt(0).toUpperCase()}
+        {/* Recent Activity */}
+        <div className="section activity-section">
+          <div className="section-header">
+            <h2 className="section-title">
+              <FaHistory className="section-icon" /> Recent Activity
+            </h2>
+            <p className="section-subtitle">Latest verification and system activities</p>
+          </div>
+          
+          <div className="section-content">
+            <div className="activity-list">
+              {stats.recentActivities && stats.recentActivities.length > 0 ? (
+                stats.recentActivities.map(activity => (
+                  <div key={activity.id} className="activity-card">
+                    <div className="activity-header">
+                      <div className="activity-action">
+                        {getActionIcon(activity.action)} {activity.action}
                       </div>
-                      <div className="user-info">
-                        <div className="user-name">{activity.userName}</div>
-                        <div className="user-id">
-                          <FaIdCard className="id-icon" />
-                          {activity.userId}
-                        </div>
+                      <div className="activity-timestamp">
+                        {formatDate(activity.timestamp)}
                       </div>
                     </div>
                     
-                    <div className="activity-admin">
-                      <span className="admin-label">Verified by:</span>
-                      <span className="admin-name">
-                        <FaUserShield className="admin-icon" />
-                        {activity.adminName}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {activity.txHash && (
-                    <div className="activity-footer">
-                      <div className="tx-hash">
-                        <FaLink className="tx-icon" />
-                        <span className="tx-label">Blockchain TX:</span>
-                        <Link to={`/activity-logs?txHash=${activity.txHash}`} className="tx-value">
-                          {truncateHash(activity.txHash)}
-                        </Link>
+                    <div className="activity-content">
+                      <div className="activity-user">
+                        <div className="user-name">
+                          {activity.userName}
+                        </div>
+                        <div className="user-id">
+                          <FaFingerprint className="id-icon" />
+                          {activity.userId}
+                        </div>
+                      </div>
+                      
+                      <div className="activity-admin">
+                        <span className="admin-label">Verified by:</span>
+                        <span className="admin-name">
+                          <FaUserShield className="admin-icon" />
+                          {activity.adminName}
+                        </span>
                       </div>
                     </div>
-                  )}
+                    
+                    {activity.txHash && (
+                      <div className="activity-footer">
+                        <div className="tx-hash">
+                          <FaLink className="tx-icon" />
+                          <span className="tx-label">Blockchain TX:</span>
+                          <Link to={`/activity-logs?txHash=${activity.txHash}`} className="tx-value">
+                            {truncateHash(activity.txHash)}
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="empty-state">
+                  <FaHistory className="empty-icon" />
+                  <p className="empty-text">No recent activities found</p>
                 </div>
-              ))}
+              )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
       
-      {/* Quick Actions */}
-      <div className="section quick-actions-section">
+        {/* Quick Actions */}
+        <div className="section quick-actions-section">
         <div className="section-header">
           <h2 className="section-title">
             <FaShieldAlt className="section-icon" />
@@ -752,6 +479,7 @@ const Dashboard = () => {
               <FaChevronRight />
             </div>
           </Link>
+        </div>
         </div>
       </div>
     </div>
