@@ -1,70 +1,240 @@
-# Getting Started with Create React App
+# TrueID Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+TrueID is a decentralized identity verification platform built on the Avalanche blockchain. This frontend application provides a user interface for managing digital identities, wallet operations, and verification status.
+
+## Features
+
+- **User Authentication**: Secure login and registration system
+- **Dashboard**: Overview of identity status and wallet information
+- **Wallet Management**: View balance and transaction history
+- **Identity Verification**: Track verification status in real-time
+- **Professional Records**: Manage and view professional credentials
+- **Blockchain Integration**: Interact with Avalanche C-Chain for identity management
+- **Real-time Updates**: Automatic refresh of data every 15 seconds
+
+## Prerequisites
+
+- Node.js (v14 or later)
+- npm (v6 or later) or yarn
+- Backend server running (default: http://localhost:5000)
+- MetaMask or other Web3 wallet (for blockchain interactions)
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v14 or later)
+- npm (v6 or later) or yarn
+- Backend server running (default: http://localhost:5000)
+- MetaMask or other Web3 wallet (for blockchain interactions)
+
+### Installation
+
+```bash
+# Install dependencies
+npm install
+# or
+yarn install
+
+# Create .env file
+echo 'REACT_APP_API_URL=http://localhost:5000
+REACT_APP_AVALANCHE_CONTRACT_ADDRESS=0x266B577380aE3De838A66DEf28fffD5e75c5816E
+REACT_APP_AVALANCHE_NETWORK=fuji' > .env
+```
 
 ## Available Scripts
 
-In the project directory, you can run:
-
 ### `npm start`
 
-Runs the app in the development mode.\
+Runs the app in development mode.\
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
 
 ### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Launches the test runner in interactive watch mode.
 
 ### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Builds the app for production to the `build` folder.
 
 ### `npm run eject`
 
 **Note: this is a one-way operation. Once you `eject`, you can't go back!**
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Ejects the app from create-react-app configuration. Use with caution.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## API Integration
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+The frontend communicates with the backend through a centralized API service. Here's how the API integration works:
 
-## Learn More
+### API Service Architecture
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+1. **Axios Instance**
+   - Base URL: `http://localhost:5000/api`
+   - Default timeout: 10 seconds
+   - Automatic JWT token handling
+   - Request/response interceptors for error handling
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+2. **Authentication Flow**
+   ```javascript
+   // Request interceptor adds JWT token to headers
+   API.interceptors.request.use(config => {
+     const token = localStorage.getItem('accessToken');
+     if (token) config.headers['Authorization'] = `Bearer ${token}`;
+     return config;
+   });
+   
+   // Response interceptor handles token refresh
+   API.interceptors.response.use(
+     response => response,
+     async error => {
+       if (error.response.status === 401) {
+         // Handle token refresh logic
+       }
+       return Promise.reject(error);
+     }
+   );
+   ```
 
-### Code Splitting
+### Available API Endpoints
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+#### Authentication (`/api/auth`)
+- `POST /register` - Register a new user
+- `POST /login` - User login
+- `POST /refresh-token` - Refresh access token
+- `POST /verify-biometric` - Verify biometric data
 
-### Analyzing the Bundle Size
+#### User Profile (`/api/users`)
+- `GET /profile` - Get current user profile
+- `PUT /profile` - Update user profile
+- `GET /verification-status` - Get verification status
+- `POST /professional-records` - Add professional record
+- `GET /professional-records` - Get professional records
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+#### Blockchain (`/api/blockchain`)
+- `GET /transactions` - Get user transactions
+- `GET /status` - Get blockchain status
+- `POST /record-identity` - Record identity on blockchain
+- `GET /transaction/:txHash` - Get transaction status
+- `POST /verify-document` - Verify document hash
 
-### Making a Progressive Web App
+#### Wallet (`/api/wallet`)
+- `GET /balance/:address` - Get wallet balance
+- `POST /transfer` - Transfer tokens
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### Error Handling
+- 401 Unauthorized: Invalid or expired token
+- 403 Forbidden: Insufficient permissions
+- 404 Not Found: Resource not found
+- 422 Validation Error: Invalid request data
+- 500 Internal Server Error: Server-side error
 
-### Advanced Configuration
+### Example API Usage
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```javascript
+// In a React component
+import { userAPI, authAPI } from '../services/api.service';
 
-### Deployment
+// Login user
+const handleLogin = async (email, password) => {
+  try {
+    const response = await authAPI.login({ email, password });
+    const { accessToken, refreshToken, user } = response.data;
+    // Store tokens and user data
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+    setUser(user);
+  } catch (error) {
+    console.error('Login failed:', error);
+  }
+};
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+// Get user profile
+const fetchProfile = async () => {
+  try {
+    const response = await userAPI.getProfile();
+    setProfile(response.data.user);
+  } catch (error) {
+    console.error('Failed to fetch profile:', error);
+  }
+};
+```
 
-### `npm run build` fails to minify
+### Real-time Updates
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The application implements a polling mechanism to keep data in sync:
+
+```javascript
+// Example of polling verification status
+useEffect(() => {
+  const interval = setInterval(async () => {
+    try {
+      const response = await userAPI.getVerificationStatus();
+      setVerificationStatus(response.data.status);
+    } catch (error) {
+      console.error('Error fetching verification status:', error);
+    }
+  }, 15000); // Poll every 15 seconds
+
+  return () => clearInterval(interval);
+}, []);
+```
+
+## Project Structure
+
+```
+src/
+├── components/     # Reusable UI components
+├── pages/          # Page components
+│   ├── Dashboard/
+│   ├── WalletPage/
+│   ├── VerificationStatus/
+│   ├── ProfessionalRecords/
+│   └── BlockchainStatus/
+├── services/      # API and blockchain services
+├── styles/        # Global styles and themes
+└── utils/         # Utility functions and constants
+```
+
+## Configuration
+
+The application is configured to work with the following services:
+
+### Environment Variables
+
+Create a `.env` file in the frontend directory with the following variables:
+
+```env
+REACT_APP_API_URL=http://localhost:5000
+REACT_APP_AVALANCHE_CONTRACT_ADDRESS=0x266B577380aE3De838A66DEf28fffD5e75c5816E
+REACT_APP_AVALANCHE_NETWORK=fuji
+REACT_APP_AVALANCHE_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
+```
+
+### CORS Configuration
+
+The backend is configured to allow requests from multiple frontend origins:
+- Main frontend: http://localhost:3000
+- Government portal: http://localhost:8000
+
+### Blockchain Configuration
+
+- **Network**: Avalanche Fuji Testnet
+- **Contract Address**: 0x266B577380aE3De838A66DEf28fffD5e75c5816E
+- **RPC URL**: https://api.avax-test.network/ext/bc/C/rpc
+- **Chain ID**: 43113 (Fuji Testnet)
+
+### Security
+
+- JWT authentication with access and refresh tokens
+- Token auto-refresh mechanism
+- Secure storage of sensitive data
+- CSRF protection
+- Rate limiting on sensitive endpoints
+
+## Real-time Updates
+
+The dashboard features real-time updates with:
+- 15-second polling interval for status updates
+- Visual indicators during data refresh
+- Automatic wallet balance updates
