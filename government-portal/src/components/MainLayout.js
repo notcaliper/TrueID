@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
 import { useTheme } from '../utils/ThemeContext';
-import { FaChevronLeft, FaChevronRight, FaTachometerAlt, FaUsers, 
+import { FaChevronLeft, FaChevronRight, FaTachometerAlt, 
          FaHistory, FaCog, FaSignOutAlt, FaCode, FaToggleOn, FaToggleOff,
-         FaShieldAlt, FaBell, FaUserShield, FaFingerprint, FaIdCard,
+         FaShieldAlt, FaBell, FaUserShield, FaIdCard,
          FaSun, FaMoon } from 'react-icons/fa';
 
 const MainLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showDevControls, setShowDevControls] = useState(false);
   const { currentUser, logout, devMode, toggleDevMode } = useAuth();
-  const { theme, toggleTheme, isDarkMode } = useTheme();
+  const { toggleTheme, isDarkMode } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 

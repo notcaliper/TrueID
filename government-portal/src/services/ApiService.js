@@ -3,7 +3,7 @@ import axios from 'axios';
 class ApiService {
   constructor() {
     this.api = axios.create({
-      baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3001/api'
+      baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api'
     });
     
     // Cache for API responses
@@ -358,4 +358,5 @@ class ApiService {
   }
 }
 
-export default new ApiService();
+const apiServiceInstance = new ApiService();
+export default apiServiceInstance;

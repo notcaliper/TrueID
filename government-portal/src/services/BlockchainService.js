@@ -11,49 +11,31 @@ class BlockchainService {
   }
 
   async initialize() {
-    try {
-      // Check if MetaMask is installed
-      if (window.ethereum) {
-        // Connect to the Ethereum network using MetaMask
-        this.provider = new ethers.providers.Web3Provider(window.ethereum);
-        
-        // Request account access
-        await window.ethereum.request({ method: 'eth_requestAccounts' });
-        
-        // Get the signer
-        this.signer = this.provider.getSigner();
-        
-        // Create contract instance
-        this.contract = new ethers.Contract(
-          this.contractAddress,
-          IdentityManagementABI,
-          this.signer
-        );
-        
-        this.initialized = true;
-        console.log('Blockchain service initialized');
-        return true;
-      } else {
-        console.error('MetaMask not installed');
-        return false;
-      }
-    } catch (error) {
-      console.error('Error initializing blockchain service:', error);
-      return false;
-    }
+    // No initialization needed as we'll use backend API
+    this.initialized = true;
+    return true;
   }
 
-  async verifyIdentity(userAddress) {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-    
+  async verifyIdentity(userId) {
     try {
-      const tx = await this.contract.verifyIdentity(userAddress);
-      const receipt = await tx.wait();
+      const response = await fetch(`/api/admin/users/${userId}/verify`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({ action: 'VERIFY' })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to verify identity');
+      }
+      
       return {
         success: true,
-        txHash: receipt.transactionHash
+        txHash: data.txHash
       };
     } catch (error) {
       console.error('Error verifying identity:', error);
@@ -181,4 +163,5 @@ class BlockchainService {
   }
 }
 
-export default new BlockchainService();
+const blockchainServiceInstance = new BlockchainService();
+export default blockchainServiceInstance;
