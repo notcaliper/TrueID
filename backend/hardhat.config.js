@@ -38,7 +38,7 @@ module.exports = {
     }
   },
   // Contract verification is done manually through the Snowtrace interface
-  etherscan: {
+  snowtrace: {
     apiKey: {
       avalancheFujiTestnet: ""
     }

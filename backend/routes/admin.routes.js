@@ -57,6 +57,13 @@ router.put('/users/:id/update', authenticateAdmin, adminController.updateUser);
 router.get('/logs', authenticateAdmin, adminController.getActivityLogs);
 
 /**
+ * @route GET /api/admin/logs/user/:id
+ * @desc Get activity logs for a specific user
+ * @access Admin
+ */
+router.get('/logs/user/:id', authenticateAdmin, adminController.getUserActivityLogs);
+
+/**
  * @route POST /api/admin/create
  * @desc Create a new admin (Super Admin only)
  * @access Super Admin
@@ -69,6 +76,13 @@ router.post('/create', authenticateAdmin, requireSuperAdmin, adminController.cre
  * @access Admin
  */
 router.get('/dashboard', authenticateAdmin, adminController.getDashboardStats);
+
+/**
+ * @route GET /api/admin/dashboard/stats
+ * @desc Get detailed dashboard statistics
+ * @access Admin
+ */
+router.get('/dashboard/stats', authenticateAdmin, adminController.getDetailedDashboardStats);
 
 /**
  * @route GET /api/admin/profile
@@ -111,5 +125,19 @@ router.put('/users/:id/reactivate', authenticateAdmin, adminController.reactivat
  * @access Admin
  */
 router.post('/blockchain/check-expiry', authenticateAdmin, adminController.checkBlockchainExpiry);
+
+/**
+ * @route GET /api/admin/professional-records
+ * @desc Get all professional records
+ * @access Admin
+ */
+router.get('/professional-records', authenticateAdmin, adminController.getAllProfessionalRecords);
+
+/**
+ * @route GET /api/admin/users/:id/professional-records
+ * @desc Get professional records for a specific user
+ * @access Admin
+ */
+router.get('/users/:id/professional-records', authenticateAdmin, adminController.getUserProfessionalRecords);
 
 module.exports = router;

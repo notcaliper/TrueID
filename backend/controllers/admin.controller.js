@@ -328,7 +328,7 @@ exports.getUserById = async (req, res) => {
     
     // Get biometric data (only metadata, not the actual data)
     const biometricResult = await db.query(
-      `SELECT id, is_active, created_at, updated_at
+      `SELECT id, facemesh_hash, blockchain_tx_hash, verification_status, created_at, updated_at
        FROM biometric_data
        WHERE user_id = $1
        ORDER BY created_at DESC`,
@@ -356,9 +356,32 @@ exports.getUserById = async (req, res) => {
       [id]
     );
     
+    // Add facemesh_hash and blockchain_tx_hash to user object if available
+    if (biometricResult.rows && biometricResult.rows.length > 0) {
+      // Use the latest biometric record (assuming sorted by created_at DESC)
+      const latestBiometric = biometricResult.rows[0];
+      if (latestBiometric.facemesh_hash) {
+        user.facemesh_hash = latestBiometric.facemesh_hash;
+      }
+      if (latestBiometric.blockchain_tx_hash) {
+        user.blockchain_tx_hash = latestBiometric.blockchain_tx_hash;
+      }
+      user.biometric_verification_status = latestBiometric.verification_status;
+    } else {
+      user.facemesh_hash = null;
+      user.blockchain_tx_hash = null;
+      user.biometric_verification_status = null;
+    }
     res.status(200).json({
       user,
-      biometricData: biometricResult.rows,
+      biometricData: biometricResult.rows.map(b => ({
+        id: b.id,
+        facemesh_hash: b.facemesh_hash,
+        blockchain_tx_hash: b.blockchain_tx_hash,
+        verification_status: b.verification_status,
+        created_at: b.created_at,
+        updated_at: b.updated_at
+      })),
       professionalRecords: recordsResult.rows,
       recentActivity: logsResult.rows
     });
@@ -415,6 +438,15 @@ exports.verifyUser = async (req, res) => {
           verificationStatus === 'VERIFIED', // Set is_verified to true only if status is VERIFIED
           id
         ]
+      );
+      
+      // Also update biometric data verification status to maintain consistency
+      await client.query(
+        `UPDATE biometric_data 
+         SET verification_status = $1,
+             updated_at = NOW()
+         WHERE user_id = $2 AND is_active = true`,
+        [verificationStatus, id]
       );
       
       const updatedUser = updateResult.rows[0];
@@ -583,6 +615,15 @@ exports.verifyUser = async (req, res) => {
                           network: blockchainRegistrationResult.network
                         })
                       ]
+                    );
+                    
+                    // Update the biometric data with the blockchain transaction hash
+                    await client.query(
+                      `UPDATE biometric_data 
+                       SET blockchain_tx_hash = $1,
+                           updated_at = NOW()
+                       WHERE user_id = $2 AND is_active = true`,
+                      [blockchainRegistrationResult.transactionHash, id]
                     );
                   }
                   
@@ -1391,5 +1432,208 @@ exports.checkBlockchainExpiry = async (req, res) => {
   } catch (error) {
     logger.error('Blockchain expiry check error:', error);
     res.status(500).json({ message: 'Server error while checking blockchain expiry status' });
+  }
+};
+/**
+ * Get activity logs for a specific user
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getUserActivityLogs = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { id } = req.params;
+  
+  try {
+    // Check if user exists
+    const userResult = await db.query(
+      'SELECT id, name FROM users WHERE id = $1',
+      [id]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Get user activity logs
+    const logsResult = await db.query(
+      `SELECT id, admin_id, user_id, action, entity_type, entity_id, details, ip_address, created_at
+       FROM audit_logs
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 100`,
+      [id]
+    );
+    
+    // Get admin names for the logs
+    const adminIds = [...new Set(logsResult.rows.filter(log => log.admin_id).map(log => log.admin_id))];
+    
+    let adminNames = {};
+    if (adminIds.length > 0) {
+      const adminResult = await db.query(
+        `SELECT id, name FROM admins WHERE id IN (${adminIds.map((_, i) => `$${i + 1}`).join(', ')})`,
+        adminIds
+      );
+      
+      adminNames = adminResult.rows.reduce((acc, admin) => {
+        acc[admin.id] = admin.name;
+        return acc;
+      }, {});
+    }
+    
+    // Add admin names to logs
+    const logsWithAdminNames = logsResult.rows.map(log => ({
+      ...log,
+      adminName: log.admin_id ? (adminNames[log.admin_id] || 'Unknown Admin') : 'System'
+    }));
+    
+    res.status(200).json({
+      user: userResult.rows[0],
+      logs: logsWithAdminNames
+    });
+  } catch (error) {
+    logger.error('Get user activity logs error:', error);
+    res.status(500).json({ message: 'Server error while retrieving user activity logs' });
+  }
+};
+/**
+ * Get detailed dashboard statistics
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getDetailedDashboardStats = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  
+  try {
+    // Get user statistics by verification status
+    const userStatsByStatus = await db.query(`
+      SELECT verification_status, COUNT(*) as count 
+      FROM users 
+      GROUP BY verification_status
+    `);
+    
+    // Get user statistics by registration date (last 30 days)
+    const userStatsByDate = await db.query(`
+      SELECT DATE(created_at) as date, COUNT(*) as count 
+      FROM users 
+      WHERE created_at >= NOW() - INTERVAL '30 days' 
+      GROUP BY DATE(created_at) 
+      ORDER BY date
+    `);
+    
+    // Get biometric data statistics
+    const biometricStats = await db.query(`
+      SELECT verification_status, COUNT(*) as count 
+      FROM biometric_data 
+      GROUP BY verification_status
+    `);
+    
+    // Get blockchain transaction statistics
+    const blockchainStats = await db.query(`
+      SELECT transaction_type, COUNT(*) as count 
+      FROM blockchain_transactions 
+      GROUP BY transaction_type
+    `);
+    
+    // Get activity logs statistics
+    const activityStats = await db.query(`
+      SELECT action, COUNT(*) as count 
+      FROM audit_logs 
+      WHERE created_at >= NOW() - INTERVAL '30 days' 
+      GROUP BY action
+    `);
+    
+    res.status(200).json({
+      userStatsByStatus: userStatsByStatus.rows,
+      userStatsByDate: userStatsByDate.rows,
+      biometricStats: biometricStats.rows,
+      blockchainStats: blockchainStats.rows,
+      activityStats: activityStats.rows
+    });
+  } catch (error) {
+    logger.error('Get detailed dashboard stats error:', error);
+    res.status(500).json({ message: 'Server error while retrieving detailed dashboard statistics' });
+  }
+};
+/**
+ * Get all professional records
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getAllProfessionalRecords = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { page = 1, limit = 10, sort = 'created_at', order = 'DESC' } = req.query;
+  
+  try {
+    const offset = (page - 1) * limit;
+    
+    // Get total count
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM professional_records'
+    );
+    const totalCount = parseInt(countResult.rows[0].count);
+    
+    // Get professional records with user details
+    const recordsResult = await db.query(
+      `SELECT pr.*, u.name as user_name, u.email as user_email
+       FROM professional_records pr
+       JOIN users u ON pr.user_id = u.id
+       ORDER BY pr.${sort} ${order}
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    
+    res.status(200).json({
+      records: recordsResult.rows,
+      pagination: {
+        total: totalCount,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(totalCount / limit)
+      }
+    });
+  } catch (error) {
+    logger.error('Get all professional records error:', error);
+    res.status(500).json({ message: 'Server error while retrieving professional records' });
+  }
+};
+/**
+ * Get professional records for a specific user
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getUserProfessionalRecords = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { id } = req.params;
+  
+  try {
+    // Check if user exists
+    const userResult = await db.query(
+      'SELECT id, name, email FROM users WHERE id = $1',
+      [id]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Get professional records for the user
+    const recordsResult = await db.query(
+      `SELECT * FROM professional_records 
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [id]
+    );
+    
+    res.status(200).json({
+      user: userResult.rows[0],
+      records: recordsResult.rows
+    });
+  } catch (error) {
+    logger.error('Get user professional records error:', error);
+    res.status(500).json({ message: 'Server error while retrieving user professional records' });
   }
 };
