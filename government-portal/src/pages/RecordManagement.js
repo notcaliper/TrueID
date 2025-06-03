@@ -168,9 +168,9 @@ const RecordManagement = () => {
   return (
     <div className="record-management" style={{
       padding: '32px',
-      backgroundColor: '#1a1a1a',
+      backgroundColor: 'white',
       minHeight: '100vh',
-      color: '#e0e0e0',
+      color: '#1f2937',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
     }}>
       <div className="page-header" style={{
@@ -186,24 +186,25 @@ const RecordManagement = () => {
             width: '48px',
             height: '48px',
             borderRadius: '12px',
-            backgroundColor: '#2d2d2d',
+            backgroundColor: 'white',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '1px solid #404040'
+            border: '1px solid #3b82f6',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
           }}>
-            <FaDatabase style={{ color: '#6366f1', fontSize: '20px' }} />
+            <FaDatabase style={{ color: '#3b82f6', fontSize: '20px' }} />
           </div>
           <div>
             <h1 style={{
               fontSize: '28px',
               fontWeight: '600',
               margin: '0 0 4px 0',
-              color: '#fff',
+              color: '#1f2937',
               letterSpacing: '-0.5px'
             }}>User Records</h1>
             <p style={{
-              color: '#a3a3a3',
+              color: '#6b7280',
               fontSize: '14px',
               margin: '0'
             }}>Manage and monitor user identities in the system</p>
@@ -211,10 +212,11 @@ const RecordManagement = () => {
         </div>
         
         <form onSubmit={handleSearch} style={{
-          backgroundColor: '#2d2d2d',
+          backgroundColor: 'white',
           padding: '24px',
           borderRadius: '16px',
-          border: '1px solid #404040'
+          border: '1px solid #3b82f6',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
         }}>
           <div style={{
             display: 'flex',
@@ -230,10 +232,10 @@ const RecordManagement = () => {
                 style={{
                   width: '100%',
                   padding: '12px 16px',
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #404040',
+                  backgroundColor: 'white',
+                  border: '1px solid #3b82f6',
                   borderRadius: '12px',
-                  color: '#e0e0e0',
+                  color: '#1f2937',
                   fontSize: '14px',
                   outline: 'none',
                   cursor: 'pointer',
@@ -263,10 +265,10 @@ const RecordManagement = () => {
                 style={{
                   width: '100%',
                   padding: '12px 16px 12px 40px',
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #404040',
+                  backgroundColor: 'white',
+                  border: '1px solid #3b82f6',
                   borderRadius: '12px',
-                  color: '#e0e0e0',
+                  color: '#1f2937',
                   fontSize: '14px',
                   outline: 'none',
                   transition: 'all 0.2s ease'
@@ -284,7 +286,7 @@ const RecordManagement = () => {
             <button
               type="submit"
               style={{
-                backgroundColor: '#6366f1',
+                backgroundColor: '#3b82f6',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '12px',
@@ -295,10 +297,7 @@ const RecordManagement = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                transition: 'all 0.2s ease',
-                ':hover': {
-                  backgroundColor: '#4f46e5'
-                }
+                transition: 'all 0.2s ease'
               }}
             >
               <FaSearch />
@@ -328,17 +327,18 @@ const RecordManagement = () => {
 
       {error && (
         <div style={{
-          backgroundColor: '#2c1519',
-          color: '#f87171',
+          backgroundColor: 'white',
+          color: '#ef4444',
           padding: '16px',
           borderRadius: '12px',
           marginBottom: '24px',
           fontSize: '14px',
-          border: '1px solid #451a1a',
+          border: '1px solid #ef4444',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          animation: 'shake 0.5s'
+          animation: 'shake 0.5s',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
         }}>
           <FaExclamationCircle />
           {error}
@@ -346,11 +346,12 @@ const RecordManagement = () => {
       )}
 
       <div style={{
-        backgroundColor: '#2d2d2d',
+        backgroundColor: 'white',
         borderRadius: '16px',
         overflow: 'hidden',
-        border: '1px solid #404040',
-        marginBottom: '24px'
+        border: '1px solid #3b82f6',
+        marginBottom: '24px',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
       }}>
         <div style={{
           overflowX: 'auto'
@@ -362,54 +363,54 @@ const RecordManagement = () => {
           }}>
             <thead>
               <tr style={{
-                backgroundColor: '#262626'
+                backgroundColor: '#3b82f6'
               }}>
                 <th style={{
                   padding: '16px',
                   textAlign: 'left',
                   fontWeight: '600',
-                  color: '#e0e0e0',
-                  borderBottom: '2px solid #404040',
+                  color: 'white',
+                  borderBottom: '2px solid white',
                   whiteSpace: 'nowrap'
                 }}>Serial No.</th>
                 <th style={{
                   padding: '16px',
                   textAlign: 'left',
                   fontWeight: '600',
-                  color: '#e0e0e0',
-                  borderBottom: '2px solid #404040',
+                  color: 'white',
+                  borderBottom: '2px solid white',
                   whiteSpace: 'nowrap'
                 }}>Name</th>
                 <th style={{
                   padding: '16px',
                   textAlign: 'left',
                   fontWeight: '600',
-                  color: '#e0e0e0',
-                  borderBottom: '2px solid #404040',
+                  color: 'white',
+                  borderBottom: '2px solid white',
                   whiteSpace: 'nowrap'
                 }}>Unique ID</th>
                 <th style={{
                   padding: '16px',
                   textAlign: 'left',
                   fontWeight: '600',
-                  color: '#e0e0e0',
-                  borderBottom: '2px solid #404040',
+                  color: 'white',
+                  borderBottom: '2px solid white',
                   whiteSpace: 'nowrap'
                 }}>Status</th>
                 <th style={{
                   padding: '16px',
                   textAlign: 'left',
                   fontWeight: '600',
-                  color: '#e0e0e0',
-                  borderBottom: '2px solid #404040',
+                  color: 'white',
+                  borderBottom: '2px solid white',
                   whiteSpace: 'nowrap'
                 }}>Last Updated</th>
                 <th style={{
                   padding: '16px',
                   textAlign: 'left',
                   fontWeight: '600',
-                  color: '#e0e0e0',
-                  borderBottom: '2px solid #404040',
+                  color: 'white',
+                  borderBottom: '2px solid white',
                   whiteSpace: 'nowrap'
                 }}>Actions</th>
               </tr>
@@ -460,26 +461,23 @@ const RecordManagement = () => {
               ) : (
                 users.map((user, index) => (
                   <tr key={user?.id || index} style={{
-                    borderBottom: '1px solid #404040',
-                    backgroundColor: index % 2 === 0 ? '#262626' : '#2d2d2d',
-                    transition: 'background-color 0.2s ease',
-                    ':hover': {
-                      backgroundColor: '#323232'
-                    }
+                    borderBottom: '1px solid #e5e7eb',
+                    backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb',
+                    transition: 'background-color 0.2s ease'
                   }}>
                     <td style={{
                       padding: '16px',
-                      color: '#e0e0e0',
+                      color: '#1f2937',
                       whiteSpace: 'nowrap'
                     }}>{(currentPage - 1) * usersPerPage + index + 1}</td>
                     <td style={{
                       padding: '16px',
-                      color: '#e0e0e0',
+                      color: '#1f2937',
                       whiteSpace: 'nowrap'
                     }}>{user?.name || 'N/A'}</td>
                     <td style={{
                       padding: '16px',
-                      color: '#e0e0e0',
+                      color: '#1f2937',
                       fontFamily: 'monospace',
                       whiteSpace: 'nowrap'
                     }}>{user?.government_id || 'N/A'}</td>
@@ -495,15 +493,13 @@ const RecordManagement = () => {
                         borderRadius: '20px',
                         fontSize: '13px',
                         fontWeight: '500',
-                        backgroundColor: user?.verification_status === 'VERIFIED' ? 'rgba(16, 185, 129, 0.1)' :
-                                       user?.verification_status === 'REJECTED' ? 'rgba(239, 68, 68, 0.1)' :
-                                       'rgba(245, 158, 11, 0.1)',
-                        color: user?.verification_status === 'VERIFIED' ? '#34d399' :
-                               user?.verification_status === 'REJECTED' ? '#f87171' :
-                               '#fbbf24',
-                        border: `1px solid ${user?.verification_status === 'VERIFIED' ? 'rgba(16, 185, 129, 0.2)' :
-                                           user?.verification_status === 'REJECTED' ? 'rgba(239, 68, 68, 0.2)' :
-                                           'rgba(245, 158, 11, 0.2)'}`,
+                        backgroundColor: 'white',
+                        color: user?.verification_status === 'VERIFIED' ? '#10b981' :
+                               user?.verification_status === 'REJECTED' ? '#ef4444' :
+                               '#f59e0b',
+                        border: `1px solid ${user?.verification_status === 'VERIFIED' ? '#10b981' :
+                                           user?.verification_status === 'REJECTED' ? '#ef4444' :
+                                           '#f59e0b'}`,
                         transition: 'all 0.2s ease'
                       }}>
                         {user?.verification_status === 'VERIFIED' && <FaUserCheck />}
@@ -514,7 +510,7 @@ const RecordManagement = () => {
                     </td>
                     <td style={{
                       padding: '16px',
-                      color: '#a3a3a3',
+                      color: '#6b7280',
                       whiteSpace: 'nowrap'
                     }}>{user?.updated_at ? formatDate(user.updated_at) : 'N/A'}</td>
                     <td style={{
@@ -528,17 +524,13 @@ const RecordManagement = () => {
                         <button
                           onClick={() => handleViewUser(user)}
                           style={{
-                            backgroundColor: '#374151',
-                            color: '#6366f1',
-                            border: 'none',
+                            backgroundColor: 'white',
+                            color: '#3b82f6',
+                            border: '1px solid #3b82f6',
                             borderRadius: '8px',
                             padding: '8px',
                             cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            ':hover': {
-                              backgroundColor: '#4b5563',
-                              transform: 'translateY(-1px)'
-                            }
+                            transition: 'all 0.2s ease'
                           }}
                           title="View Details"
                         >
@@ -547,17 +539,13 @@ const RecordManagement = () => {
                         <button
                           onClick={() => handleViewUser({...user, isEdit: true})}
                           style={{
-                            backgroundColor: '#374151',
-                            color: '#6366f1',
-                            border: 'none',
+                            backgroundColor: 'white',
+                            color: '#3b82f6',
+                            border: '1px solid #3b82f6',
                             borderRadius: '8px',
                             padding: '8px',
                             cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            ':hover': {
-                              backgroundColor: '#4b5563',
-                              transform: 'translateY(-1px)'
-                            }
+                            transition: 'all 0.2s ease'
                           }}
                           title="Edit User"
                         >
@@ -591,7 +579,7 @@ const RecordManagement = () => {
             gap: '16px'
           }}>
             <div style={{
-              color: '#a3a3a3',
+              color: '#6b7280',
               fontSize: '14px'
             }}>
               Page {currentPage} of {totalPages}
@@ -610,10 +598,10 @@ const RecordManagement = () => {
                   justifyContent: 'center',
                   width: '36px',
                   height: '36px',
-                  backgroundColor: '#374151',
-                  border: '1px solid #404040',
+                  backgroundColor: 'white',
+                  border: '1px solid #3b82f6',
                   borderRadius: '12px',
-                  color: '#e0e0e0',
+                  color: '#3b82f6',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease'
                 }}
@@ -638,10 +626,10 @@ const RecordManagement = () => {
                   checked={autoRefresh}
                   onChange={toggleAutoRefresh}
                   style={{
-                    accentColor: '#6366f1'
+                    accentColor: '#3b82f6'
                   }}
                 />
-                <label htmlFor="autoRefresh" style={{ fontSize: '14px', color: '#a3a3a3' }}>
+                <label htmlFor="autoRefresh" style={{ fontSize: '14px', color: '#6b7280' }}>
                   Auto-refresh
                 </label>
               </div>
@@ -652,10 +640,10 @@ const RecordManagement = () => {
                   onChange={handleRefreshIntervalChange}
                   style={{
                     padding: '4px 8px',
-                    backgroundColor: '#374151',
-                    border: '1px solid #404040',
+                    backgroundColor: 'white',
+                    border: '1px solid #3b82f6',
                     borderRadius: '8px',
-                    color: '#e0e0e0',
+                    color: '#1f2937',
                     fontSize: '14px'
                   }}
                 >
@@ -684,16 +672,13 @@ const RecordManagement = () => {
                 alignItems: 'center',
                 gap: '8px',
                 padding: '10px 16px',
-                backgroundColor: currentPage === 1 ? '#262626' : '#374151',
-                border: '1px solid #404040',
+                backgroundColor: 'white',
+                border: '1px solid #3b82f6',
                 borderRadius: '12px',
-                color: currentPage === 1 ? '#6b7280' : '#e0e0e0',
+                color: currentPage === 1 ? '#9ca3af' : '#3b82f6',
                 cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease',
-                ':hover': currentPage !== 1 && {
-                  backgroundColor: '#4b5563',
-                  transform: 'translateY(-1px)'
-                }
+                opacity: currentPage === 1 ? 0.6 : 1
               }}
             >
               <FaChevronLeft />
@@ -723,16 +708,12 @@ const RecordManagement = () => {
                     style={{
                       minWidth: '40px',
                       padding: '10px',
-                      backgroundColor: currentPage === pageNum ? '#6366f1' : '#374151',
-                      border: '1px solid #404040',
+                      backgroundColor: currentPage === pageNum ? '#3b82f6' : 'white',
+                      border: '1px solid #3b82f6',
                       borderRadius: '12px',
-                      color: currentPage === pageNum ? '#fff' : '#e0e0e0',
+                      color: currentPage === pageNum ? '#fff' : '#3b82f6',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      ':hover': currentPage !== pageNum && {
-                        backgroundColor: '#4b5563',
-                        transform: 'translateY(-1px)'
-                      }
+                      transition: 'all 0.2s ease'
                     }}
                   >
                     {pageNum}
@@ -749,16 +730,13 @@ const RecordManagement = () => {
                 alignItems: 'center',
                 gap: '8px',
                 padding: '10px 16px',
-                backgroundColor: currentPage === totalPages ? '#262626' : '#374151',
-                border: '1px solid #404040',
+                backgroundColor: 'white',
+                border: '1px solid #3b82f6',
                 borderRadius: '12px',
-                color: currentPage === totalPages ? '#6b7280' : '#e0e0e0',
+                color: currentPage === totalPages ? '#9ca3af' : '#3b82f6',
                 cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease',
-                ':hover': currentPage !== totalPages && {
-                  backgroundColor: '#4b5563',
-                  transform: 'translateY(-1px)'
-                }
+                opacity: currentPage === totalPages ? 0.6 : 1
               }}
             >
               <span>Next</span>

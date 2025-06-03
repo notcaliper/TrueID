@@ -9,6 +9,8 @@ import Dashboard from './pages/Dashboard';
 import RecordManagement from './pages/RecordManagement';
 import ActivityLogs from './pages/ActivityLogs';
 import Settings from './pages/Settings';
+import ProfessionalRecords from './pages/ProfessionalRecords';
+import FaceVerification from './pages/FaceVerification';
 
 // Components
 import MainLayout from './components/MainLayout';
@@ -78,6 +80,22 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Settings />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/professional-records" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ProfessionalRecords />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/face-verification" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <FaceVerification />
               </MainLayout>
             </ProtectedRoute>
           } />
