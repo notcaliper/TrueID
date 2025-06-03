@@ -550,3 +550,236 @@ exports.getUserTransactions = async (req, res) => {
     res.status(500).json({ message: 'Server error while retrieving blockchain transactions' });
   }
 };
+
+/**
+ * Record a user's professional record on blockchain
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.recordUserProfessionalRecord = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const userId = req.user.id;
+  const recordId = req.params.id;
+  
+  try {
+    // Check if user exists and has a wallet address
+    const userResult = await db.query(
+      'SELECT id, name, government_id, avax_address, avax_private_key FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Check if user has a wallet address
+    if (!user.avax_address || !user.avax_private_key) {
+      return res.status(400).json({ message: 'User does not have a wallet address or private key' });
+    }
+    
+    // Check if professional record exists and belongs to user
+    const recordResult = await db.query(
+      `SELECT id, title, institution, year, data_hash, verification_status, on_blockchain 
+       FROM professional_records 
+       WHERE id = $1 AND user_id = $2`,
+      [recordId, userId]
+    );
+    
+    if (recordResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Professional record not found or does not belong to user' });
+    }
+    
+    const record = recordResult.rows[0];
+    
+    // Check if record is already on blockchain
+    if (record.on_blockchain) {
+      return res.status(400).json({ message: 'Professional record is already on blockchain' });
+    }
+    
+    // Check if record is verified
+    if (record.verification_status !== 'VERIFIED') {
+      return res.status(400).json({ message: 'Only verified professional records can be recorded on blockchain' });
+    }
+    
+    // Calculate validity period (1 year from now)
+    const startTimestamp = Math.floor(Date.now() / 1000);
+    const endTimestamp = startTimestamp + (365 * 24 * 60 * 60); // 1 year in seconds
+    
+    // Record professional record on blockchain
+    const result = await blockchainService.recordProfessionalRecord(
+      user.avax_private_key,
+      user.avax_address,
+      record.data_hash,
+      startTimestamp,
+      endTimestamp
+    );
+    
+    // Start a transaction
+    const client = await db.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Update record with blockchain status
+      await client.query(
+        `UPDATE professional_records 
+         SET on_blockchain = true, 
+             blockchain_tx_hash = $1, 
+             updated_at = NOW() 
+         WHERE id = $2`,
+        [result.transactionHash, recordId]
+      );
+      
+      // Record transaction in database
+      await client.query(
+        `INSERT INTO blockchain_transactions 
+         (user_id, transaction_hash, from_address, to_address, transaction_type, status, entity_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+        [
+          userId,
+          result.transactionHash,
+          user.avax_address,
+          process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS,
+          'PROFESSIONAL_RECORD',
+          'COMPLETED',
+          recordId
+        ]
+      );
+      
+      // Log the action
+      await client.query(
+        `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          userId,
+          'PROFESSIONAL_RECORD_RECORDED_ON_BLOCKCHAIN',
+          'professional_records',
+          recordId,
+          JSON.stringify({
+            transactionHash: result.transactionHash,
+            blockNumber: result.blockNumber,
+            title: record.title,
+            institution: record.institution,
+            year: record.year
+          }),
+          req.ip
+        ]
+      );
+      
+      await client.query('COMMIT');
+      
+      res.status(200).json({
+        message: 'Professional record recorded on blockchain successfully',
+        transaction: {
+          hash: result.transactionHash,
+          blockNumber: result.blockNumber,
+          status: 'COMPLETED'
+        },
+        record: {
+          id: record.id,
+          title: record.title,
+          onBlockchain: true
+        }
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    logger.error('Record user professional record on blockchain error:', error);
+    res.status(500).json({ message: 'Server error while recording professional record on blockchain' });
+  }
+};
+
+/**
+ * Get blockchain identity expiry information
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getBlockchainExpiry = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const userId = req.user.id;
+  
+  try {
+    // Get user's blockchain status
+    const userResult = await db.query(
+      `SELECT id, avax_address, blockchain_status, blockchain_expiry 
+       FROM users 
+       WHERE id = $1`,
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Check if user has blockchain status
+    if (user.blockchain_status !== 'CONFIRMED') {
+      return res.status(400).json({ 
+        message: 'User identity is not on blockchain', 
+        blockchainStatus: user.blockchain_status || 'NOT_REGISTERED'
+      });
+    }
+    
+    // Get latest blockchain transaction
+    const txResult = await db.query(
+      `SELECT transaction_hash, created_at 
+       FROM blockchain_transactions 
+       WHERE user_id = $1 AND transaction_type = 'IDENTITY_REGISTRATION' 
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+    
+    let transactionInfo = null;
+    if (txResult.rows.length > 0) {
+      transactionInfo = {
+        hash: txResult.rows[0].transaction_hash,
+        timestamp: txResult.rows[0].created_at
+      };
+    }
+    
+    // Calculate expiry (1 year from registration)
+    let expiryDate = user.blockchain_expiry;
+    if (!expiryDate && transactionInfo) {
+      // If no expiry date is set but we have a transaction, calculate it as 1 year from transaction date
+      const txDate = new Date(transactionInfo.timestamp);
+      expiryDate = new Date(txDate.setFullYear(txDate.getFullYear() + 1));
+    } else if (!expiryDate) {
+      // Default to 1 year from now if we can't determine
+      expiryDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    }
+    
+    // Calculate days remaining until expiry
+    const now = new Date();
+    const expiryTime = new Date(expiryDate).getTime();
+    const daysRemaining = Math.max(0, Math.floor((expiryTime - now.getTime()) / (1000 * 60 * 60 * 24)));
+    
+    // Determine expiry status
+    let expiryStatus = 'VALID';
+    if (daysRemaining <= 0) {
+      expiryStatus = 'EXPIRED';
+    } else if (daysRemaining <= 30) {
+      expiryStatus = 'EXPIRING_SOON';
+    }
+    
+    res.status(200).json({
+      blockchainStatus: user.blockchain_status,
+      expiryDate: expiryDate,
+      daysRemaining: daysRemaining,
+      expiryStatus: expiryStatus,
+      transaction: transactionInfo,
+      walletAddress: user.avax_address
+    });
+  } catch (error) {
+    logger.error('Get blockchain expiry error:', error);
+    res.status(500).json({ message: 'Server error while retrieving blockchain expiry information' });
+  }
+};

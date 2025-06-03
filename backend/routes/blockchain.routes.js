@@ -35,6 +35,20 @@ router.get('/status', authenticateUser, blockchainController.getUserBlockchainSt
 router.post('/professional-record', authenticateAdmin, blockchainController.recordProfessionalRecord);
 
 /**
+ * @route POST /api/blockchain/record-professional-record/:id
+ * @desc Record a specific professional record on blockchain
+ * @access User
+ */
+router.post('/record-professional-record/:id', authenticateUser, blockchainController.recordUserProfessionalRecord);
+
+/**
+ * @route GET /api/blockchain/expiry
+ * @desc Get blockchain identity expiry information
+ * @access User
+ */
+router.get('/expiry', authenticateUser, blockchainController.getBlockchainExpiry);
+
+/**
  * @route GET /api/blockchain/verify/:hash
  * @desc Verify a document hash on the blockchain
  * @access Public

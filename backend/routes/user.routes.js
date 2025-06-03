@@ -43,6 +43,20 @@ router.post('/professional-record', authenticateUser, professionalRecordRules, v
 router.get('/professional-records', authenticateUser, userController.getProfessionalRecords);
 
 /**
+ * @route PUT /api/users/professional-record/:id
+ * @desc Update a professional record
+ * @access User
+ */
+router.put('/professional-record/:id', authenticateUser, professionalRecordRules, validate, userController.updateProfessionalRecord);
+
+/**
+ * @route GET /api/users/professional-record/:id/verification
+ * @desc Get verification status of a professional record
+ * @access User
+ */
+router.get('/professional-record/:id/verification', authenticateUser, userController.getProfessionalRecordVerification);
+
+/**
  * @route PUT /api/users/update-facemesh
  * @desc Update user's facemesh data
  * @access User

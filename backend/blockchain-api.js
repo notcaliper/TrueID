@@ -57,8 +57,8 @@ const verifyToken = (req, res, next) => {
 // Basic blockchain service implementation
 const blockchainService = {
   getBlockchainConfig: () => {
-    const network = process.env.BLOCKCHAIN_NETWORK || 'hardhat';
-    const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545';
+    const network = process.env.BLOCKCHAIN_NETWORK;
+    const rpcUrl = process.env.BLOCKCHAIN_RPC_URL;
     const contractAddress = process.env.LOCAL_CONTRACT_ADDRESS;
     const privateKey = process.env.ADMIN_PRIVATE_KEY;
     
@@ -90,6 +90,8 @@ const blockchainService = {
     };
   }
 };
+
+const TX_EXPLORER_URL = "https://testnet.snowscan.io/tx/";
 
 // Routes
 app.get('/health', (req, res) => {
@@ -167,8 +169,9 @@ app.post('/push/:userId', verifyToken, async (req, res) => {
       transaction: {
         hash: txHash,
         blockNumber: blockNumber,
-        status: 'SUCCESS'
-      }
+        status: 'SUCCESS',
+        explorerUrl: `${TX_EXPLORER_URL}${txHash}`
+     }
     });
   } catch (error) {
     console.error('Record identity on blockchain error:', error);

@@ -2,37 +2,49 @@
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
-  id SERIAL PRIMARY KEY,
-  username VARCHAR(50) UNIQUE NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  government_id VARCHAR(255) UNIQUE NOT NULL,
-  email VARCHAR(255) UNIQUE,
-  password_hash VARCHAR(255),
-  password VARCHAR(255),
-  phone VARCHAR(50),
-  is_verified BOOLEAN DEFAULT FALSE,
-  verification_status VARCHAR(20) DEFAULT 'PENDING', -- PENDING, VERIFIED, REJECTED
-  verification_notes TEXT,
-  verified_by INTEGER,
-  verified_at TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  avax_address TEXT, -- Avalanche C-Chain wallet address for the user
-  avax_private_key TEXT, -- Private key for the Avalanche wallet (should be encrypted in production)
-  blockchain_status VARCHAR(20) DEFAULT 'PENDING', -- PENDING, REGISTERED, CONFIRMED
-  blockchain_expiry TIMESTAMP -- Expiry time for blockchain registration
+    id integer NOT NULL DEFAULT nextval('users_id_seq'::regclass),
+    username character varying(50) NOT NULL,
+    name character varying(255) NOT NULL,
+    government_id character varying(255) NOT NULL,
+    email character varying(255),
+    password_hash character varying(255),
+    phone character varying(50),
+    wallet_address character varying(42),
+    is_verified boolean DEFAULT FALSE,
+    verification_status character varying(20) DEFAULT 'PENDING',
+    verification_notes text,
+    verified_by integer,
+    verified_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    avax_address text,
+    avax_private_key text,
+    password character varying(255),
+    blockchain_status character varying(20) DEFAULT 'PENDING',
+    blockchain_expiry timestamp without time zone,
+    CONSTRAINT users_pkey PRIMARY KEY (id),
+    CONSTRAINT users_email_key UNIQUE (email),
+    CONSTRAINT users_government_id_key UNIQUE (government_id),
+    CONSTRAINT users_username_key UNIQUE (username)
 );
 
 -- Biometric data table
 CREATE TABLE IF NOT EXISTS biometric_data (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  facemesh_hash VARCHAR(255) NOT NULL, -- SHA-256 hash of facemesh data
-  facemesh_data JSONB, -- Optional: store original facemesh data (encrypted)
+  user_id INTEGER,
+  facemesh_hash VARCHAR(255) NOT NULL,
+  facemesh_data JSONB,
   is_active BOOLEAN DEFAULT TRUE,
-  blockchain_tx_hash VARCHAR(66), -- Transaction hash when registered on blockchain
+  blockchain_tx_hash VARCHAR(66),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  verification_status VARCHAR(20) DEFAULT 'PENDING',
+  verification_score NUMERIC(5,2),
+  last_verified_at TIMESTAMP,
+  CONSTRAINT biometric_data_user_id_fkey FOREIGN KEY (user_id)
+    REFERENCES users(id) MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE CASCADE
 );
 
 -- Admins table
@@ -134,10 +146,10 @@ CREATE TABLE IF NOT EXISTS biometric_verifications (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_users_government_id ON users(government_id);
-CREATE INDEX IF NOT EXISTS idx_users_avax_address ON users(avax_address); -- Used for both wallet and Avalanche address
-CREATE INDEX IF NOT EXISTS idx_biometric_data_user_id ON biometric_data(user_id);
+CREATE INDEX IF NOT EXISTS idx_users_government_id ON users USING btree (government_id);
+CREATE INDEX IF NOT EXISTS idx_users_avax_address ON users USING btree (avax_address);
 CREATE INDEX IF NOT EXISTS idx_biometric_data_facemesh_hash ON biometric_data(facemesh_hash);
+CREATE INDEX IF NOT EXISTS idx_biometric_data_user_id ON biometric_data(user_id);
 CREATE INDEX IF NOT EXISTS idx_biometric_verifications_user_id ON biometric_verifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_professional_records_user_id ON professional_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);

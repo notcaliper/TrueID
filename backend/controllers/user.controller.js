@@ -313,6 +313,176 @@ exports.getProfessionalRecords = async (req, res) => {
 };
 
 /**
+ * Update a professional record
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.updateProfessionalRecord = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const userId = req.user.id;
+  const recordId = req.params.id;
+  const { title, institution, year, description, documentUrl } = req.body;
+  
+  try {
+    // Check if record exists and belongs to user
+    const recordResult = await db.query(
+      'SELECT id, verification_status FROM professional_records WHERE id = $1 AND user_id = $2',
+      [recordId, userId]
+    );
+    
+    if (recordResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Professional record not found or does not belong to user' });
+    }
+    
+    const record = recordResult.rows[0];
+    
+    // Check if record is already verified - can't update verified records
+    if (record.verification_status === 'VERIFIED') {
+      return res.status(400).json({ message: 'Cannot update a verified professional record' });
+    }
+    
+    // Generate a data hash for the record
+    const recordData = {
+      title: title,
+      institution: institution,
+      year: year,
+      description: description,
+      userId: userId,
+      timestamp: new Date().toISOString()
+    };
+    
+    const dataHash = crypto.createHash('sha256').update(JSON.stringify(recordData)).digest('hex');
+    
+    // Update the record
+    const updateResult = await db.query(
+      `UPDATE professional_records
+       SET title = $1,
+           institution = $2,
+           year = $3,
+           description = $4,
+           document_url = $5,
+           data_hash = $6,
+           verification_status = 'PENDING',
+           updated_at = NOW()
+       WHERE id = $7 AND user_id = $8
+       RETURNING id, title, institution, year, description, document_url, verification_status, on_blockchain, created_at, updated_at`,
+      [
+        title,
+        institution,
+        year,
+        description,
+        documentUrl,
+        dataHash,
+        recordId,
+        userId
+      ]
+    );
+    
+    const updatedRecord = updateResult.rows[0];
+    
+    // Log the update action
+    await db.query(
+      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        userId,
+        'PROFESSIONAL_RECORD_UPDATED',
+        'professional_records',
+        recordId,
+        JSON.stringify({
+          title,
+          institution,
+          year
+        }),
+        req.ip
+      ]
+    );
+    
+    res.status(200).json({
+      message: 'Professional record updated successfully',
+      record: {
+        id: updatedRecord.id,
+        title: updatedRecord.title,
+        institution: updatedRecord.institution,
+        year: updatedRecord.year,
+        description: updatedRecord.description,
+        documentUrl: updatedRecord.document_url,
+        verificationStatus: updatedRecord.verification_status,
+        onBlockchain: updatedRecord.on_blockchain,
+        createdAt: updatedRecord.created_at,
+        updatedAt: updatedRecord.updated_at
+      }
+    });
+  } catch (error) {
+    logger.error('Update professional record error:', error);
+    res.status(500).json({ message: 'Server error while updating professional record' });
+  }
+};
+
+/**
+ * Get verification status of a professional record
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getProfessionalRecordVerification = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const userId = req.user.id;
+  const recordId = req.params.id;
+  
+  try {
+    // Check if record exists and belongs to user
+    const recordResult = await db.query(
+      `SELECT pr.id, pr.title, pr.verification_status, pr.on_blockchain, 
+              pr.verified_at, pr.verified_by, a.username as admin_username
+       FROM professional_records pr
+       LEFT JOIN admins a ON pr.verified_by = a.id
+       WHERE pr.id = $1 AND pr.user_id = $2`,
+      [recordId, userId]
+    );
+    
+    if (recordResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Professional record not found or does not belong to user' });
+    }
+    
+    const record = recordResult.rows[0];
+    
+    // Get blockchain transaction if on blockchain
+    let blockchainTransaction = null;
+    if (record.on_blockchain) {
+      const txResult = await db.query(
+        `SELECT transaction_hash, created_at
+         FROM blockchain_transactions
+         WHERE user_id = $1 AND transaction_type = 'PROFESSIONAL_RECORD' AND entity_id = $2
+         ORDER BY created_at DESC LIMIT 1`,
+        [userId, recordId]
+      );
+      
+      if (txResult.rows.length > 0) {
+        blockchainTransaction = {
+          hash: txResult.rows[0].transaction_hash,
+          timestamp: txResult.rows[0].created_at
+        };
+      }
+    }
+    
+    res.status(200).json({
+      id: record.id,
+      title: record.title,
+      verificationStatus: record.verification_status,
+      onBlockchain: record.on_blockchain,
+      verifiedAt: record.verified_at,
+      verifiedBy: record.admin_username,
+      blockchainTransaction
+    });
+  } catch (error) {
+    logger.error('Get professional record verification error:', error);
+    res.status(500).json({ message: 'Server error while retrieving professional record verification' });
+  }
+};
+
+/**
  * Update user's facemesh data
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
