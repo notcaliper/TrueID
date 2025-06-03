@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
+const walletService = require('../services/wallet.service');
 
 /**
  * Generate SHA-256 hash for facemesh data
@@ -17,6 +18,64 @@ const generateFacemeshHash = (facemeshData) => {
   
   // Generate SHA-256 hash
   return crypto.createHash('sha256').update(facemeshString).digest('hex');
+};
+
+/**
+ * Verify user biometric data (used for verification, not login)
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.verifyUserBiometric = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { userId, facemeshData } = req.body;
+
+  if (!userId || !facemeshData) {
+    return res.status(400).json({ message: 'User ID and facemesh data are required' });
+  }
+
+  try {
+    // Generate facemesh hash
+    const facemeshHash = generateFacemeshHash(facemeshData);
+
+    // Check biometric data
+    const biometricResult = await db.query(
+      `SELECT id, facemesh_hash
+       FROM biometric_data
+       WHERE user_id = $1 AND is_active = true`,
+      [userId]
+    );
+
+    if (biometricResult.rows.length === 0) {
+      return res.status(404).json({ message: 'No active biometric data found for this user' });
+    }
+
+    // Verify facemesh hash
+    const storedHash = biometricResult.rows[0].facemesh_hash;
+    const isMatch = storedHash === facemeshHash;
+
+    // Log verification attempt
+    await db.query(
+      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        userId,
+        isMatch ? 'BIOMETRIC_VERIFICATION_SUCCESS' : 'BIOMETRIC_VERIFICATION_FAILED',
+        'users',
+        userId,
+        JSON.stringify({ verified: isMatch }),
+        req.ip
+      ]
+    );
+
+    return res.status(200).json({
+      verified: isMatch,
+      message: isMatch ? 'Biometric verification successful' : 'Biometric verification failed'
+    });
+  } catch (error) {
+    logger.error('Biometric verification error:', error);
+    res.status(500).json({ message: 'Server error during biometric verification' });
+  }
 };
 
 /**
@@ -58,131 +117,204 @@ const generateUserToken = (user) => {
 exports.registerUser = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
-  const { username, name, governmentId, email, phone, facemeshData, walletAddress } = req.body;
+  const { username, password, name, governmentId, email, phone, facemeshData, avaxAddress } = req.body;
   
-  // If username is not provided, generate one from the government ID
-  const userUsername = username || `user_${governmentId.replace(/[^a-zA-Z0-9]/g, '')}`;
-
+  // If username is not provided, generate one based on name or a random identifier
+  const userUsername = username || 
+    (name ? `user_${name.toLowerCase().replace(/[^a-z0-9]/g, '')}${Math.floor(Math.random() * 10000)}` : 
+    `user${Math.floor(Math.random() * 100000)}`);
+  
+  // Password is now required
+  if (!password) {
+    return res.status(400).json({ message: 'Password is required' });
+  }
+  
+  // Hash the password
+  const hashedPassword = await bcrypt.hash(password, 10);
+  
   try {
-    // Check if user already exists
-    const existingUser = await db.query(
-      'SELECT id FROM users WHERE government_id = $1',
-      [governmentId]
-    );
-
-    if (existingUser.rows.length > 0) {
-      return res.status(409).json({ message: 'User with this government ID already exists' });
-    }
-
-    // Generate facemesh hash
-    const facemeshHash = generateFacemeshHash(facemeshData);
-
-    // Check if facemesh hash already exists
-    const existingBiometric = await db.query(
-      'SELECT id FROM biometric_data WHERE facemesh_hash = $1',
-      [facemeshHash]
-    );
-
-    if (existingBiometric.rows.length > 0) {
-      return res.status(409).json({ message: 'Biometric data already registered to another user' });
-    }
-
-    // Start a transaction
-    const client = await db.connect();
+    // Start transaction
+    await db.query('BEGIN');
     
-    try {
-      await client.query('BEGIN');
-
-      // Insert user
-      const userResult = await client.query(
-        `INSERT INTO users (username, name, government_id, email, phone, wallet_address, verification_status)
-         VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')
-         RETURNING id, username, government_id, name, email, phone, wallet_address, verification_status, created_at`,
-        [userUsername, name, governmentId, email, phone, walletAddress]
-      );
-
-      const user = userResult.rows[0];
-
-      // Insert biometric data
-      await client.query(
-        `INSERT INTO biometric_data (user_id, facemesh_hash, facemesh_data, is_active)
-         VALUES ($1, $2, $3, true)`,
-        [user.id, facemeshHash, JSON.stringify(facemeshData)]
-      );
-
-      // Log the registration
-      await client.query(
-        `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          user.id,
-          'USER_REGISTRATION',
-          'users',
-          user.id,
-          JSON.stringify({
-            governmentId: user.government_id,
-            hasBiometricData: true
-          }),
-          req.ip
-        ]
-      );
-
-      await client.query('COMMIT');
-
-      // Generate token
-      const tokens = generateUserToken(user);
-
-      // Store session
-      await db.query(
-        `INSERT INTO user_sessions (user_id, token, refresh_token, ip_address, user_agent, expires_at)
-         VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '24 hours')`,
-        [user.id, tokens.accessToken, tokens.refreshToken, req.ip, req.headers['user-agent']]
-      );
-
-      // Return user data and token
-      res.status(201).json({
-        message: 'User registered successfully',
-        user: {
-          id: user.id,
-          name: user.name,
-          governmentId: user.government_id,
-          email: user.email,
-          phone: user.phone,
-          verificationStatus: user.verification_status,
-          createdAt: user.created_at
-        },
-        tokens
-      });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+    // Check if username already exists
+    const existingUser = await db.query(
+      'SELECT id FROM users WHERE username = $1',
+      [userUsername]
+    );
+    
+    if (existingUser.rows.length > 0) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({ message: 'Username already exists' });
     }
+    
+    // Check if government ID already exists
+    if (governmentId) {
+      const existingGovId = await db.query(
+        'SELECT id FROM users WHERE government_id = $1',
+        [governmentId]
+      );
+      
+      if (existingGovId.rows.length > 0) {
+        await db.query('ROLLBACK');
+        return res.status(400).json({ message: 'Government ID already registered' });
+      }
+    }
+    
+    // Generate a new Avalanche wallet if one wasn't provided
+    let userWalletAddress = avaxAddress; // Use avaxAddress from request body
+    let avaxPrivateKey = null;
+    
+    if (!userWalletAddress) {
+      try {
+        logger.info('Generating new Avalanche wallet for user registration');
+        const wallet = walletService.generateWallet();
+        userWalletAddress = wallet.address;
+        avaxPrivateKey = wallet.privateKey;
+      } catch (err) {
+        logger.error('Error generating wallet:', err);
+        await db.query('ROLLBACK');
+        return res.status(500).json({ message: 'Error generating wallet' });
+      }
+    }
+    
+    // Insert user
+    const userResult = await db.query(
+      `INSERT INTO users (
+        username,
+        password,
+        name,
+        government_id,
+        email,
+        phone,
+        avax_address,
+        avax_private_key,
+        is_verified,
+        verification_status,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+      RETURNING id, username, name, government_id, email, phone, avax_address, is_verified, verification_status`,
+      [
+        userUsername,
+        hashedPassword,
+        name,
+        governmentId,
+        email,
+        phone,
+        userWalletAddress, // Wallet address
+        avaxPrivateKey, // Avalanche private key
+        false, // is_verified
+        'PENDING' // verification_status
+      ]
+    );
+    
+    const user = userResult.rows[0];
+    
+    // If facemesh data was provided, store it
+    if (facemeshData) {
+      const facemeshHash = generateFacemeshHash(facemeshData);
+      
+      await db.query(
+        `INSERT INTO biometric_data (
+          user_id,
+          facemesh_hash,
+          is_active,
+          created_at
+        ) VALUES ($1, $2, $3, NOW())`,
+        [user.id, facemeshHash, true]
+      );
+    }
+    
+    // Generate tokens
+    const tokens = generateUserToken(user);
+    
+    // Store session
+    await db.query(
+      `INSERT INTO user_sessions (
+        user_id,
+        token,
+        refresh_token,
+        ip_address,
+        user_agent,
+        expires_at
+      ) VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '24 hours')`,
+      [user.id, tokens.accessToken, tokens.refreshToken, req.ip, req.headers['user-agent']]
+    );
+    
+    // Log registration
+    await db.query(
+      `INSERT INTO audit_logs (
+        user_id,
+        action,
+        entity_type,
+        entity_id,
+        details,
+        ip_address
+      ) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        user.id,
+        'USER_REGISTERED',
+        'users',
+        user.id,
+        JSON.stringify({
+          method: 'password',
+          hasBiometric: !!facemeshData,
+          hasWallet: true
+        }),
+        req.ip
+      ]
+    );
+    
+    // Commit transaction
+    await db.query('COMMIT');
+    
+    // Return success response
+    res.status(201).json({
+      message: 'Registration successful',
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        governmentId: user.government_id,
+        email: user.email,
+        phone: user.phone,
+        walletAddress: user.avax_address,
+        isVerified: user.is_verified,
+        verificationStatus: user.verification_status
+      },
+      tokens
+    });
   } catch (error) {
+    // Rollback transaction on error
+    await db.query('ROLLBACK');
+    
     logger.error('User registration error:', error);
     res.status(500).json({ message: 'Server error during registration' });
   }
 };
 
 /**
- * Login a user with biometric data
+ * Login a user with username and password
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
 exports.loginUser = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
-  const { governmentId, facemeshHash } = req.body;
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ message: 'Username and password are required' });
+  }
 
   try {
-    // Get user by government ID
+    // Get user by username
     const userResult = await db.query(
-      `SELECT u.id, u.government_id, u.name, u.email, u.phone, u.wallet_address, 
+      `SELECT u.id, u.username, u.password, u.government_id, u.name, u.email, u.phone, u.avax_address, 
               u.is_verified, u.verification_status
        FROM users u
-       WHERE u.government_id = $1`,
-      [governmentId]
+       WHERE u.username = $1`,
+      [username]
     );
 
     if (userResult.rows.length === 0) {
@@ -191,22 +323,10 @@ exports.loginUser = async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // Check biometric data
-    const biometricResult = await db.query(
-      `SELECT id, facemesh_hash
-       FROM biometric_data
-       WHERE user_id = $1 AND is_active = true`,
-      [user.id]
-    );
-
-    if (biometricResult.rows.length === 0) {
-      return res.status(401).json({ message: 'No active biometric data found' });
-    }
-
-    // Verify facemesh hash
-    const storedHash = biometricResult.rows[0].facemesh_hash;
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     
-    if (storedHash !== facemeshHash) {
+    if (!isPasswordValid) {
       // Log failed login attempt
       await db.query(
         `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
@@ -216,12 +336,12 @@ exports.loginUser = async (req, res) => {
           'LOGIN_FAILED',
           'users',
           user.id,
-          JSON.stringify({ reason: 'Biometric mismatch' }),
+          JSON.stringify({ reason: 'Invalid password' }),
           req.ip
         ]
       );
       
-      return res.status(401).json({ message: 'Biometric verification failed' });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Generate token
@@ -243,7 +363,7 @@ exports.loginUser = async (req, res) => {
         'LOGIN_SUCCESS',
         'users',
         user.id,
-        JSON.stringify({ method: 'biometric' }),
+        JSON.stringify({ method: 'password' }),
         req.ip
       ]
     );

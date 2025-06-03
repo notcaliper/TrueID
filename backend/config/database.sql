@@ -3,18 +3,24 @@
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
+  username VARCHAR(50) UNIQUE NOT NULL,
   name VARCHAR(255) NOT NULL,
   government_id VARCHAR(255) UNIQUE NOT NULL,
   email VARCHAR(255) UNIQUE,
+  password_hash VARCHAR(255),
+  password VARCHAR(255),
   phone VARCHAR(50),
-  wallet_address VARCHAR(42),
   is_verified BOOLEAN DEFAULT FALSE,
   verification_status VARCHAR(20) DEFAULT 'PENDING', -- PENDING, VERIFIED, REJECTED
   verification_notes TEXT,
   verified_by INTEGER,
   verified_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  avax_address TEXT, -- Avalanche C-Chain wallet address for the user
+  avax_private_key TEXT, -- Private key for the Avalanche wallet (should be encrypted in production)
+  blockchain_status VARCHAR(20) DEFAULT 'PENDING', -- PENDING, REGISTERED, CONFIRMED
+  blockchain_expiry TIMESTAMP -- Expiry time for blockchain registration
 );
 
 -- Biometric data table
@@ -117,10 +123,22 @@ INSERT INTO admins (username, password, email, role)
 VALUES ('admin', '$argon2id$v=19$m=65536,t=3,p=4$hnDOWUtprTXmHGMM4ZxTig$2eZ1T3Vy4SY10OuNkXEPTO6UFHT+aFxc2MZwsrfS9tQ', 'admin@dbis.gov', 'SUPER_ADMIN')
 ON CONFLICT (username) DO NOTHING;
 
+-- Biometric verifications table
+CREATE TABLE IF NOT EXISTS biometric_verifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  biometric_data_id INTEGER REFERENCES biometric_data(id) ON DELETE SET NULL,
+  success BOOLEAN DEFAULT FALSE,
+  verification_score NUMERIC(5,2),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_users_government_id ON users(government_id);
+CREATE INDEX IF NOT EXISTS idx_users_avax_address ON users(avax_address); -- Used for both wallet and Avalanche address
 CREATE INDEX IF NOT EXISTS idx_biometric_data_user_id ON biometric_data(user_id);
 CREATE INDEX IF NOT EXISTS idx_biometric_data_facemesh_hash ON biometric_data(facemesh_hash);
+CREATE INDEX IF NOT EXISTS idx_biometric_verifications_user_id ON biometric_verifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_professional_records_user_id ON professional_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_admin_id ON audit_logs(admin_id);

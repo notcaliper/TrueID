@@ -157,35 +157,57 @@ exports.isIdentityRegistered = async (walletAddress) => {
   try {
     const { contract } = initBlockchain();
     
-    // Get biometric hash to check if identity exists
-    const biometricHash = await contract.getBiometricHash(walletAddress);
-    
-    // If biometric hash is zero, identity is not registered
-    return biometricHash !== ethers.constants.HashZero;
+    try {
+      // Get biometric hash to check if identity exists
+      const biometricHash = await contract.getBiometricHash(walletAddress);
+      
+      // If we get here, the identity exists and has a biometric hash
+      return true;
+    } catch (contractError) {
+      // If the error contains 'Identity does not exist', the identity is not registered
+      if (contractError.reason === 'Identity does not exist' || 
+          (contractError.errorArgs && contractError.errorArgs[0] === 'Identity does not exist')) {
+        return false;
+      }
+      
+      // For any other contract error, rethrow it
+      throw contractError;
+    }
   } catch (error) {
+    // Log the error but don't throw, just return false
     console.error('Check identity registration error:', error);
-    throw new Error('Failed to check if identity is registered on blockchain');
+    return false;
   }
 };
 
 /**
  * Register identity on blockchain
- * @param {String} walletAddress - User's wallet address
+ * @param {String} privateKey - Private key to use for the transaction
  * @param {String} biometricHash - Hash of user's biometric data
  * @param {String} professionalDataHash - Hash of user's professional data
  * @returns {Object} Transaction result
  */
-exports.registerIdentity = async (walletAddress, biometricHash, professionalDataHash) => {
+exports.registerIdentity = async (privateKey, biometricHash, professionalDataHash) => {
   try {
-    const { contract, networkName } = initBlockchain();
+    const { provider, networkName } = initBlockchain();
+    
+    // Create wallet instance using the provided private key
+    const wallet = new ethers.Wallet(privateKey, provider);
+    
+    // Create contract instance connected to the wallet
+    const contract = new ethers.Contract(
+      process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS,
+      IdentityManagementABI,
+      wallet
+    );
     
     // Convert hashes to bytes32
     const biometricHashBytes = ethers.utils.id(biometricHash);
     const professionalDataHashBytes = ethers.utils.id(professionalDataHash);
     
-    // Create identity on blockchain
+    // Create identity on blockchain using the wallet
+    // The identity will be created for the address associated with the private key
     const tx = await contract.createIdentity(
-      walletAddress,
       biometricHashBytes,
       professionalDataHashBytes
     );
@@ -519,5 +541,258 @@ exports.switchNetwork = async (network) => {
   } catch (error) {
     console.error('Switch network error:', error);
     return false;
+  }
+};
+
+/**
+ * Check if user data exists on blockchain
+ * @param {String} walletAddress - User's wallet address
+ * @returns {Boolean} True if data exists on blockchain, false otherwise
+ */
+async function checkUserDataOnBlockchain(walletAddress) {
+  try {
+    return await exports.isIdentityRegistered(walletAddress);
+  } catch (error) {
+    console.error(`Error checking user data on blockchain for address ${walletAddress}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Process expired blockchain statuses
+ * This function checks for users with pending blockchain status who have passed
+ * their 48-hour expiry time. If a user hasn't transferred their data to the blockchain
+ * within 48 hours after verification, their blockchain status will be reset.
+ * 
+ * @param {Object} db - Database connection pool
+ * @returns {Object} Processing results
+ */
+exports.processExpiredBlockchainStatuses = async (db) => {
+  const client = await db.connect();
+  try {
+    console.log('Processing expired blockchain statuses...');
+    
+    // Begin transaction
+    await client.query('BEGIN');
+    
+    // Get users with expired blockchain status
+    const expiredUsersResult = await client.query(
+      `SELECT id, name, government_id, avax_address, blockchain_status, blockchain_expiry, blockchain_tx_hash
+       FROM users
+       WHERE blockchain_status = 'PENDING'
+       AND blockchain_expiry < NOW()`
+    );
+    
+    console.log(`Found ${expiredUsersResult.rows.length} users with expired blockchain status`);
+    
+    const results = {
+      total: expiredUsersResult.rows.length,
+      confirmed: 0,
+      expired: 0,
+      details: []
+    };
+    
+    for (const user of expiredUsersResult.rows) {
+      console.log(`Processing user ${user.id} (${user.name})...`);
+      
+      // Check if user data exists on blockchain despite expiry
+      let dataOnBlockchain = false;
+      if (user.avax_address) {
+        dataOnBlockchain = await checkUserDataOnBlockchain(user.avax_address);
+      }
+      
+      if (dataOnBlockchain) {
+        // If data is on blockchain, update status to CONFIRMED
+        console.log(`User ${user.id} data found on blockchain, updating status to CONFIRMED`);
+        await client.query(
+          `UPDATE users
+           SET blockchain_status = 'CONFIRMED',
+               blockchain_expiry = NULL,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [user.id]
+        );
+        
+        // Log the status update
+        await client.query(
+          `INSERT INTO audit_logs (action, entity_type, entity_id, details)
+           VALUES ($1, $2, $3, $4)`,
+          [
+            'USER_BLOCKCHAIN_CONFIRMED',
+            'users',
+            user.id,
+            JSON.stringify({
+              message: 'User data confirmed on blockchain after manual check',
+              previousStatus: 'PENDING'
+            })
+          ]
+        );
+        
+        results.confirmed++;
+        results.details.push({
+          userId: user.id,
+          name: user.name,
+          governmentId: user.government_id,
+          newStatus: 'CONFIRMED'
+        });
+      } else {
+        // If data is not on blockchain, reset blockchain status and transfer funds back to admin
+        console.log(`User ${user.id} data not found on blockchain, resetting blockchain status and transferring funds back`);
+        
+        // Get the transaction details to determine how much AVAX was sent
+        const txResult = await client.query(
+          `SELECT tx_hash, from_address, to_address, amount, created_at 
+           FROM blockchain_transactions 
+           WHERE user_id = $1 AND tx_type = 'INITIAL_FUNDING' AND status = 'COMPLETED'
+           ORDER BY created_at DESC LIMIT 1`,
+          [user.id]
+        );
+        
+        let refundResult = null;
+        
+        // If we found a transaction, attempt to transfer funds back to admin
+        if (txResult.rows.length > 0) {
+          const tx = txResult.rows[0];
+          const { ethers } = require('ethers');
+          
+          try {
+            // Get admin wallet private key from environment variables
+            const adminPrivateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
+            if (!adminPrivateKey) {
+              throw new Error('ADMIN_WALLET_PRIVATE_KEY not defined in environment variables');
+            }
+            
+            // Get admin wallet address from environment variables
+            const adminWalletAddress = process.env.ADMIN_WALLET_ADDRESS;
+            if (!adminWalletAddress) {
+              throw new Error('ADMIN_WALLET_ADDRESS not defined in environment variables');
+            }
+            
+            // Initialize provider
+            const rpcUrl = process.env.AVALANCHE_FUJI_RPC_URL;
+            if (!rpcUrl) {
+              throw new Error('AVALANCHE_FUJI_RPC_URL not defined in environment variables');
+            }
+            const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+            
+            // Create wallet instance from user's private key
+            // We need to retrieve the user's private key from the database
+            const userWalletResult = await client.query(
+              'SELECT avax_address, avax_private_key FROM users WHERE id = $1',
+              [user.id]
+            );
+            
+            if (userWalletResult.rows.length > 0 && userWalletResult.rows[0].avax_private_key) {
+              const userWallet = new ethers.Wallet(userWalletResult.rows[0].avax_private_key, provider);
+              
+              // Check user wallet balance
+              const balance = await provider.getBalance(userWallet.address);
+              
+              if (balance.gt(ethers.utils.parseEther('0'))) {
+                // Calculate gas cost (21000 is standard gas limit for transfers)
+                const gasPrice = await provider.getGasPrice();
+                const gasCost = gasPrice.mul(21000);
+                
+                // Calculate amount to send (balance - gas cost)
+                const amountToSend = balance.sub(gasCost);
+                
+                if (amountToSend.gt(0)) {
+                  // Create transaction
+                  const tx = {
+                    to: adminWalletAddress,
+                    value: amountToSend,
+                    gasLimit: 21000,
+                    gasPrice: gasPrice
+                  };
+                  
+                  // Send transaction
+                  const transaction = await userWallet.sendTransaction(tx);
+                  const receipt = await transaction.wait();
+                  
+                  refundResult = {
+                    success: true,
+                    transactionHash: receipt.transactionHash,
+                    blockNumber: receipt.blockNumber,
+                    fromAddress: userWallet.address,
+                    toAddress: adminWalletAddress,
+                    amount: ethers.utils.formatEther(amountToSend)
+                  };
+                  
+                  // Log the refund transaction
+                  await client.query(
+                    `INSERT INTO blockchain_transactions 
+                     (user_id, tx_hash, from_address, to_address, amount, tx_type, status, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+                    [
+                      user.id,
+                      receipt.transactionHash,
+                      userWallet.address,
+                      adminWalletAddress,
+                      ethers.utils.formatEther(amountToSend),
+                      'EXPIRY_REFUND',
+                      'COMPLETED'
+                    ]
+                  );
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`Error transferring funds back from user ${user.id}:`, error);
+            refundResult = {
+              success: false,
+              error: error.message
+            };
+          }
+        }
+        
+        // Update user blockchain status
+        await client.query(
+          `UPDATE users
+           SET blockchain_status = 'EXPIRED',
+               blockchain_expiry = NULL,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [user.id]
+        );
+        
+        // Log the status update with refund information
+        await client.query(
+          `INSERT INTO audit_logs (action, entity_type, entity_id, details)
+           VALUES ($1, $2, $3, $4)`,
+          [
+            'USER_BLOCKCHAIN_EXPIRED',
+            'users',
+            user.id,
+            JSON.stringify({
+              message: '48-hour blockchain expiry period elapsed without data transfer',
+              previousStatus: 'PENDING',
+              txHash: user.blockchain_tx_hash,
+              refundResult: refundResult
+            })
+          ]
+        );
+        
+        results.expired++;
+        results.details.push({
+          userId: user.id,
+          name: user.name,
+          governmentId: user.government_id,
+          newStatus: 'EXPIRED',
+          refundResult: refundResult
+        });
+      }
+    }
+    
+    // Commit transaction
+    await client.query('COMMIT');
+    console.log('Finished processing expired blockchain statuses');
+    
+    return results;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error processing expired blockchain statuses:', error);
+    throw error;
+  } finally {
+    client.release();
   }
 };

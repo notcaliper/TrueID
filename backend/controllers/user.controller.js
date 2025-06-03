@@ -29,7 +29,7 @@ exports.getUserProfile = async (req, res) => {
   try {
     // Get user details
     const userResult = await db.query(
-      `SELECT id, name, government_id, email, phone, wallet_address, 
+      `SELECT id, name, government_id, email, phone, avax_address,
               is_verified, verification_status, created_at, updated_at
        FROM users
        WHERE id = $1`,
@@ -69,7 +69,7 @@ exports.getUserProfile = async (req, res) => {
         governmentId: user.government_id,
         email: user.email,
         phone: user.phone,
-        walletAddress: user.wallet_address,
+        walletAddress: user.avax_address || user.avax_address,
         isVerified: user.is_verified,
         verificationStatus: user.verification_status,
         createdAt: user.created_at,
@@ -93,12 +93,12 @@ exports.updateUserProfile = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
   const userId = req.user.id;
-  const { name, email, phone, walletAddress } = req.body;
+  const { name, email, phone, avaxAddress } = req.body;
   
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT name, email, phone, wallet_address FROM users WHERE id = $1',
+      'SELECT name, email, phone, avax_address FROM users WHERE id = $1',
       [userId]
     );
     
@@ -114,15 +114,15 @@ exports.updateUserProfile = async (req, res) => {
        SET name = $1, 
            email = $2,
            phone = $3,
-           wallet_address = $4,
+           avax_address = $4,
            updated_at = NOW()
        WHERE id = $5
-       RETURNING id, name, government_id, email, phone, wallet_address, updated_at`,
+       RETURNING id, name, government_id, email, phone, avax_address, updated_at`,
       [
         name || user.name,
         email || user.email,
         phone || user.phone,
-        walletAddress || user.wallet_address,
+        avaxAddress || user.avax_address,
         userId
       ]
     );
@@ -143,7 +143,7 @@ exports.updateUserProfile = async (req, res) => {
             name: name !== user.name ? { from: user.name, to: name } : undefined,
             email: email !== user.email ? { from: user.email, to: email } : undefined,
             phone: phone !== user.phone ? { from: user.phone, to: phone } : undefined,
-            walletAddress: walletAddress !== user.wallet_address ? { from: user.wallet_address, to: walletAddress } : undefined
+            walletAddress: walletAddress !== user.avax_address ? { from: user.avax_address, to: walletAddress } : undefined
           }
         }),
         req.ip
@@ -172,7 +172,7 @@ exports.getVerificationStatus = async (req, res) => {
   
   try {
     const result = await db.query(
-      `SELECT is_verified, verification_status, verification_notes, verified_at,
+      `SELECT u.is_verified, u.verification_status, u.verification_notes, u.verified_at, u.created_at,
               a.username as verified_by
        FROM users u
        LEFT JOIN admins a ON u.verified_by = a.id
@@ -184,8 +184,17 @@ exports.getVerificationStatus = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
+    // Format the response to match what the frontend expects
+    const userData = result.rows[0];
+    
     res.status(200).json({
-      verificationStatus: result.rows[0]
+      data: {
+        status: userData.verification_status,
+        submittedAt: userData.created_at,
+        verifiedAt: userData.verified_at,
+        rejectionReason: userData.verification_notes,
+        verifiedBy: userData.verified_by
+      }
     });
   } catch (error) {
     logger.error('Get verification status error:', error);
@@ -319,26 +328,16 @@ exports.updateFacemesh = async (req, res) => {
   }
   
   try {
-    // Generate facemesh hash
+    // Generate hash for facemesh data
     const facemeshHash = generateFacemeshHash(facemeshData);
     
-    // Check if facemesh hash already exists for another user
-    const existingBiometric = await db.query(
-      'SELECT user_id FROM biometric_data WHERE facemesh_hash = $1 AND user_id != $2',
-      [facemeshHash, userId]
-    );
-    
-    if (existingBiometric.rows.length > 0) {
-      return res.status(409).json({ message: 'Biometric data already registered to another user' });
-    }
-    
-    // Start a transaction
-    const client = await db.connect();
+    // Use a transaction for atomicity
+    const client = await db.getClient();
     
     try {
       await client.query('BEGIN');
       
-      // Set all existing biometric data to inactive
+      // Deactivate any existing biometric data
       await client.query(
         'UPDATE biometric_data SET is_active = false WHERE user_id = $1',
         [userId]
@@ -393,6 +392,76 @@ exports.updateFacemesh = async (req, res) => {
 };
 
 /**
+ * Get user's biometric verification status
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getBiometricStatus = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const userId = req.user.id;
+  
+  try {
+    // Get the latest active biometric data
+    const biometricResult = await db.query(
+      `SELECT id, facemesh_hash, is_active, created_at, updated_at, 
+              verification_status, verification_score, last_verified_at
+       FROM biometric_data
+       WHERE user_id = $1 AND is_active = true
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+    
+    // Check if user has biometric data
+    const hasBiometricData = biometricResult.rows.length > 0;
+    
+    // Get verification attempts
+    const verificationResult = await db.query(
+      `SELECT COUNT(*) as total_verifications, 
+              COUNT(*) FILTER (WHERE success = true) as successful_verifications,
+              MAX(created_at) FILTER (WHERE success = true) as last_successful_verification
+       FROM biometric_verifications
+       WHERE user_id = $1`,
+      [userId]
+    );
+    
+    const verificationStats = verificationResult.rows[0];
+    
+    // Determine if user is verified based on active biometric data and successful verification
+    const isVerified = hasBiometricData && 
+                      biometricResult.rows[0].verification_status === 'VERIFIED' &&
+                      verificationStats.successful_verifications > 0;
+    
+    // Prepare response data
+    const responseData = {
+      verified: isVerified,
+      facemeshExists: hasBiometricData,
+      lastVerified: verificationStats.last_successful_verification || null,
+      verificationCount: parseInt(verificationStats.total_verifications) || 0,
+      successfulVerifications: parseInt(verificationStats.successful_verifications) || 0
+    };
+    
+    // Add biometric details if they exist
+    if (hasBiometricData) {
+      const biometricData = biometricResult.rows[0];
+      responseData.biometricDetails = {
+        id: biometricData.id,
+        createdAt: biometricData.created_at,
+        updatedAt: biometricData.updated_at,
+        verificationStatus: biometricData.verification_status,
+        verificationScore: biometricData.verification_score
+      };
+    }
+    
+    res.status(200).json(responseData);
+  } catch (error) {
+    logger.error('Get biometric status error:', error);
+    res.status(500).json({ message: 'Server error while retrieving biometric status' });
+  }
+};
+
+/**
  * Get user's blockchain status
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -404,9 +473,9 @@ exports.getBlockchainStatus = async (req, res) => {
   const blockchainService = require('../services/blockchain.service');
   
   try {
-    // Get user wallet address
+    // Get user wallet address and blockchain status
     const userResult = await db.query(
-      'SELECT wallet_address FROM users WHERE id = $1',
+      'SELECT avax_address, blockchain_status, blockchain_expiry FROM users WHERE id = $1',
       [userId]
     );
     
@@ -414,7 +483,8 @@ exports.getBlockchainStatus = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    const walletAddress = userResult.rows[0].wallet_address;
+    const user = userResult.rows[0];
+    const walletAddress = user.avax_address;
     
     if (!walletAddress) {
       return res.status(400).json({ message: 'User does not have a wallet address' });
@@ -422,7 +492,7 @@ exports.getBlockchainStatus = async (req, res) => {
     
     // Get blockchain transactions
     const transactionsResult = await db.query(
-      `SELECT transaction_hash, transaction_type, status, created_at
+      `SELECT tx_hash as transaction_hash, tx_type as transaction_type, status, created_at
        FROM blockchain_transactions
        WHERE user_id = $1
        ORDER BY created_at DESC
@@ -441,20 +511,256 @@ exports.getBlockchainStatus = async (req, res) => {
       blockchainIdentityStatus = {
         isRegistered,
         isVerified,
-        walletAddress
+        walletAddress,
+        databaseStatus: user.blockchain_status,
+        expiryTime: user.blockchain_expiry
       };
+      
+      // If data is on blockchain but status is still PENDING in database, update it
+      if (isRegistered && user.blockchain_status === 'PENDING') {
+        await db.query(
+          `UPDATE users 
+           SET blockchain_status = 'CONFIRMED', 
+               blockchain_expiry = NULL,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [userId]
+        );
+        
+        blockchainIdentityStatus.databaseStatus = 'CONFIRMED';
+        blockchainIdentityStatus.expiryTime = null;
+      }
     } catch (error) {
       logger.error('Blockchain status check error:', error);
       blockchainError = 'Could not retrieve blockchain status';
     }
     
+    // Calculate time remaining if status is PENDING
+    let timeRemaining = null;
+    if (user.blockchain_status === 'PENDING' && user.blockchain_expiry) {
+      const now = new Date();
+      const expiry = new Date(user.blockchain_expiry);
+      const diffMs = expiry - now;
+      
+      if (diffMs > 0) {
+        const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        timeRemaining = {
+          hours: diffHrs,
+          minutes: diffMins,
+          totalMilliseconds: diffMs
+        };
+      } else {
+        timeRemaining = { expired: true };
+      }
+    }
+    
     res.status(200).json({
       blockchainIdentityStatus,
       blockchainError,
+      timeRemaining,
       recentTransactions: transactionsResult.rows
     });
   } catch (error) {
     logger.error('Get blockchain status error:', error);
     res.status(500).json({ message: 'Server error while retrieving blockchain status' });
+  }
+};
+
+/**
+ * Transfer user data to blockchain
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.transferToBlockchain = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const userId = req.user.id;
+  
+  try {
+    // Check if user exists and get wallet information
+    const userResult = await db.query(
+      `SELECT id, name, government_id, avax_address, avax_private_key, 
+              blockchain_status, blockchain_expiry, verification_status 
+       FROM users WHERE id = $1`,
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Check if user is verified
+    if (user.verification_status !== 'VERIFIED') {
+      return res.status(400).json({ 
+        message: 'User must be verified before transferring to blockchain',
+        status: user.verification_status
+      });
+    }
+    
+    // Check if user has a wallet address and private key
+    if (!user.avax_address || !user.avax_private_key) {
+      return res.status(400).json({ message: 'User does not have a valid blockchain wallet' });
+    }
+    
+    // Check blockchain status
+    if (user.blockchain_status === 'CONFIRMED') {
+      return res.status(400).json({ message: 'User data is already on the blockchain' });
+    }
+    
+    // Check if blockchain status is PENDING and within expiry time
+    if (user.blockchain_status === 'PENDING') {
+      // Check if expiry time has passed
+      if (user.blockchain_expiry && new Date(user.blockchain_expiry) < new Date()) {
+        return res.status(400).json({ 
+          message: 'Blockchain transfer period has expired',
+          expiryTime: user.blockchain_expiry
+        });
+      }
+    } else if (user.blockchain_status !== 'PENDING') {
+      return res.status(400).json({ 
+        message: 'User is not eligible for blockchain transfer',
+        status: user.blockchain_status
+      });
+    }
+    
+    // Get user biometric data
+    const biometricResult = await db.query(
+      `SELECT facemesh_hash, facemesh_data FROM biometric_data 
+       WHERE user_id = $1 AND is_active = true`,
+      [userId]
+    );
+    
+    if (biometricResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Biometric data not found' });
+    }
+    
+    // Get user professional data
+    const professionalResult = await db.query(
+      `SELECT data_hash FROM professional_records 
+       WHERE user_id = $1 
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+    
+    // Generate hashes for blockchain
+    const biometricHash = '0x' + biometricResult.rows[0].facemesh_hash;
+    
+    // Use professional data hash if available, otherwise create a placeholder
+    let professionalDataHash;
+    if (professionalResult.rows.length > 0 && professionalResult.rows[0].data_hash) {
+      professionalDataHash = '0x' + professionalResult.rows[0].data_hash;
+    } else {
+      // Create a placeholder hash for professional data
+      const placeholder = JSON.stringify({
+        userId: user.id,
+        governmentId: user.government_id,
+        timestamp: new Date().toISOString()
+      });
+      professionalDataHash = '0x' + crypto.createHash('sha256').update(placeholder).digest('hex');
+    }
+    
+    // Import blockchain service
+    const blockchainService = require('../services/blockchain.service');
+    
+    // Check if identity is already registered
+    const isRegistered = await blockchainService.isIdentityRegistered(user.avax_address);
+    
+    if (isRegistered) {
+      // Update user blockchain status
+      await db.query(
+        `UPDATE users 
+         SET blockchain_status = 'CONFIRMED', 
+             blockchain_expiry = NULL,
+             updated_at = NOW() 
+         WHERE id = $1`,
+        [userId]
+      );
+      
+      return res.status(200).json({
+        message: 'Identity is already registered on blockchain',
+        blockchainStatus: 'CONFIRMED'
+      });
+    }
+    
+    // Start a transaction
+    const client = await db.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Register identity on blockchain
+      const result = await blockchainService.registerIdentity(
+        user.avax_private_key,
+        biometricHash,
+        professionalDataHash
+      );
+      
+      if (result.status === 'success') {
+        // Update user blockchain status
+        await client.query(
+          `UPDATE users 
+           SET blockchain_status = 'CONFIRMED', 
+               blockchain_expiry = NULL,
+               updated_at = NOW() 
+           WHERE id = $1`,
+          [userId]
+        );
+        
+        // Log the blockchain registration
+        await client.query(
+          `INSERT INTO blockchain_transactions 
+           (user_id, tx_hash, from_address, to_address, tx_type, status, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+          [
+            userId,
+            result.transactionHash,
+            user.avax_address,
+            process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS,
+            'IDENTITY_REGISTRATION',
+            'COMPLETED'
+          ]
+        );
+        
+        // Log the action
+        await client.query(
+          `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            userId,
+            'BLOCKCHAIN_IDENTITY_REGISTERED',
+            'users',
+            userId,
+            JSON.stringify({
+              transactionHash: result.transactionHash,
+              blockNumber: result.blockNumber,
+              network: result.network
+            }),
+            req.ip
+          ]
+        );
+        
+        await client.query('COMMIT');
+        
+        res.status(200).json({
+          message: 'Identity successfully registered on blockchain',
+          transactionHash: result.transactionHash,
+          blockNumber: result.blockNumber,
+          blockchainStatus: 'CONFIRMED'
+        });
+      } else {
+        throw new Error('Blockchain registration failed');
+      }
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    logger.error('Transfer to blockchain error:', error);
+    res.status(500).json({ message: 'Server error during blockchain transfer' });
   }
 };

@@ -28,15 +28,14 @@ module.exports = {
     cache: "./blockchain/cache",
     artifacts: "./blockchain/artifacts"
   },
+  defaultNetwork: "avalanche_fuji",
   networks: {
     // Avalanche Fuji Testnet configuration
-    avalancheFujiTestnet: {
+    avalanche_fuji: {
       url: process.env.AVALANCHE_FUJI_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc",
       accounts: [PRIVATE_KEY],
       chainId: 43113
-    },
-    // Default to Avalanche Fuji for all deployments
-    defaultNetwork: "avalancheFujiTestnet"
+    }
   },
   // Contract verification is done manually through the Snowtrace interface
   etherscan: {

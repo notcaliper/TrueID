@@ -9,7 +9,11 @@ const { body, validationResult } = require('express-validator');
 exports.validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+    console.log('Validation errors:', JSON.stringify(errors.array()));
+    return res.status(400).json({ 
+      message: 'Validation failed', 
+      errors: errors.array() 
+    });
   }
   next();
 };
@@ -18,6 +22,17 @@ exports.validate = (req, res, next) => {
  * User registration validation rules
  */
 exports.userRegistrationRules = [
+  body('username')
+    .trim()
+    .isLength({ min: 3, max: 50 })
+    .withMessage('Username must be between 3 and 50 characters')
+    .matches(/^[A-Za-z0-9_]+$/)
+    .withMessage('Username can only contain alphanumeric characters and underscores'),
+
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long'),
+
   body('name')
     .trim()
     .isLength({ min: 2, max: 100 })
@@ -42,6 +57,7 @@ exports.userRegistrationRules = [
     .withMessage('Must provide a valid phone number'),
   
   body('facemeshData')
+    .optional()
     .isObject()
     .withMessage('Facemesh data must be a valid JSON object'),
   
@@ -55,15 +71,14 @@ exports.userRegistrationRules = [
  * User login validation rules
  */
 exports.userLoginRules = [
-  body('governmentId')
+  body('username')
     .trim()
-    .isLength({ min: 5, max: 50 })
-    .withMessage('Government ID must be between 5 and 50 characters'),
+    .isLength({ min: 3, max: 50 })
+    .withMessage('Username must be between 3 and 50 characters'),
   
-  body('facemeshHash')
-    .isString()
-    .isLength({ min: 64, max: 64 })
-    .withMessage('Facemesh hash must be a valid SHA-256 hash')
+  body('password')
+    .isLength({ min: 1 })
+    .withMessage('Password is required')
 ];
 
 /**
@@ -132,4 +147,17 @@ exports.professionalRecordRules = [
     .optional()
     .isBoolean()
     .withMessage('Is current must be a boolean value')
+];
+
+/**
+ * Biometric verification validation rules
+ */
+exports.biometricVerificationRules = [
+  body('userId')
+    .isUUID()
+    .withMessage('User ID must be a valid UUID'),
+  
+  body('facemeshData')
+    .isObject()
+    .withMessage('Facemesh data must be a valid JSON object')
 ];

@@ -126,7 +126,7 @@ exports.loginAdmin = async (req, res) => {
       ]
     );
 
-    // Return admin data and token
+    // Return admin data and token in the format expected by the government portal
     res.status(200).json({
       message: 'Login successful',
       admin: {
@@ -135,7 +135,15 @@ exports.loginAdmin = async (req, res) => {
         email: admin.email,
         role: admin.role
       },
-      tokens
+      tokens,
+      // Include token directly for backward compatibility with government portal
+      token: tokens.accessToken,
+      user: {
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        role: admin.role
+      }
     });
   } catch (error) {
     logger.error('Admin login error:', error);
@@ -199,9 +207,21 @@ exports.refreshAdminToken = async (req, res) => {
       [tokens.accessToken, tokens.refreshToken, refreshToken]
     );
 
+    // Get admin profile to include in response
+    const profileResult = await db.query(
+      'SELECT id, username, email, role FROM admins WHERE id = $1',
+      [admin.id]
+    );
+    
+    const adminProfile = profileResult.rows[0];
+    
     res.status(200).json({
       message: 'Token refreshed successfully',
-      tokens
+      tokens,
+      // Include token directly for backward compatibility with government portal
+      token: tokens.accessToken,
+      admin: adminProfile,
+      user: adminProfile
     });
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
@@ -228,7 +248,7 @@ exports.getAllUsers = async (req, res) => {
   
   try {
     let query = `
-      SELECT u.id, u.name, u.government_id, u.email, u.phone, u.wallet_address, 
+      SELECT u.id, u.name, u.government_id, u.email, u.phone, u.avax_address, 
              u.is_verified, u.verification_status, u.created_at, u.updated_at,
              EXISTS(SELECT 1 FROM biometric_data b WHERE b.user_id = u.id AND b.is_active = true) as has_biometric
       FROM users u
@@ -290,7 +310,7 @@ exports.getUserById = async (req, res) => {
   try {
     // Get user details
     const userResult = await db.query(
-      `SELECT u.id, u.name, u.government_id, u.email, u.phone, u.wallet_address, 
+      `SELECT u.id, u.name, u.government_id, u.email, u.phone, u.avax_address, 
               u.is_verified, u.verification_status, u.verification_notes, 
               u.created_at, u.updated_at, u.verified_at,
               a.username as verified_by_username
@@ -308,7 +328,7 @@ exports.getUserById = async (req, res) => {
     
     // Get biometric data (only metadata, not the actual data)
     const biometricResult = await db.query(
-      `SELECT id, is_active, blockchain_tx_hash, created_at, updated_at
+      `SELECT id, is_active, created_at, updated_at
        FROM biometric_data
        WHERE user_id = $1
        ORDER BY created_at DESC`,
@@ -319,7 +339,7 @@ exports.getUserById = async (req, res) => {
     const recordsResult = await db.query(
       `SELECT id, record_type, institution, title, description, 
               start_date, end_date, is_current, is_verified, 
-              blockchain_tx_hash, created_at, updated_at
+              created_at, updated_at
        FROM professional_records
        WHERE user_id = $1
        ORDER BY start_date DESC`,
@@ -357,12 +377,12 @@ exports.verifyUser = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
   const { id } = req.params;
-  const { verificationStatus, verificationNotes } = req.body;
+  const { verificationStatus, verificationNotes, transferAmount } = req.body;
   
   try {
-    // Check if user exists
+    // Check if user exists and get all necessary user data including private key
     const userResult = await db.query(
-      'SELECT id, name, government_id, verification_status FROM users WHERE id = $1',
+      'SELECT id, name, government_id, verification_status, avax_address, avax_address, avax_private_key FROM users WHERE id = $1',
       [id]
     );
     
@@ -372,54 +392,325 @@ exports.verifyUser = async (req, res) => {
     
     const user = userResult.rows[0];
     
-    // Update user verification status
-    const updateResult = await db.query(
-      `UPDATE users 
-       SET verification_status = $1, 
-           verification_notes = $2,
-           verified_by = $3,
-           verified_at = NOW(),
-           is_verified = $4,
-           updated_at = NOW()
-       WHERE id = $5
-       RETURNING id, name, government_id, verification_status, verified_at`,
-      [
-        verificationStatus,
-        verificationNotes,
-        req.admin.id,
-        verificationStatus === 'VERIFIED', // Set is_verified to true only if status is VERIFIED
-        id
-      ]
-    );
-    
-    const updatedUser = updateResult.rows[0];
-    
-    // Log the verification action
-    await db.query(
-      `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        req.admin.id,
-        id,
-        `USER_${verificationStatus}`,
-        'users',
-        id,
-        JSON.stringify({
-          previousStatus: user.verification_status,
-          newStatus: verificationStatus,
-          notes: verificationNotes
-        }),
-        req.ip
-      ]
-    );
-    
-    res.status(200).json({
-      message: `User ${verificationStatus.toLowerCase()} successfully`,
-      user: updatedUser
-    });
+    // Start a transaction
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Update user verification status
+      const updateResult = await client.query(
+        `UPDATE users 
+         SET verification_status = $1, 
+             verification_notes = $2,
+             verified_by = $3,
+             verified_at = NOW(),
+             is_verified = $4,
+             updated_at = NOW()
+         WHERE id = $5
+         RETURNING id, name, government_id, verification_status, verified_at, avax_address, avax_address`,
+        [
+          verificationStatus,
+          verificationNotes,
+          req.admin.id,
+          verificationStatus === 'VERIFIED', // Set is_verified to true only if status is VERIFIED
+          id
+        ]
+      );
+      
+      const updatedUser = updateResult.rows[0];
+      
+      // Log the verification action
+      await client.query(
+        `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          req.admin.id,
+          id,
+          `USER_${verificationStatus}`,
+          'users',
+          id,
+          JSON.stringify({
+            previousStatus: user.verification_status,
+            newStatus: verificationStatus,
+            notes: verificationNotes
+          }),
+          req.ip
+        ]
+      );
+      
+      // Initialize variables for transaction results
+      let fundingResult = null;
+      let blockchainRegistrationResult = null;
+      
+      // STEP 1: If verification status is VERIFIED, first transfer funds to the user's wallet
+      if (verificationStatus === 'VERIFIED') {
+        // Import the wallet service
+        const walletService = require('../services/wallet.service');
+        
+        // Get transfer amount from request or use default (0.03 AVAX)
+        const amount = transferAmount || 0.03;
+        
+        // Check if user has avax_address, use that if available
+        const targetAddress = user.avax_address || user.avax_address;
+        
+        if (targetAddress) {
+          logger.info(`Transferring ${amount} AVAX to user ${user.id} at address ${targetAddress}`);
+          
+          // Transfer AVAX to user's wallet
+          fundingResult = await walletService.transferTokens(targetAddress, amount);
+          
+          if (fundingResult.success) {
+            // Update user's blockchain transaction record
+            await client.query(
+              `INSERT INTO blockchain_transactions 
+               (user_id, transaction_type, transaction_hash, block_number, status, data)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [
+                id,
+                'VERIFICATION_FUNDING',
+                fundingResult.transactionHash,
+                fundingResult.blockNumber,
+                'SUCCESS',
+                JSON.stringify({
+                  amount: amount,
+                  from: fundingResult.from,
+                  to: targetAddress,
+                  gasUsed: fundingResult.gasUsed,
+                  network: 'avalanche_fuji'
+                })
+              ]
+            );
+            
+            // Log the transaction
+            await client.query(
+              `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [
+                req.admin.id,
+                id,
+                'USER_BLOCKCHAIN_FUNDING',
+                'users',
+                id,
+                JSON.stringify({
+                  transactionHash: fundingResult.transactionHash,
+                  amount: amount,
+                  status: 'SUCCESS'
+                }),
+                req.ip
+              ]
+            );
+            
+            // STEP 2: After successful funding, forcefully register user's identity on blockchain
+            if (user.avax_private_key) {
+              try {
+                // Get user's biometric data hash
+                const biometricResult = await client.query(
+                  'SELECT facemesh_hash FROM biometric_data WHERE user_id = $1 AND is_active = true',
+                  [id]
+                );
+                
+                if (biometricResult.rows.length > 0) {
+                  const biometricHash = biometricResult.rows[0].facemesh_hash;
+                  
+                  // Import blockchain service
+                  const blockchainService = require('../services/blockchain.service');
+                  
+                  // Check if identity already exists on blockchain
+                  const targetAddress = user.avax_address || user.avax_address;
+                  let identityExists = false;
+                  
+                  try {
+                    identityExists = await blockchainService.isIdentityRegistered(targetAddress);
+                    logger.info(`Identity check for user ${user.id} completed. Result: ${identityExists ? 'EXISTS' : 'NOT EXISTS'}`);
+                  } catch (identityCheckError) {
+                    logger.error(`Error checking if identity exists for user ${user.id}:`, identityCheckError);
+                    // Continue with registration attempt even if check fails
+                  }
+                  
+                  if (identityExists) {
+                    logger.info(`Identity for user ${user.id} already exists on blockchain, skipping registration`);
+                    
+                    // Record the existing identity in audit logs
+                    await client.query(
+                      `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                      [
+                        req.admin.id,
+                        id,
+                        'USER_BLOCKCHAIN_IDENTITY_EXISTS',
+                        'users',
+                        id,
+                        JSON.stringify({
+                          message: 'Identity already exists on blockchain',
+                          walletAddress: targetAddress
+                        }),
+                        req.ip
+                      ]
+                    );
+                    
+                    // Set blockchainRegistrationResult to indicate existing identity
+                    blockchainRegistrationResult = {
+                      status: 'ALREADY_EXISTS',
+                      message: 'Identity already exists on blockchain'
+                    };
+                  } else {
+                    // Use empty professional data hash for now
+                    const professionalDataHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
+                    
+                    logger.info(`Registering user ${user.id} identity on blockchain using their private key`);
+                    
+                    // Register identity on blockchain using user's private key
+                    blockchainRegistrationResult = await blockchainService.registerIdentity(
+                      user.avax_private_key,
+                      biometricHash,
+                      professionalDataHash
+                    );
+                  
+                    // Record blockchain registration only if we actually registered (not for existing identities)
+                    await client.query(
+                      `INSERT INTO blockchain_transactions 
+                       (user_id, transaction_type, transaction_hash, block_number, status, data)
+                       VALUES ($1, $2, $3, $4, $5, $6)`,
+                      [
+                        id,
+                        'IDENTITY_REGISTRATION',
+                        blockchainRegistrationResult.transactionHash,
+                        blockchainRegistrationResult.blockNumber,
+                        blockchainRegistrationResult.status,
+                        JSON.stringify({
+                          biometricHash: biometricHash,
+                          registeredBy: 'SYSTEM_AUTOMATIC',
+                          network: blockchainRegistrationResult.network
+                        })
+                      ]
+                    );
+                  }
+                  
+                  // Log blockchain registration in audit logs only since blockchain_status column doesn't exist
+                  logger.info(`Successfully registered user ${id} identity on blockchain with tx hash: ${blockchainRegistrationResult.transactionHash}`);
+                  
+                  // Log the blockchain registration
+                  await client.query(
+                    `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                    [
+                      req.admin.id,
+                      id,
+                      'USER_BLOCKCHAIN_REGISTRATION',
+                      'users',
+                      id,
+                      JSON.stringify({
+                        transactionHash: blockchainRegistrationResult.transactionHash,
+                        status: blockchainRegistrationResult.status,
+                        automatic: true
+                      }),
+                      req.ip
+                    ]
+                  );
+                } else {
+                  logger.error(`No active biometric data found for user ${id}`);
+                }
+              } catch (blockchainError) {
+                logger.error(`Error registering user ${id} on blockchain:`, blockchainError);
+                
+                // Log the failed blockchain registration
+                await client.query(
+                  `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                  [
+                    req.admin.id,
+                    id,
+                    'USER_BLOCKCHAIN_REGISTRATION_FAILED',
+                    'users',
+                    id,
+                    JSON.stringify({
+                      error: blockchainError.message
+                    }),
+                    req.ip
+                  ]
+                );
+              }
+            } else {
+              logger.error(`No private key available for user ${id}`);
+            }
+          } else {
+            // Log the failed funding transaction
+            await client.query(
+              `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [
+                req.admin.id,
+                id,
+                'USER_BLOCKCHAIN_FUNDING_FAILED',
+                'users',
+                id,
+                JSON.stringify({
+                  error: fundingResult.error,
+                  amount: amount
+                }),
+                req.ip
+              ]
+            );
+          }
+        } else {
+          logger.error(`No wallet address available for user ${id}`);
+        }
+      }
+      
+      await client.query('COMMIT');
+      
+      // Prepare response
+      const response = {
+        message: `User ${verificationStatus.toLowerCase()} successfully`,
+        user: {
+          id: updatedUser.id,
+          name: updatedUser.name,
+          governmentId: updatedUser.government_id,
+          verificationStatus: updatedUser.verification_status,
+          verifiedAt: updatedUser.verified_at
+        }
+      };
+      
+      // Add transaction details to response if available
+      if (fundingResult && fundingResult.success) {
+        response.fundingTransaction = {
+          hash: fundingResult.transactionHash,
+          blockNumber: fundingResult.blockNumber,
+          explorerUrl: fundingResult.explorerUrl
+        };
+      }
+      
+      // Add blockchain registration details if available
+      if (blockchainRegistrationResult) {
+        response.blockchainRegistration = {};
+        
+        // Handle the case where identity already exists
+        if (blockchainRegistrationResult.status === 'ALREADY_EXISTS') {
+          response.blockchainRegistration.status = 'ALREADY_EXISTS';
+          response.blockchainRegistration.message = blockchainRegistrationResult.message;
+        } else {
+          // For newly registered identities
+          response.blockchainRegistration.hash = blockchainRegistrationResult.transactionHash;
+          response.blockchainRegistration.blockNumber = blockchainRegistrationResult.blockNumber;
+          response.blockchainRegistration.status = blockchainRegistrationResult.status;
+          
+          // Include network info if available
+          if (blockchainRegistrationResult.network) {
+            response.blockchainRegistration.network = blockchainRegistrationResult.network;
+          }
+        }
+      }
+      
+      res.status(200).json(response);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     logger.error('Verify user error:', error);
-    res.status(500).json({ message: 'Server error while updating user verification status' });
+    res.status(500).json({ message: 'Server error during user verification' });
   }
 };
 
@@ -437,7 +728,7 @@ exports.updateUser = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, email, phone, wallet_address FROM users WHERE id = $1',
+      'SELECT id, name, email, phone, avax_address FROM users WHERE id = $1',
       [id]
     );
     
@@ -453,15 +744,15 @@ exports.updateUser = async (req, res) => {
        SET name = $1, 
            email = $2,
            phone = $3,
-           wallet_address = $4,
+           avax_address = $4,
            updated_at = NOW()
        WHERE id = $5
-       RETURNING id, name, government_id, email, phone, wallet_address, updated_at`,
+       RETURNING id, name, government_id, email, phone, avax_address, updated_at`,
       [
         name || user.name,
         email || user.email,
         phone || user.phone,
-        walletAddress || user.wallet_address,
+        walletAddress || user.avax_address,
         id
       ]
     );
@@ -483,7 +774,7 @@ exports.updateUser = async (req, res) => {
             name: name !== user.name ? { from: user.name, to: name } : undefined,
             email: email !== user.email ? { from: user.email, to: email } : undefined,
             phone: phone !== user.phone ? { from: user.phone, to: phone } : undefined,
-            walletAddress: walletAddress !== user.wallet_address ? { from: user.wallet_address, to: walletAddress } : undefined
+            walletAddress: walletAddress !== user.avax_address ? { from: user.avax_address, to: walletAddress } : undefined
           }
         }),
         req.ip
@@ -759,8 +1050,13 @@ exports.getAdminProfile = async (req, res) => {
     
     const activityCount = parseInt(activityCountResult.rows[0].count);
     
+    // Format the response to match what the government portal expects
+    const adminData = adminResult.rows[0];
+    
     res.status(200).json({
-      admin: adminResult.rows[0],
+      admin: adminData,
+      // Also include as user for compatibility with government portal
+      user: adminData,
       activityCount
     });
   } catch (error) {
@@ -916,7 +1212,7 @@ exports.changeAdminPassword = async (req, res) => {
 };
 
 /**
- * Deactivate user
+ * Deactivate a user
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -924,7 +1220,7 @@ exports.deactivateUser = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
   const userId = req.params.id;
-  const { reason } = req.body;
+  const { action, notes } = req.body;
   
   try {
     // Check if user exists
@@ -1052,5 +1348,48 @@ exports.reactivateUser = async (req, res) => {
   } catch (error) {
     logger.error('Reactivate user error:', error);
     res.status(500).json({ message: 'Server error while reactivating user' });
+  }
+};
+
+/**
+ * Check blockchain expiry status for all pending users
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.checkBlockchainExpiry = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  
+  try {
+    // Import blockchain service
+    const blockchainService = require('../services/blockchain.service');
+    
+    // Process expired blockchain statuses
+    const results = await blockchainService.processExpiredBlockchainStatuses(db);
+    
+    // Log the action
+    await db.query(
+      `INSERT INTO audit_logs (admin_id, action, entity_type, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        req.admin.id,
+        'BLOCKCHAIN_EXPIRY_CHECK',
+        'users',
+        JSON.stringify({
+          total: results.total,
+          confirmed: results.confirmed,
+          expired: results.expired
+        }),
+        req.ip
+      ]
+    );
+    
+    res.status(200).json({
+      message: 'Blockchain expiry check completed successfully',
+      results
+    });
+  } catch (error) {
+    logger.error('Blockchain expiry check error:', error);
+    res.status(500).json({ message: 'Server error while checking blockchain expiry status' });
   }
 };
