@@ -1,10 +1,10 @@
-# Decentralized Biometric Identity System (DBIS)
+# TrueID: Decentralized Biometric Identity System
 
-A secure, blockchain-based identity management system that enables users to register, authenticate, and manage their professional and biometric identity using facemesh recognition technology. DBIS provides a tamper-proof solution for digital identity verification with enhanced privacy and security features.
+TrueID is a secure, blockchain-based identity management system that enables users to register, authenticate, and manage their professional and biometric identity using facemesh recognition technology. The system provides a tamper-proof solution for digital identity verification with enhanced privacy and security features.
 
 ## System Overview
 
-DBIS combines blockchain technology with biometric authentication to create a tamper-proof identity management system. The system consists of the following components:
+TrueID combines blockchain technology with biometric authentication to create a tamper-proof identity management system. The system consists of the following components:
 
 ### 1. Android Mobile App
 - User registration and profile management
@@ -16,37 +16,49 @@ DBIS combines blockchain technology with biometric authentication to create a ta
 - QR code generation for identity verification
 
 ### 2. Backend Server
-- RESTful API endpoints using Node.js and Express.js
-- Authentication and authorization with JWT/OAuth2
-- Blockchain integration using Web3.js/Ethers.js
+- RESTful API endpoints using Node.js (v14+) and Express.js
+- Authentication and authorization with JWT
+- Blockchain integration using Ethers.js
 - Database operations with PostgreSQL
 - Biometric data processing and hashing (SHA-256)
 - Rate limiting and request validation
 - Webhook support for event notifications
 
 ### 3. Blockchain Layer
-- Solidity smart contracts on EVM-compatible chains (Polygon/Ethereum testnet)
+- Solidity smart contracts (v0.8.0+) on Avalanche Fuji testnet
 - Identity verification contracts with multi-signature support
 - Professional history tracking with immutable records
 - Audit trail management with timestamp verification
-- Access control with delegated permissions
+- Access control with role-based permissions
 - Gas optimization for cost-effective transactions
 
-### 4. Government Portal
-- Modern React.js web dashboard for government officials
+### 4. Frontend Web Application
+- Modern React.js (v19+) with Material UI components
+- Responsive design for all device sizes
+- Web3 integration for blockchain interaction
+- JWT authentication with secure token management
+- User-friendly interface for identity management
+
+### 5. Government Portal
+- React.js web dashboard with Tailwind CSS
 - Role-based access control with administrative hierarchy
 - Identity verification and management with detailed user profiles
 - User record management with search and filtering capabilities
 - Comprehensive audit trail viewing and reporting
 - Real-time statistics and data visualization
-- Enhanced UI with responsive design and accessibility features
 - Developer mode for testing and debugging
+
+### 6. C Client
+- Lightweight C implementation for embedded systems
+- API client for interacting with the TrueID backend
+- Minimal dependencies for broad compatibility
 
 ## Security Features
 
 - Biometric data is never stored directly; only hashed representations are saved
 - SHA-256 hashing for facemesh data with salting for enhanced security
-- JWT/OAuth2 authentication for API security with token refresh mechanisms
+- JWT authentication for API security with token refresh mechanisms
+- Argon2 password hashing for secure credential storage
 - Comprehensive role-based access control with fine-grained permissions
 - Tamper-proof audit trails on blockchain with timestamp verification
 - Decentralized identity verification with multi-factor authentication options
@@ -55,36 +67,43 @@ DBIS combines blockchain technology with biometric authentication to create a ta
 - Regular security audits and vulnerability assessments
 - Compliance with data protection regulations
 
+## Project Structure
+
+```
+TrueID/
+├── android-app/         # Mobile application for user identity management
+├── backend/             # Node.js Express server with API endpoints
+│   ├── blockchain/      # Blockchain integration and smart contracts
+│   ├── config/          # Configuration files
+│   ├── controllers/     # API controllers
+│   ├── middleware/      # Express middleware
+│   ├── models/          # Database models
+│   ├── routes/          # API routes
+│   └── services/        # Business logic
+├── c-client/            # C implementation for embedded systems
+├── contracts/           # Solidity smart contracts (root directory)
+├── database/            # Database schemas and migration scripts
+├── frontend/            # React.js web application for users
+├── government-portal/   # React.js admin dashboard for government officials
+└── docs/                # Documentation and API specifications
+```
+
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v16+)
+- Node.js (v14+)
 - PostgreSQL (v13+)
 - Android Studio (for mobile app development)
-- Python 3.8+ (for face authentication components)
 - Metamask or similar Web3 wallet
-- Polygon/Ethereum testnet access
-
-### Project Structure
-
-```
-DBIS/
-├── android-app/         # Mobile application for user identity management
-├── backend/             # Node.js Express server with API endpoints
-├── blockchain/          # Solidity smart contracts and deployment scripts
-├── database/            # Database schemas and migration scripts
-├── government-portal/   # React.js admin dashboard for government officials
-├── python-auth/         # Python-based face authentication system
-└── docs/                # Documentation and API specifications
-```
+- Avalanche Fuji testnet access
 
 ### Installation
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/yourusername/DBIS.git
-   cd DBIS
+   git clone https://github.com/yourusername/TrueID.git
+   cd TrueID
    ```
 
 2. Install backend dependencies
@@ -100,29 +119,22 @@ DBIS/
    npm run seed  # Optional: adds test data
    ```
 
-4. Install Python dependencies
+4. Install frontend dependencies
    ```bash
-   cd python-auth
-   pip install -r requirements.txt
+   cd frontend
+   npm install
    ```
 
-5. Build the Android app
-   ```bash
-   cd android-app
-   ./gradlew build
-   ```
-
-6. Set up the government portal
+5. Set up the government portal
    ```bash
    cd government-portal
    npm install
    ```
 
-7. Deploy smart contracts (optional during development)
+6. Deploy smart contracts to Avalanche Fuji testnet
    ```bash
-   cd blockchain
-   npx hardhat compile
-   npx hardhat deploy --network polygon_testnet
+   cd backend
+   npm run blockchain:deploy:fuji
    ```
 
 ### Configuration
@@ -131,33 +143,39 @@ Copy the example environment files and update with your settings:
 
 ```bash
 cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
 cp government-portal/.env.example government-portal/.env
-cp blockchain/.env.example blockchain/.env
 ```
+
+Required environment variables for the backend:
+- `PORT`: Server port (default: 5000)
+- `DATABASE_URL`: PostgreSQL connection string
+- `JWT_SECRET`: Secret key for JWT token generation
+- `BLOCKCHAIN_RPC_URL`: Avalanche Fuji RPC URL
+- `CONTRACT_ADDRESS`: Deployed smart contract address
+- `PRIVATE_KEY`: Private key for contract interaction
 
 ### Running the System
 
 1. Start the backend server
    ```bash
    cd backend
+   npm run dev
+   ```
+
+2. Start the frontend application
+   ```bash
+   cd frontend
    npm start
    ```
 
-2. Start the government portal
+3. Start the government portal
    ```bash
    cd government-portal
    npm start
    ```
 
-3. Run the Python face authentication server
-   ```bash
-   cd python-auth
-   python src/main.py
-   ```
-
-4. Deploy the Android app to a device or emulator
-
-5. For development mode with mock data (useful for UI development)
+4. For development mode with mock data (useful for UI development)
    ```bash
    cd government-portal
    npm run dev:mock
@@ -173,6 +191,15 @@ The system uses a hybrid architecture that combines:
 - Role-based access control for different user types
 - Event-driven design for real-time updates
 - Microservices approach for scalability
+
+### Key Technologies
+
+- **Frontend**: React.js, Material UI, Web3.js, Ethers.js
+- **Backend**: Node.js, Express.js, JWT, Argon2
+- **Database**: PostgreSQL
+- **Blockchain**: Solidity, Hardhat, Avalanche Fuji testnet
+- **Mobile**: Android, MediaPipe/ML Kit for facemesh
+- **Government Portal**: React.js, Tailwind CSS, Headless UI
 
 ## Key Features
 
@@ -195,79 +222,45 @@ The system uses a hybrid architecture that combines:
 - Advanced search and filtering
 - Detailed activity logging
 - Developer mode for testing and debugging
-- Mock data support for development
 
 ### Mobile Application
 - User-friendly registration process
-- Secure biometric capture
-- Profile management
-- Verification status tracking
-- QR code-based identity sharing
+- Secure biometric authentication
+- Professional identity management
+- Offline verification capabilities
+- QR code generation for identity sharing
 
-## Deployment Options
+## API Documentation
 
-- Local development environment
-- Testnet deployment for staging
-- Production deployment on mainnet
-- Docker containerization support
-- CI/CD pipeline integration
+The backend provides a comprehensive RESTful API for all operations. Key endpoints include:
+
+- `/api/auth`: Authentication endpoints (register, login, refresh)
+- `/api/users`: User management endpoints
+- `/api/identity`: Identity management endpoints
+- `/api/verification`: Identity verification endpoints
+- `/api/blockchain`: Blockchain interaction endpoints
+
+For detailed API documentation, see the [API Documentation](docs/api.md).
+
+## Smart Contract Documentation
+
+The system uses the following smart contracts:
+
+- `IdentityManagement.sol`: Main contract for identity management
+- `IdentityVerification.sol`: Contract for verification processes
+
+For detailed smart contract documentation, see the [Smart Contract Documentation](docs/contracts.md).
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Avalanche Integration
+## Acknowledgments
 
-The TrueID system can now be deployed on Avalanche C-Chain for production-ready identity management. This integration allows for:
-
-1. **Dual-blockchain approach**
-   - Pending IDs are stored on local blockchain for testing
-   - Verified IDs are stored on Avalanche (Fuji Testnet or Mainnet)
-
-2. **Deployment Options**
-   - Deploy to Fuji Testnet for testing (recommended)
-   - Deploy to Avalanche Mainnet for production (requires real AVAX)
-
-### Getting Started with Avalanche
-
-1. **Configure your environment**
-   ```
-   cp backend/.env.example backend/.env
-   ```
-   Edit the `.env` file and set:
-   - `ADMIN_PRIVATE_KEY` with your wallet's private key
-   - `SNOWTRACE_API_KEY` if you want to verify contracts
-
-2. **Use the Blockchain Manager**
-   ```
-   cd backend
-   node blockchain-manager.js
-   ```
-   Select option 9 for "Avalanche Management" and follow the prompts
-
-3. **Development Workflow**
-   - Start with local development (option 2)
-   - Deploy to Fuji Testnet for staging
-   - Deploy to Mainnet for production
-
-### Integration Details
-
-The system has been updated to make smart decisions based on the verification status:
-- Unverified users utilize the local blockchain
-- Verified users utilize the Avalanche blockchain
-
-### Network Information
-
-- **Fuji Testnet (C-Chain)**
-  - Network Name: Avalanche Fuji C-Chain
-  - RPC URL: https://api.avax-test.network/ext/bc/C/rpc
-  - ChainID: 43113
-  - Symbol: AVAX
-  - Block Explorer: https://testnet.snowtrace.io/
-
-- **Avalanche Mainnet (C-Chain)**
-  - Network Name: Avalanche C-Chain
-  - RPC URL: https://api.avax.network/ext/bc/C/rpc
-  - ChainID: 43114
-  - Symbol: AVAX
-  - Block Explorer: https://snowtrace.io/
+- The Avalanche team for their blockchain infrastructure
+- MediaPipe for the facemesh recognition technology
+- All contributors who have helped with the development of TrueID
