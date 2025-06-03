@@ -1,5 +1,6 @@
 /* Base styles */
 :root {
+  /* Light theme variables */
   --color-primary: #1976D2;
   --color-secondary: #0D47A1;
   --color-accent: #FF5722;
@@ -10,8 +11,12 @@
   --color-text-light: #757575;
   --color-border: #E0E0E0;
   --color-background: #F5F7FA;
+  --color-card-background: #FFFFFF;
+  --color-header-background: #FFFFFF;
   --color-sidebar-gradient-start: #1E3A8A;
   --color-sidebar-gradient-end: #0F172A;
+  --color-hover-background: #F0F4F8;
+  --color-active-background: rgba(25, 118, 210, 0.1);
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -20,10 +25,34 @@
   --radius-lg: 0.75rem;
 }
 
+/* Dark theme variables */
+[data-theme='dark'] {
+  --color-primary: #2196F3;
+  --color-secondary: #1E88E5;
+  --color-accent: #FF7043;
+  --color-success: #66BB6A;
+  --color-warning: #FFCA28;
+  --color-danger: #EF5350;
+  --color-text: #E0E0E0;
+  --color-text-light: #BDBDBD;
+  --color-border: #424242;
+  --color-background: #121212;
+  --color-card-background: #1E1E1E;
+  --color-header-background: #1E1E1E;
+  --color-sidebar-gradient-start: #0F172A;
+  --color-sidebar-gradient-end: #0A0F1D;
+  --color-hover-background: #2D3748;
+  --color-active-background: rgba(33, 150, 243, 0.2);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 body {
@@ -216,7 +245,7 @@ body {
 }
 
 .main-header {
-  background-color: white;
+  background-color: var(--color-header-background);
   padding: 1.25rem 2rem;
   border-bottom: 1px solid var(--color-border);
   display: flex;
@@ -380,7 +409,7 @@ body {
 }
 
 .user-profile:hover {
-  background-color: #F5F7FA;
+  background-color: var(--color-hover-background);
 }
 
 .user-avatar {
@@ -422,7 +451,7 @@ body {
   padding: 2rem;
   overflow-y: auto;
   flex: 1;
-  background-color: #F5F7FA;
+  background-color: var(--color-background);
   position: relative;
   transition: all 0.3s ease;
   background-image: linear-gradient(135deg, rgba(25, 118, 210, 0.03) 0%, rgba(13, 71, 161, 0.01) 100%);
@@ -486,7 +515,7 @@ body {
 }
 
 .login-card {
-  background-color: white;
+  background-color: var(--color-card-background);
   border-radius: 0.75rem;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   padding: 2.5rem;
@@ -576,7 +605,8 @@ body {
   border-radius: 0.5rem;
   font-size: 1rem;
   transition: all 0.3s;
-  background-color: #F9FAFB;
+  background-color: var(--color-card-background);
+  color: var(--color-text);
 }
 
 .form-input:focus {
@@ -2028,6 +2058,68 @@ body {
   0% { opacity: 1; }
   50% { opacity: 0.7; }
   100% { opacity: 1; }
+}
+
+/* Theme toggle styles */
+.theme-toggle {
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle:hover {
+  transform: rotate(15deg);
+}
+
+/* Dark mode specific overrides */
+.dark-mode .card,
+.dark-mode .dashboard-card,
+.dark-mode .data-card,
+.dark-mode .modal-content,
+.dark-mode .dropdown-menu,
+.dark-mode .notification-panel {
+  background-color: var(--color-card-background);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.dark-mode .table {
+  color: var(--color-text);
+}
+
+.dark-mode .table th {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.dark-mode .table tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .table tr:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .dev-controls-panel {
+  background-color: var(--color-card-background);
+  border: 1px solid var(--color-border);
+}
+
+.dark-mode .dev-info-value {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.dark-mode .form-input,
+.dark-mode .form-select,
+.dark-mode .search-input {
+  background-color: rgba(0, 0, 0, 0.2);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.dark-mode .form-input:focus,
+.dark-mode .form-select:focus,
+.dark-mode .search-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
 }
 
 /* Developer Controls Panel */

@@ -63,4 +63,46 @@ router.get('/logs', authenticateAdmin, adminController.getActivityLogs);
  */
 router.post('/create', authenticateAdmin, requireSuperAdmin, adminController.createAdmin);
 
+/**
+ * @route GET /api/admin/dashboard
+ * @desc Get dashboard statistics
+ * @access Admin
+ */
+router.get('/dashboard', authenticateAdmin, adminController.getDashboardStats);
+
+/**
+ * @route GET /api/admin/profile
+ * @desc Get admin profile
+ * @access Admin
+ */
+router.get('/profile', authenticateAdmin, adminController.getAdminProfile);
+
+/**
+ * @route PUT /api/admin/profile
+ * @desc Update admin profile
+ * @access Admin
+ */
+router.put('/profile', authenticateAdmin, adminController.updateAdminProfile);
+
+/**
+ * @route PUT /api/admin/change-password
+ * @desc Change admin password
+ * @access Admin
+ */
+router.put('/change-password', authenticateAdmin, adminController.changeAdminPassword);
+
+/**
+ * @route PUT /api/admin/users/:id/deactivate
+ * @desc Deactivate a user
+ * @access Admin
+ */
+router.put('/users/:id/deactivate', authenticateAdmin, adminController.deactivateUser);
+
+/**
+ * @route PUT /api/admin/users/:id/reactivate
+ * @desc Reactivate a user
+ * @access Admin
+ */
+router.put('/users/:id/reactivate', authenticateAdmin, adminController.reactivateUser);
+
 module.exports = router;

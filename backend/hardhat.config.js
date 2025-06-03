@@ -1,6 +1,6 @@
 /**
  * Hardhat configuration for DBIS
- * Configured for Avalanche Fuji Testnet (AVAX Testnet)
+ * Supports both local development and Avalanche Fuji testnet
  */
 require('@nomiclabs/hardhat-waffle');
 require('@nomiclabs/hardhat-ethers');
@@ -29,16 +29,14 @@ module.exports = {
     artifacts: "./blockchain/artifacts"
   },
   networks: {
-    // Hardhat local network (for testing contract compilation only)
-    hardhat: {
-      chainId: 31337
-    },
-    // Avalanche Fuji Testnet - main deployment target
-    avalanche_fuji: {
+    // Avalanche Fuji Testnet configuration
+    avalancheFujiTestnet: {
       url: process.env.AVALANCHE_FUJI_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc",
       accounts: [PRIVATE_KEY],
       chainId: 43113
-    }
+    },
+    // Default to Avalanche Fuji for all deployments
+    defaultNetwork: "avalancheFujiTestnet"
   },
   // Contract verification is done manually through the Snowtrace interface
   etherscan: {

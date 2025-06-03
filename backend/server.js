@@ -25,19 +25,11 @@ app.use(express.json()); // Parse JSON request body
 
 // Database connection
 const pool = new Pool({
-<<<<<<< HEAD
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-=======
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'dbis',
   password: process.env.DB_PASSWORD || 'postgres',
   port: process.env.DB_PORT || 5432,
->>>>>>> parent of 645e0af (Merge pull request #4 from notcaliper/blockchain)
 });
 
 // Test database connection
@@ -49,22 +41,31 @@ pool.query('SELECT NOW()', (err, res) => {
   }
 });
 
-// Make db pool available to routes
+// Create a simple logger
+const logger = {
+  info: (message, ...args) => console.log(`[INFO] ${message}`, ...args),
+  error: (message, ...args) => console.error(`[ERROR] ${message}`, ...args),
+  warn: (message, ...args) => console.warn(`[WARN] ${message}`, ...args),
+  debug: (message, ...args) => console.debug(`[DEBUG] ${message}`, ...args)
+};
+
+// Make db pool and logger available to routes
 app.locals.db = pool;
+app.locals.logger = logger;
 
 // Import routes
-const authRoutes = require('./src/routes/auth.routes');
-const userRoutes = require('./src/routes/user.routes');
-const identityRoutes = require('./src/routes/identity.routes');
-const governmentRoutes = require('./src/routes/government.routes');
-const blockchainRoutes = require('./src/routes/blockchain.routes');
+const authRoutes = require('./routes/auth.routes');
+const userRoutes = require('./routes/user.routes');
+const adminRoutes = require('./routes/admin.routes');
+const blockchainRoutes = require('./routes/blockchain.routes');
+const networkRoutes = require('./routes/network.routes');
 
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/identity', identityRoutes);
-app.use('/api/government', governmentRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/blockchain', blockchainRoutes);
+app.use('/api/network', networkRoutes);
 
 // Root route
 app.get('/', (req, res) => {
@@ -74,65 +75,6 @@ app.get('/', (req, res) => {
   });
 });
 
-<<<<<<< HEAD
-// Test route for connectivity check
-app.get('/api/test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Backend API is connected and working',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Network status endpoint
-app.get('/api/network/status', async (req, res) => {
-  const blockchainService = require('./services/blockchain.service');
-  
-  try {
-    // Get blockchain network information
-    const networkInfo = blockchainService.getNetworkInfo();
-    
-    // Check if contract is accessible
-    const contractStatus = await blockchainService.isContractAccessible();
-    
-    res.json({
-      success: true,
-      status: 'online',
-      network: {
-        name: networkInfo.network.networkName,
-        status: contractStatus.accessible ? 'online' : 'offline',
-        contractAddress: networkInfo.network.contractAddress,
-        error: contractStatus.error
-      },
-      connections: {
-        database: true,
-        blockchain: contractStatus.accessible,
-        cache: true
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Network status error:', error);
-    res.json({
-      success: false,
-      status: 'error',
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Admin login endpoint for GET requests (for status checking)
-app.get('/api/admin/login', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Login endpoint is available. Use POST method to login.',
-    timestamp: new Date().toISOString()
-  });
-});
-
-=======
->>>>>>> parent of 645e0af (Merge pull request #4 from notcaliper/blockchain)
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

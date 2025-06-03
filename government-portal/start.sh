@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Starting DBIS Government Portal..."
+echo "Starting TrueID Government Portal..."
 echo "Installing dependencies..."
 npm install
 

@@ -1,6 +1,6 @@
 /**
  * Blockchain network management script for DBIS
- * Allows switching between local Hardhat and Polygon networks
+ * Allows switching between local Hardhat and Avalanche Fuji networks
  */
 const fs = require('fs');
 const path = require('path');
@@ -27,13 +27,13 @@ const getCurrentNetworkConfig = () => {
     };
   }
   
-  // Configuration for Polygon Mumbai testnet
-  if (network === 'polygon') {
+  // Configuration for Avalanche Fuji testnet
+  if (network === 'avalanche') {
     return {
-      network: 'polygon',
-      rpcUrl: process.env.POLYGON_RPC_URL || 'https://rpc-mumbai.maticvigil.com',
-      contractAddress: process.env.POLYGON_CONTRACT_ADDRESS,
-      networkName: 'Polygon Mumbai'
+      network: 'avalanche',
+      rpcUrl: process.env.AVALANCHE_FUJI_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc',
+      contractAddress: process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS,
+      networkName: 'Avalanche Fuji Testnet'
     };
   }
   
@@ -48,13 +48,13 @@ const getCurrentNetworkConfig = () => {
 
 /**
  * Switch blockchain network
- * @param {String} network - Network to switch to ('local' or 'polygon')
+ * @param {String} network - Network to switch to ('local' or 'avalanche')
  * @returns {Boolean} True if switch was successful
  */
 const switchNetwork = async (network) => {
   try {
-    if (network !== 'local' && network !== 'polygon') {
-      throw new Error('Invalid network. Must be "local" or "polygon"');
+    if (network !== 'local' && network !== 'avalanche') {
+      throw new Error('Invalid network. Must be "local" or "avalanche"');
     }
     
     // Update .env file
@@ -74,7 +74,7 @@ const switchNetwork = async (network) => {
       // Update environment variable in current process
       process.env.BLOCKCHAIN_NETWORK = network;
       
-      console.log(`Switched to ${network === 'local' ? 'Local Hardhat' : 'Polygon Mumbai'} network`);
+      console.log(`Switched to ${network === 'local' ? 'Local Hardhat' : 'Avalanche Fuji Testnet'} network`);
       return true;
     } else {
       throw new Error('.env file not found');
@@ -165,7 +165,7 @@ const displayNetworkStatus = async () => {
   
   console.log('\n=== Available Commands ===');
   console.log('1. Switch to Local Hardhat: node scripts/manage-network.js local');
-  console.log('2. Switch to Polygon Mumbai: node scripts/manage-network.js polygon');
+  console.log('2. Switch to Avalanche Fuji: node scripts/manage-network.js avalanche');
   console.log('3. Check Status: node scripts/manage-network.js status');
   console.log('');
 };
@@ -182,11 +182,11 @@ async function main() {
     return;
   }
   
-  if (command === 'local' || command === 'polygon') {
+  if (command === 'local' || command === 'avalanche') {
     const currentConfig = getCurrentNetworkConfig();
     
     if (currentConfig.network === command) {
-      console.log(`Already on ${command === 'local' ? 'Local Hardhat' : 'Polygon Mumbai'} network`);
+      console.log(`Already on ${command === 'local' ? 'Local Hardhat' : 'Avalanche Fuji Testnet'} network`);
     } else {
       await switchNetwork(command);
     }
@@ -198,7 +198,7 @@ async function main() {
   console.log('Invalid command. Available commands:');
   console.log('- node scripts/manage-network.js status');
   console.log('- node scripts/manage-network.js local');
-  console.log('- node scripts/manage-network.js polygon');
+  console.log('- node scripts/manage-network.js avalanche');
 }
 
 // Run the script

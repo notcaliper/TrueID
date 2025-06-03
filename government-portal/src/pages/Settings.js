@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../utils/AuthContext';
 import ApiService from '../services/ApiService';
+import { FaUser, FaLock, FaBell, FaShieldAlt, FaExclamationTriangle, FaCheckCircle, FaSave } from 'react-icons/fa';
 
 const Settings = () => {
   const { currentUser } = useAuth();
@@ -124,171 +125,400 @@ const Settings = () => {
   };
 
   return (
-    <div className="settings-page">
-      <h1 className="page-title">Settings</h1>
+    <div className="settings-page" style={{
+      padding: '24px',
+      backgroundColor: '#1a1a1a',
+      minHeight: '100vh',
+      color: '#e0e0e0',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    }}>
+      <h1 style={{
+        fontSize: '28px',
+        fontWeight: '600',
+        margin: '0 0 24px 0',
+        color: '#fff',
+        letterSpacing: '-0.5px'
+      }}>Settings</h1>
       
       {error && (
-        <div className="error-message">
-          <i className="icon-alert-triangle"></i>
+        <div style={{
+          backgroundColor: '#2c1519',
+          color: '#f87171',
+          padding: '12px 16px',
+          borderRadius: '8px',
+          marginBottom: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '14px',
+          border: '1px solid #451a1a'
+        }}>
+          <FaExclamationTriangle />
           {error}
         </div>
       )}
       
       {success && (
-        <div className="success-message">
-          <i className="icon-check-circle"></i>
+        <div style={{
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          color: '#34d399',
+          padding: '12px 16px',
+          borderRadius: '8px',
+          marginBottom: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '14px',
+          border: '1px solid rgba(16, 185, 129, 0.2)'
+        }}>
+          <FaCheckCircle />
           Settings updated successfully!
         </div>
       )}
       
-      <div className="settings-card">
-        <div className="card-header">
-          <h2 className="card-title">Account Settings</h2>
+      <div style={{
+        backgroundColor: '#2d2d2d',
+        borderRadius: '12px',
+        border: '1px solid #404040',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          padding: '24px',
+          borderBottom: '1px solid #404040'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            margin: '0',
+            color: '#fff'
+          }}>Account Settings</h2>
         </div>
         
-        <form onSubmit={handleSubmit} className="settings-form">
-          <div className="form-grid">
+        <form onSubmit={handleSubmit} style={{
+          padding: '24px'
+        }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '32px'
+          }}>
             {/* Profile Section */}
-            <div className="form-section">
-              <div className="section-header">
-                <i className="icon-user"></i>
-                <h3>Profile Information</h3>
+            <div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '24px'
+              }}>
+                <FaUser style={{ color: '#6366f1', fontSize: '20px' }} />
+                <h3 style={{
+                  margin: '0',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: '#fff'
+                }}>Profile Information</h3>
               </div>
               
-              <div className="form-group">
-                <label htmlFor="name">Full Name</label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="form-input"
-                />
-              </div>
-              
-              <div className="form-group">
-                <label htmlFor="email">Email Address</label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="form-input"
-                />
-              </div>
-              
-              <div className="section-header">
-                <i className="icon-bell"></i>
-                <h3>Notification Preferences</h3>
-              </div>
-              
-              <div className="checkbox-group">
-                <div className="checkbox-item">
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px'
+              }}>
+                <div>
+                  <label htmlFor="name" style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#a3a3a3',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}>Full Name</label>
                   <input
-                    type="checkbox"
-                    id="notifyVerification"
-                    name="notifyVerification"
-                    checked={formData.notifyVerification}
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
                     onChange={handleChange}
-                    className="checkbox-input"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      backgroundColor: '#1a1a1a',
+                      border: '1px solid #404040',
+                      borderRadius: '8px',
+                      color: '#e0e0e0',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
                   />
-                  <label htmlFor="notifyVerification">
-                    Notify when a user is verified
-                  </label>
                 </div>
                 
-                <div className="checkbox-item">
+                <div>
+                  <label htmlFor="email" style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#a3a3a3',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}>Email Address</label>
                   <input
-                    type="checkbox"
-                    id="notifyRejection"
-                    name="notifyRejection"
-                    checked={formData.notifyRejection}
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
                     onChange={handleChange}
-                    className="checkbox-input"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      backgroundColor: '#1a1a1a',
+                      border: '1px solid #404040',
+                      borderRadius: '8px',
+                      color: '#e0e0e0',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
                   />
-                  <label htmlFor="notifyRejection">
-                    Notify when a user is rejected
-                  </label>
+                </div>
+              </div>
+              
+              <div style={{
+                marginTop: '32px'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '24px'
+                }}>
+                  <FaBell style={{ color: '#6366f1', fontSize: '20px' }} />
+                  <h3 style={{
+                    margin: '0',
+                    fontSize: '18px',
+                    fontWeight: '600',
+                    color: '#fff'
+                  }}>Notification Preferences</h3>
                 </div>
                 
-                <div className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    id="notifyUpdate"
-                    name="notifyUpdate"
-                    checked={formData.notifyUpdate}
-                    onChange={handleChange}
-                    className="checkbox-input"
-                  />
-                  <label htmlFor="notifyUpdate">
-                    Notify when facemesh data is updated
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px'
+                }}>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="checkbox"
+                      id="notifyVerification"
+                      name="notifyVerification"
+                      checked={formData.notifyVerification}
+                      onChange={handleChange}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        accentColor: '#6366f1'
+                      }}
+                    />
+                    <span style={{ color: '#e0e0e0', fontSize: '14px' }}>
+                      Notify when a user is verified
+                    </span>
                   </label>
-                </div>
-                
-                <div className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    id="notifyNewUser"
-                    name="notifyNewUser"
-                    checked={formData.notifyNewUser}
-                    onChange={handleChange}
-                    className="checkbox-input"
-                  />
-                  <label htmlFor="notifyNewUser">
-                    Notify when a new user is registered
+                  
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="checkbox"
+                      id="notifyRejection"
+                      name="notifyRejection"
+                      checked={formData.notifyRejection}
+                      onChange={handleChange}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        accentColor: '#6366f1'
+                      }}
+                    />
+                    <span style={{ color: '#e0e0e0', fontSize: '14px' }}>
+                      Notify when a user is rejected
+                    </span>
+                  </label>
+                  
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="checkbox"
+                      id="notifyUpdate"
+                      name="notifyUpdate"
+                      checked={formData.notifyUpdate}
+                      onChange={handleChange}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        accentColor: '#6366f1'
+                      }}
+                    />
+                    <span style={{ color: '#e0e0e0', fontSize: '14px' }}>
+                      Notify when facemesh data is updated
+                    </span>
+                  </label>
+                  
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="checkbox"
+                      id="notifyNewUser"
+                      name="notifyNewUser"
+                      checked={formData.notifyNewUser}
+                      onChange={handleChange}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        accentColor: '#6366f1'
+                      }}
+                    />
+                    <span style={{ color: '#e0e0e0', fontSize: '14px' }}>
+                      Notify when a new user is registered
+                    </span>
                   </label>
                 </div>
               </div>
             </div>
             
             {/* Security Section */}
-            <div className="form-section">
-              <div className="section-header">
-                <i className="icon-shield"></i>
-                <h3>Security</h3>
+            <div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '24px'
+              }}>
+                <FaShieldAlt style={{ color: '#6366f1', fontSize: '20px' }} />
+                <h3 style={{
+                  margin: '0',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: '#fff'
+                }}>Security</h3>
               </div>
               
-              <div className="form-group">
-                <label htmlFor="currentPassword">Current Password</label>
-                <input
-                  type="password"
-                  id="currentPassword"
-                  name="currentPassword"
-                  value={formData.currentPassword}
-                  onChange={handleChange}
-                  className="form-input"
-                />
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px'
+              }}>
+                <div>
+                  <label htmlFor="currentPassword" style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#a3a3a3',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}>Current Password</label>
+                  <input
+                    type="password"
+                    id="currentPassword"
+                    name="currentPassword"
+                    value={formData.currentPassword}
+                    onChange={handleChange}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      backgroundColor: '#1a1a1a',
+                      border: '1px solid #404040',
+                      borderRadius: '8px',
+                      color: '#e0e0e0',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="newPassword" style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#a3a3a3',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}>New Password</label>
+                  <input
+                    type="password"
+                    id="newPassword"
+                    name="newPassword"
+                    value={formData.newPassword}
+                    onChange={handleChange}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      backgroundColor: '#1a1a1a',
+                      border: '1px solid #404040',
+                      borderRadius: '8px',
+                      color: '#e0e0e0',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="confirmPassword" style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: '#a3a3a3',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}>Confirm New Password</label>
+                  <input
+                    type="password"
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      backgroundColor: '#1a1a1a',
+                      border: '1px solid #404040',
+                      borderRadius: '8px',
+                      color: '#e0e0e0',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
               </div>
               
-              <div className="form-group">
-                <label htmlFor="newPassword">New Password</label>
-                <input
-                  type="password"
-                  id="newPassword"
-                  name="newPassword"
-                  value={formData.newPassword}
-                  onChange={handleChange}
-                  className="form-input"
-                />
-              </div>
-              
-              <div className="form-group">
-                <label htmlFor="confirmPassword">Confirm New Password</label>
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="form-input"
-                />
-              </div>
-              
-              <div className="password-requirements">
-                <p>Password must be at least 8 characters long and include:</p>
-                <ul>
+              <div style={{
+                marginTop: '24px',
+                padding: '16px',
+                backgroundColor: '#262626',
+                borderRadius: '8px',
+                border: '1px solid #404040'
+              }}>
+                <p style={{
+                  margin: '0 0 12px 0',
+                  color: '#a3a3a3',
+                  fontSize: '14px'
+                }}>Password must be at least 8 characters long and include:</p>
+                <ul style={{
+                  margin: '0',
+                  paddingLeft: '20px',
+                  color: '#a3a3a3',
+                  fontSize: '14px'
+                }}>
                   <li>At least one uppercase letter</li>
                   <li>At least one lowercase letter</li>
                   <li>At least one number</li>
@@ -296,9 +526,25 @@ const Settings = () => {
                 </ul>
               </div>
               
-              <div className="security-tips">
-                <p className="tips-header">Account Security Tips:</p>
-                <ul>
+              <div style={{
+                marginTop: '24px',
+                padding: '16px',
+                backgroundColor: '#262626',
+                borderRadius: '8px',
+                border: '1px solid #404040'
+              }}>
+                <p style={{
+                  margin: '0 0 12px 0',
+                  color: '#a3a3a3',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}>Account Security Tips:</p>
+                <ul style={{
+                  margin: '0',
+                  paddingLeft: '20px',
+                  color: '#a3a3a3',
+                  fontSize: '14px'
+                }}>
                   <li>Change your password regularly</li>
                   <li>Don't share your login credentials</li>
                   <li>Always log out when using shared computers</li>
@@ -308,27 +554,60 @@ const Settings = () => {
             </div>
           </div>
           
-          <div className="form-actions">
+          <div style={{
+            marginTop: '32px',
+            padding: '24px',
+            borderTop: '1px solid #404040',
+            display: 'flex',
+            justifyContent: 'flex-end'
+          }}>
             <button
               type="submit"
               disabled={loading}
-              className="save-button"
+              style={{
+                backgroundColor: '#6366f1',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '12px 24px',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? '0.7' : '1'
+              }}
             >
               {loading ? (
                 <>
-                  <div className="button-spinner"></div>
-                  Saving...
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTopColor: '#fff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }}></div>
+                  <span>Saving...</span>
                 </>
               ) : (
                 <>
-                  <i className="icon-save"></i>
-                  Save Changes
+                  <FaSave />
+                  <span>Save Changes</span>
                 </>
               )}
             </button>
           </div>
         </form>
       </div>
+
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };

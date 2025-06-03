@@ -47,13 +47,14 @@ const ADMIN_ROLE = ethers.utils.id("ADMIN");
  * @returns {Object} Blockchain configuration
  */
 const getBlockchainConfig = () => {
-  // Always use AVAX Fuji Testnet
+  // Force use of AVAX Fuji Testnet regardless of environment variable settings
   const rpcUrl = process.env.AVALANCHE_FUJI_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc';
   const contractAddress = process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS;
   const chainId = 43113;
   const networkName = 'Avalanche Fuji Testnet';
 
   return {
+    network: 'avalanche',
     rpcUrl,
     contractAddress,
     privateKey: process.env.ADMIN_PRIVATE_KEY,
@@ -83,20 +84,8 @@ const initBlockchain = () => {
       throw new Error('ADMIN_PRIVATE_KEY is not defined in environment variables');
     }
     
-<<<<<<< HEAD
-    // Create provider with explicit network configuration
-    const provider = new ethers.providers.JsonRpcProvider(
-      rpcUrl,
-      {
-        name: networkName,
-        chainId: chainId,
-        ensAddress: null
-      }
-    );
-=======
     // Create provider
     const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
->>>>>>> parent of 645e0af (Merge pull request #4 from notcaliper/blockchain)
     
     // Create wallet
     const wallet = new ethers.Wallet(privateKey, provider);
@@ -121,19 +110,18 @@ const initBlockchain = () => {
  */
 exports.getNetworkInfo = () => {
   try {
+    // Always return Avalanche Fuji network info regardless of environment settings
     const config = getBlockchainConfig();
+    
     return {
-      network: {
-        networkName: config.networkName,
-        rpcUrl: config.rpcUrl,
-        contractAddress: config.contractAddress
-      }
+      network: 'avalanche',
+      networkName: config.networkName,
+      rpcUrl: config.rpcUrl,
+      contractAddress: config.contractAddress
     };
   } catch (error) {
     console.error('Get network info error:', error);
-    return {
-      error: error.message
-    };
+    throw new Error('Failed to get network information');
   }
 };
 
@@ -497,5 +485,39 @@ exports.verifyDocumentHash = async (hash) => {
   } catch (error) {
     console.error('Verify document hash error:', error);
     throw new Error('Failed to verify document hash on blockchain');
+  }
+};
+
+/**
+ * Switch blockchain network - always returns Avalanche Fuji
+ * @param {String} network - Network parameter (ignored, always uses Avalanche Fuji)
+ * @returns {Boolean} True if switch was successful
+ */
+exports.switchNetwork = async (network) => {
+  try {
+    // Always force Avalanche Fuji regardless of requested network
+    const envPath = path.resolve(__dirname, '..', '.env');
+    
+    if (fs.existsSync(envPath)) {
+      let envContent = fs.readFileSync(envPath, 'utf8');
+      
+      // Always set to avalanche
+      envContent = envContent.replace(
+        /BLOCKCHAIN_NETWORK=.*/,
+        `BLOCKCHAIN_NETWORK=avalanche`
+      );
+      
+      fs.writeFileSync(envPath, envContent);
+      
+      // Update environment variable in current process
+      process.env.BLOCKCHAIN_NETWORK = 'avalanche';
+      
+      return true;
+    } else {
+      throw new Error('.env file not found');
+    }
+  } catch (error) {
+    console.error('Switch network error:', error);
+    return false;
   }
 };
