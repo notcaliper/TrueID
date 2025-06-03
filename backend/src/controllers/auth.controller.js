@@ -116,7 +116,7 @@ exports.login = async (req, res) => {
 
     // Find user by email
     const result = await db.query(
-      'SELECT u.id, u.username, u.email, u.password_hash, u.full_name, u.wallet_address, ' +
+      'SELECT u.id, u.username, u.email, u.password_hash, u.full_name, u.avax_address, ' +
       'array_agg(r.name) as roles ' +
       'FROM users u ' +
       'LEFT JOIN user_roles ur ON u.id = ur.user_id ' +
@@ -180,7 +180,7 @@ exports.login = async (req, res) => {
         username: user.username,
         email: user.email,
         fullName: user.full_name,
-        walletAddress: user.wallet_address,
+        walletAddress: user.avax_address,
         roles: user.roles
       },
       token,
@@ -308,7 +308,7 @@ exports.connectWallet = async (req, res) => {
     const db = req.app.locals.db;
 
     // Check if wallet is already connected to another account
-    const walletCheck = await db.query('SELECT id FROM users WHERE wallet_address = $1', [walletAddress]);
+    const walletCheck = await db.query('SELECT id FROM users WHERE avax_address = $1', [walletAddress]);
     if (walletCheck.rows.length > 0) {
       return res.status(400).json({ message: 'Wallet address already connected to another account' });
     }
@@ -324,7 +324,7 @@ exports.connectWallet = async (req, res) => {
 
     // Update user with wallet address
     await db.query(
-      'UPDATE users SET wallet_address = $1, updated_at = NOW() WHERE id = $2',
+      'UPDATE users SET avax_address = $1, updated_at = NOW() WHERE id = $2',
       [walletAddress, userId]
     );
 

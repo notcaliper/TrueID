@@ -1,0 +1,11 @@
+{
+  "message": "User verified successfully",
+  "user": {
+    "id": 20,
+    "name": "LAsa",
+    "government_id": "242dssad",
+    "verification_status": "VERIFIED",
+    "verified_at": "2025-05-28T11:56:42.613Z",
+    "wallet_address": null
+  }
+}

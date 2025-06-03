@@ -21,7 +21,7 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, government_id, wallet_address, is_verified FROM users WHERE id = $1',
+      'SELECT id, name, government_id, avax_address, is_verified FROM users WHERE id = $1',
       [userId]
     );
     
@@ -43,7 +43,7 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
     }
     
     // Check if user has a wallet address
-    if (!user.wallet_address) {
+    if (!user.avax_address) {
       return res.status(400).json({ message: 'User does not have a wallet address' });
     }
     
@@ -67,7 +67,7 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
     
     // Record identity on blockchain
     const result = await blockchainService.registerIdentity(
-      user.wallet_address,
+      user.avax_address,
       biometricData.facemesh_hash,
       professionalDataHash,
       isVerified
@@ -92,7 +92,7 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
         result.status,
         result.network,
         JSON.stringify({
-          walletAddress: user.wallet_address,
+          walletAddress: user.avax_address,
           biometricId: biometricData.id,
           isVerified: isVerified
         })
@@ -147,7 +147,7 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, government_id, wallet_address, is_verified FROM users WHERE id = $1',
+      'SELECT id, name, government_id, avax_address, is_verified FROM users WHERE id = $1',
       [userId]
     );
     
@@ -159,12 +159,12 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
     const isVerified = user.is_verified === true;
     
     // Check if user has a wallet address
-    if (!user.wallet_address) {
+    if (!user.avax_address) {
       return res.status(400).json({ message: 'User does not have a wallet address' });
     }
     
     // Fetch identity from blockchain
-    const isRegistered = await blockchainService.isIdentityRegistered(user.wallet_address, isVerified);
+    const isRegistered = await blockchainService.isIdentityRegistered(user.avax_address, isVerified);
     
     if (!isRegistered) {
       return res.status(404).json({
@@ -172,15 +172,15 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
       });
     }
     
-    const biometricHash = await blockchainService.getBiometricHash(user.wallet_address, isVerified);
-    const identityVerified = await blockchainService.isIdentityVerified(user.wallet_address, isVerified);
-    const recordCount = await blockchainService.getProfessionalRecordCount(user.wallet_address, isVerified);
+    const biometricHash = await blockchainService.getBiometricHash(user.avax_address, isVerified);
+    const identityVerified = await blockchainService.isIdentityVerified(user.avax_address, isVerified);
+    const recordCount = await blockchainService.getProfessionalRecordCount(user.avax_address, isVerified);
     
     // Get records if any
     const records = [];
     for (let i = 0; i < recordCount; i++) {
       try {
-        const record = await blockchainService.getProfessionalRecord(user.wallet_address, i, isVerified);
+        const record = await blockchainService.getProfessionalRecord(user.avax_address, i, isVerified);
         records.push({
           index: i,
           ...record
@@ -206,7 +206,7 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
         'users',
         userId,
         JSON.stringify({
-          walletAddress: user.wallet_address,
+          walletAddress: user.avax_address,
           isRegistered,
           isVerified: identityVerified,
           recordCount,
@@ -219,7 +219,7 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
     res.status(200).json({
       message: `Identity fetched from ${isVerified ? 'Avalanche' : 'local'} blockchain successfully`,
       identity: {
-        walletAddress: user.wallet_address,
+        walletAddress: user.avax_address,
         biometricHash,
         isVerified: identityVerified,
         professionalRecordCount: recordCount,
@@ -246,7 +246,7 @@ exports.getUserBlockchainStatus = async (req, res) => {
   try {
     // Get user wallet address and verification status
     const userResult = await db.query(
-      'SELECT wallet_address, is_verified FROM users WHERE id = $1',
+      'SELECT avax_address, avax_address, is_verified FROM users WHERE id = $1',
       [userId]
     );
     
@@ -254,33 +254,96 @@ exports.getUserBlockchainStatus = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    const walletAddress = userResult.rows[0].wallet_address;
+    // Use avax_address if available, otherwise fall back to avax_address
+    const walletAddress = userResult.rows[0].avax_address || userResult.rows[0].avax_address;
     const isVerified = userResult.rows[0].is_verified === true;
     
     if (!walletAddress) {
-      return res.status(400).json({ message: 'User does not have a wallet address' });
+      logger.warn(`User ${userId} does not have a wallet address`);
+      // Return an empty status instead of an error
+      return res.status(200).json({
+        status: {
+          walletAddress: null,
+          isRegistered: false,
+          isVerified: false,
+          network: 'Avalanche Fuji Testnet',
+          identityStatus: 'NOT_REGISTERED'
+        },
+        recentTransactions: []
+      });
     }
     
     // Get network info
-    const networkInfo = blockchainService.getNetworkInfo();
-    const network = isVerified ? 
-      networkInfo.verifiedNetwork.networkName : 
-      networkInfo.pendingNetwork.networkName;
+    let network = 'Avalanche Fuji Testnet';
+    try {
+      const networkInfo = blockchainService.getNetworkInfo();
+      if (networkInfo && 
+          ((isVerified && networkInfo.verifiedNetwork) || 
+           (!isVerified && networkInfo.pendingNetwork))) {
+        network = isVerified ? 
+          networkInfo.verifiedNetwork.networkName : 
+          networkInfo.pendingNetwork.networkName;
+      }
+    } catch (networkError) {
+      logger.warn('Error getting network info:', networkError);
+      // Continue with default network name
+    }
     
     // Get blockchain status
-    const isRegistered = await blockchainService.isIdentityRegistered(walletAddress, isVerified);
-    const isIdentityVerified = isRegistered ? 
-      await blockchainService.isIdentityVerified(walletAddress, isVerified) : false;
+    let isRegistered = false;
+    let isIdentityVerified = false;
+    
+    try {
+      isRegistered = await blockchainService.isIdentityRegistered(walletAddress, isVerified);
+      if (isRegistered) {
+        try {
+          isIdentityVerified = await blockchainService.isIdentityVerified(walletAddress, isVerified);
+        } catch (verifyError) {
+          logger.warn(`Error checking if identity is verified for ${walletAddress}:`, verifyError);
+          // Continue with default value (false)
+        }
+      }
+    } catch (registerError) {
+      logger.warn(`Error checking if identity is registered for ${walletAddress}:`, registerError);
+      // Continue with default values
+    }
     
     // Get recent blockchain transactions
-    const transactionsResult = await db.query(
-      `SELECT transaction_hash, transaction_type, status, created_at, network
-       FROM blockchain_transactions
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT 5`,
-      [userId]
-    );
+    let recentTransactions = [];
+    try {
+      // First try with network column
+      const transactionsResult = await db.query(
+        `SELECT transaction_hash, transaction_type, status, created_at, 
+                COALESCE(network, 'Avalanche Fuji Testnet') as network
+         FROM blockchain_transactions
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT 5`,
+        [userId]
+      );
+      recentTransactions = transactionsResult.rows;
+    } catch (txError) {
+      // If that fails, try without network column
+      try {
+        logger.warn('Error getting transactions with network column, trying without:', txError.message);
+        const transactionsResult = await db.query(
+          `SELECT transaction_hash, transaction_type, status, created_at
+           FROM blockchain_transactions
+           WHERE user_id = $1
+           ORDER BY created_at DESC
+           LIMIT 5`,
+          [userId]
+        );
+        // Add default network
+        recentTransactions = transactionsResult.rows.map(tx => ({
+          ...tx,
+          network: 'Avalanche Fuji Testnet'
+        }));
+      } catch (fallbackError) {
+        logger.error('Error getting transactions:', fallbackError);
+        // Continue with empty transactions
+      }
+    }
     
     res.status(200).json({
       status: {
@@ -290,7 +353,7 @@ exports.getUserBlockchainStatus = async (req, res) => {
         network,
         identityStatus: isIdentityVerified ? 'VERIFIED' : (isRegistered ? 'REGISTERED' : 'NOT_REGISTERED')
       },
-      recentTransactions: transactionsResult.rows
+      recentTransactions: recentTransactions
     });
   } catch (error) {
     logger.error('Get user blockchain status error:', error);
@@ -315,7 +378,7 @@ exports.recordProfessionalRecord = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, wallet_address FROM users WHERE id = $1',
+      'SELECT id, avax_address FROM users WHERE id = $1',
       [userId]
     );
     
@@ -326,7 +389,7 @@ exports.recordProfessionalRecord = async (req, res) => {
     const user = userResult.rows[0];
     
     // Check if user has a wallet address
-    if (!user.wallet_address) {
+    if (!user.avax_address) {
       return res.status(400).json({ message: 'User does not have a wallet address' });
     }
     
@@ -349,7 +412,7 @@ exports.recordProfessionalRecord = async (req, res) => {
     const endTimestamp = record.end_date ? Math.floor(new Date(record.end_date).getTime() / 1000) : 0;
     
     const result = await blockchainService.addProfessionalRecord(
-      user.wallet_address,
+      user.avax_address,
       record.data_hash,
       startTimestamp,
       endTimestamp

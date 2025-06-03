@@ -105,4 +105,11 @@ router.put('/users/:id/deactivate', authenticateAdmin, adminController.deactivat
  */
 router.put('/users/:id/reactivate', authenticateAdmin, adminController.reactivateUser);
 
+/**
+ * @route POST /api/admin/blockchain/check-expiry
+ * @desc Check blockchain expiry status for all pending users
+ * @access Admin
+ */
+router.post('/blockchain/check-expiry', authenticateAdmin, adminController.checkBlockchainExpiry);
+
 module.exports = router;

@@ -4,42 +4,72 @@
  */
 
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
 const morgan = require('morgan');
-const dotenv = require('dotenv');
-const { Pool } = require('pg');
+const helmet = require('helmet');
+const dbService = require('./services/db.service');
+const config = require('./config/config');
 
-// Load environment variables
-dotenv.config();
-
-// Initialize Express app
+// Create Express app
 const app = express();
-const PORT = process.env.PORT;
+// Explicitly set port to 5000
+const PORT = 5000; // Using port 5000 as specified
 
 // Middleware
 app.use(helmet()); // Security headers
-app.use(cors()); // Enable CORS
+
+// Custom CORS headers
+app.use((req, res, next) => {
+  // Set CORS headers for frontend requests
+  const allowedOrigins = ['http://localhost:3000', 'http://localhost:8000'];
+  const origin = req.headers.origin;
+  
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+// Custom logging middleware to reduce verbosity
+app.use(morgan('combined', {
+  skip: function (req, res) {
+    // Skip logging for frequent GET requests to users endpoint
+    return req.method === 'GET' && req.path.includes('/api/admin/users');
+  }
+}));
+
 app.use(morgan('dev')); // Request logging
 app.use(express.json()); // Parse JSON request body
 
-// Database connection
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'dbis',
-  password: process.env.DB_PASSWORD || 'postgres',
-  port: process.env.DB_PORT || 5432,
+// Database service is already initialized and will handle connections automatically
+
+// Listen for database connection events
+dbService.on('connected', () => {
+  console.log('Database service connected successfully');
 });
 
-// Test database connection
-pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('Database connection error:', err);
-  } else {
-    console.log('Database connected successfully');
-  }
+dbService.on('error', (err) => {
+  console.error('Database service error:', err);
 });
+
+// Log database connection status
+console.log('Database service initialized with connection pooling and circuit breaker');
+console.log(`Using database host: ${config.DB_HOST}`);
+
+// Set up automatic reconnection attempts in case of failure
+setInterval(() => {
+  if (!dbService.isConnected) {
+    console.log('Attempting to reconnect to database...');
+    dbService.testConnection();
+  }
+}, 60000); // Check every minute
 
 // Create a simple logger
 const logger = {
@@ -49,9 +79,20 @@ const logger = {
   debug: (message, ...args) => console.debug(`[DEBUG] ${message}`, ...args)
 };
 
-// Make db pool and logger available to routes
-app.locals.db = pool;
+// Make db service and logger available to routes
+app.locals.db = dbService;
 app.locals.logger = logger;
+
+// Add database connection check middleware
+app.use(async (req, res, next) => {
+  if (!dbService.getConnectionStatus()) {
+    return res.status(503).json({ 
+      message: 'Database connection not ready. Please try again in a moment.',
+      retryAfter: 5
+    });
+  }
+  next();
+});
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
@@ -59,13 +100,26 @@ const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
 const blockchainRoutes = require('./routes/blockchain.routes');
 const networkRoutes = require('./routes/network.routes');
+const testRoutes = require('./routes/test.routes');
 
 // Use routes
-app.use('/api/auth', authRoutes);
+app.use('/api/user', authRoutes); // Changed from '/api/auth' to '/api/user' to match frontend expectations
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/network', networkRoutes);
+app.use('/api/test', testRoutes);
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  const dbStatus = dbService.getConnectionStatus() ? 'connected' : 'disconnected';
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date(),
+    database: dbStatus,
+    uptime: process.uptime()
+  });
+});
 
 // Root route
 app.get('/', (req, res) => {
@@ -80,13 +134,31 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
     error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+    message: config.NODE_ENV === 'development' ? err.message : 'Something went wrong'
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Start server only after database is connected
+const startServer = async () => {
+  // Wait for database connection
+  if (!dbService.getConnectionStatus()) {
+    console.log('Waiting for database connection...');
+    await new Promise((resolve) => {
+      dbService.once('connected', resolve);
+    });
+  }
+  
+  // Start the server
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Database connected successfully to ${config.DB_HOST}`);
+  });
+};
+
+// Start the server
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
 
 module.exports = app; // For testing purposes

@@ -50,10 +50,17 @@ router.get('/professional-records', authenticateUser, userController.getProfessi
 router.put('/update-facemesh', authenticateUser, userController.updateFacemesh);
 
 /**
- * @route GET /api/users/blockchain-status
- * @desc Get user's blockchain status
+ * @route GET /api/users/biometric-status
+ * @desc Get user's biometric verification status
  * @access User
  */
-router.get('/blockchain-status', authenticateUser, userController.getBlockchainStatus);
+router.get('/biometric-status', authenticateUser, userController.getBiometricStatus);
+
+/**
+ * @route POST /api/users/transfer-to-blockchain
+ * @desc Allow users to transfer their own data to blockchain (self-service)
+ * @access User
+ */
+router.post('/transfer-to-blockchain', authenticateUser, userController.transferToBlockchain);
 
 module.exports = router;

@@ -18,7 +18,7 @@ exports.listUsers = async (req, res) => {
     
     let query = `
       SELECT u.id, u.username, u.email, u.full_name, u.date_of_birth, 
-             u.wallet_address, u.created_at, array_agg(r.name) as roles
+             u.avax_address, u.created_at, array_agg(r.name) as roles
       FROM users u
       LEFT JOIN user_roles ur ON u.id = ur.user_id
       LEFT JOIN roles r ON ur.role_id = r.id
@@ -74,7 +74,7 @@ exports.getUserDetails = async (req, res) => {
     // Get user details
     const userResult = await db.query(
       `SELECT u.id, u.username, u.email, u.full_name, u.date_of_birth, 
-              u.phone_number, u.wallet_address, u.created_at, u.updated_at,
+              u.phone_number, u.avax_address, u.created_at, u.updated_at,
               array_agg(DISTINCT r.name) as roles
        FROM users u
        LEFT JOIN user_roles ur ON u.id = ur.user_id
@@ -247,13 +247,13 @@ exports.approveVerification = async (req, res) => {
           
           // Get user wallet address
           const userResult = await db.query(
-            'SELECT wallet_address FROM users WHERE id = $1',
+            'SELECT avax_address FROM users WHERE id = $1',
             [record.user_id]
           );
           
-          if (userResult.rows.length > 0 && userResult.rows[0].wallet_address) {
+          if (userResult.rows.length > 0 && userResult.rows[0].avax_address) {
             // Register verification on blockchain
-            const walletAddress = userResult.rows[0].wallet_address;
+            const walletAddress = userResult.rows[0].avax_address;
             
             // Get record index on blockchain
             const recordCount = await blockchainService.getProfessionalRecordCount(walletAddress);

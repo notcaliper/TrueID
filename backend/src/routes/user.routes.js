@@ -18,6 +18,9 @@ router.put('/profile', [
   body('dateOfBirth').optional().isISO8601().withMessage('Invalid date format')
 ], userController.updateProfile);
 
+// Verification status route
+router.get('/users/verification-status', userController.getVerificationStatus);
+
 // Password routes
 router.put('/password', [
   body('currentPassword').exists().withMessage('Current password is required'),

@@ -12,7 +12,7 @@ const { generateFacemeshHash } = require('../utils/biometric.utils');
  */
 const getUserById = async (id) => {
   const result = await db.query(
-    `SELECT id, name, government_id, email, phone, wallet_address, 
+    `SELECT id, name, government_id, email, phone, avax_address, 
             is_verified, verification_status, verification_notes, 
             created_at, updated_at
      FROM users
@@ -30,7 +30,7 @@ const getUserById = async (id) => {
  */
 const getUserByGovernmentId = async (governmentId) => {
   const result = await db.query(
-    `SELECT id, name, government_id, email, phone, wallet_address, 
+    `SELECT id, name, government_id, email, phone, avax_address, 
             is_verified, verification_status, verification_notes, 
             created_at, updated_at
      FROM users
@@ -48,7 +48,7 @@ const getUserByGovernmentId = async (governmentId) => {
  * @returns {Promise<Object>} Created user object
  */
 const createUser = async (userData, facemeshData) => {
-  const { name, governmentId, email, phone, walletAddress } = userData;
+  const { name, governmentId, email, phone, avaxAddress } = userData;
   
   // Generate facemesh hash
   const facemeshHash = generateFacemeshHash(facemeshData);
@@ -56,10 +56,10 @@ const createUser = async (userData, facemeshData) => {
   return db.executeTransaction(async (client) => {
     // Insert user
     const userResult = await client.query(
-      `INSERT INTO users (name, government_id, email, phone, wallet_address, verification_status)
+      `INSERT INTO users (name, government_id, email, phone, avax_address, verification_status)
        VALUES ($1, $2, $3, $4, $5, 'PENDING')
-       RETURNING id, name, government_id, email, phone, wallet_address, verification_status, created_at`,
-      [name, governmentId, email, phone, walletAddress]
+       RETURNING id, name, government_id, email, phone, avax_address, verification_status, created_at`,
+      [name, governmentId, email, phone, avaxAddress]
     );
     
     const user = userResult.rows[0];
@@ -82,18 +82,18 @@ const createUser = async (userData, facemeshData) => {
  * @returns {Promise<Object>} Updated user object
  */
 const updateUser = async (id, userData) => {
-  const { name, email, phone, walletAddress } = userData;
+  const { name, email, phone, avaxAddress } = userData;
   
   const result = await db.query(
     `UPDATE users 
      SET name = COALESCE($1, name), 
          email = COALESCE($2, email),
          phone = COALESCE($3, phone),
-         wallet_address = COALESCE($4, wallet_address),
+         avax_address = COALESCE($4, avax_address),
          updated_at = NOW()
      WHERE id = $5
-     RETURNING id, name, government_id, email, phone, wallet_address, updated_at`,
-    [name, email, phone, walletAddress, id]
+     RETURNING id, name, government_id, email, phone, avax_address, updated_at`,
+    [name, email, phone, avaxAddress, id]
   );
   
   return result.rows[0];
@@ -184,7 +184,7 @@ const getAllUsers = async (options) => {
   const { page = 1, limit = 10, search = '', status = '' } = options;
   
   let query = `
-    SELECT u.id, u.name, u.government_id, u.email, u.phone, u.wallet_address, 
+    SELECT u.id, u.name, u.government_id, u.email, u.phone, u.avax_address, 
            u.is_verified, u.verification_status, u.created_at, u.updated_at,
            EXISTS(SELECT 1 FROM biometric_data b WHERE b.user_id = u.id AND b.is_active = true) as has_biometric
     FROM users u
@@ -237,7 +237,7 @@ const getAllUsers = async (options) => {
  */
 const verifyUserByFacemeshHash = async (governmentId, facemeshHash) => {
   const result = await db.query(
-    `SELECT u.id, u.government_id, u.name, u.email, u.phone, u.wallet_address, 
+    `SELECT u.id, u.government_id, u.name, u.email, u.phone, u.avax_address, 
             u.is_verified, u.verification_status
      FROM users u
      JOIN biometric_data b ON u.id = b.user_id

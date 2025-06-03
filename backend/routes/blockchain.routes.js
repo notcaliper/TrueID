@@ -8,7 +8,7 @@ const blockchainController = require('../controllers/blockchain.controller');
 
 /**
  * @route POST /api/blockchain/record
- * @desc Record user identity on blockchain
+ * @desc Admin-initiated recording of user identity on blockchain
  * @access Admin
  */
 router.post('/record', authenticateAdmin, blockchainController.recordIdentityOnBlockchain);

@@ -15,7 +15,7 @@ exports.getProfile = async (req, res) => {
     const db = req.app.locals.db;
 
     const result = await db.query(
-      'SELECT id, username, email, full_name, date_of_birth, phone_number, wallet_address, created_at, updated_at FROM users WHERE id = $1',
+      'SELECT id, username, email, full_name, date_of_birth, phone_number, avax_address, created_at, updated_at FROM users WHERE id = $1',
       [userId]
     );
 
@@ -52,7 +52,7 @@ exports.updateProfile = async (req, res) => {
 
     // Update user profile
     const result = await db.query(
-      'UPDATE users SET full_name = COALESCE($1, full_name), phone_number = COALESCE($2, phone_number), date_of_birth = COALESCE($3, date_of_birth), updated_at = NOW() WHERE id = $4 RETURNING id, username, email, full_name, date_of_birth, phone_number, wallet_address, updated_at',
+      'UPDATE users SET full_name = COALESCE($1, full_name), phone_number = COALESCE($2, phone_number), date_of_birth = COALESCE($3, date_of_birth), updated_at = NOW() WHERE id = $4 RETURNING id, username, email, full_name, date_of_birth, phone_number, avax_address, updated_at',
       [fullName, phoneNumber, dateOfBirth, userId]
     );
 
@@ -80,6 +80,44 @@ exports.updateProfile = async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ message: 'Server error while updating profile' });
+  }
+};
+
+/**
+ * Get user verification status
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getVerificationStatus = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const db = req.app.locals.db;
+
+    const result = await db.query(
+      `SELECT verification_status, verified_at, verification_notes, created_at,
+              a.username as verified_by
+       FROM users u
+       LEFT JOIN admins a ON u.verified_by = a.id
+       WHERE u.id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const userData = result.rows[0];
+
+    res.status(200).json({
+      status: userData.verification_status,
+      submittedAt: userData.created_at,
+      verifiedAt: userData.verified_at,
+      rejectionReason: userData.verification_notes,
+      verifiedBy: userData.verified_by
+    });
+  } catch (error) {
+    console.error('Get verification status error:', error);
+    res.status(500).json({ message: 'Server error while retrieving verification status' });
   }
 };
 

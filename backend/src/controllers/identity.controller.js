@@ -760,7 +760,7 @@ exports.registerOnBlockchain = async (req, res) => {
     
     // Check if user has a wallet address
     const userResult = await db.query(
-      'SELECT wallet_address FROM users WHERE id = $1',
+      'SELECT avax_address FROM users WHERE id = $1',
       [userId]
     );
     
@@ -768,7 +768,7 @@ exports.registerOnBlockchain = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    const walletAddress = userResult.rows[0].wallet_address;
+    const walletAddress = userResult.rows[0].avax_address;
     if (!walletAddress) {
       return res.status(400).json({ message: 'User does not have a connected wallet address' });
     }
@@ -844,7 +844,7 @@ exports.getBlockchainStatus = async (req, res) => {
     
     // Check if user has a wallet address
     const userResult = await db.query(
-      'SELECT wallet_address FROM users WHERE id = $1',
+      'SELECT avax_address FROM users WHERE id = $1',
       [userId]
     );
     
@@ -852,7 +852,7 @@ exports.getBlockchainStatus = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    const walletAddress = userResult.rows[0].wallet_address;
+    const walletAddress = userResult.rows[0].avax_address;
     if (!walletAddress) {
       return res.status(400).json({ message: 'User does not have a connected wallet address' });
     }
