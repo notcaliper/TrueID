@@ -67,20 +67,32 @@ class BlockchainService {
     }
   }
 
-  async verifyProfessionalRecord(userAddress, recordIndex) {
+  async verifyProfessionalRecord(userId, recordId) {
     if (!this.initialized) {
       await this.initialize();
     }
     
     try {
-      const tx = await this.contract.verifyProfessionalRecord(userAddress, recordIndex);
-      const receipt = await tx.wait();
+      const response = await fetch(`/api/blockchain/record-professional-record/${recordId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to record professional record on blockchain');
+      }
+      
       return {
         success: true,
-        txHash: receipt.transactionHash
+        txHash: data.transactionHash
       };
     } catch (error) {
-      console.error('Error verifying professional record:', error);
+      console.error('Error recording professional record on blockchain:', error);
       return {
         success: false,
         error: error.message
@@ -94,10 +106,24 @@ class BlockchainService {
     }
     
     try {
-      const isVerified = await this.contract.isIdentityVerified(userAddress);
+      const response = await fetch('/api/blockchain/expiry', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to check identity verification status');
+      }
+      
       return {
         success: true,
-        isVerified
+        isVerified: data.isVerified,
+        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+        daysRemaining: data.daysRemaining
       };
     } catch (error) {
       console.error('Error checking identity verification:', error);
@@ -108,26 +134,39 @@ class BlockchainService {
     }
   }
 
-  async getProfessionalRecords(userAddress) {
+  async getProfessionalRecords(userId) {
     if (!this.initialized) {
       await this.initialize();
     }
     
     try {
-      const count = await this.contract.getProfessionalRecordCount(userAddress);
-      const records = [];
+      const response = await fetch(`/api/users/${userId}/professional-records`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
       
-      for (let i = 0; i < count; i++) {
-        const record = await this.contract.getProfessionalRecord(userAddress, i);
-        records.push({
-          dataHash: record.dataHash,
-          startDate: new Date(record.startDate * 1000),
-          endDate: record.endDate > 0 ? new Date(record.endDate * 1000) : null,
-          verifier: record.verifier,
-          isVerified: record.isVerified,
-          createdAt: new Date(record.createdAt * 1000)
-        });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch professional records');
       }
+      
+      // Format the records to match the expected structure
+      const records = data.records.map(record => ({
+        id: record.id,
+        dataHash: record.hash,
+        title: record.title,
+        organization: record.organization,
+        startDate: new Date(record.startDate),
+        endDate: record.endDate ? new Date(record.endDate) : null,
+        description: record.description,
+        verificationStatus: record.verificationStatus,
+        onBlockchain: record.onBlockchain,
+        createdAt: new Date(record.createdAt),
+        updatedAt: new Date(record.updatedAt)
+      }));
       
       return {
         success: true,

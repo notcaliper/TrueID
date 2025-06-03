@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import ApiService from '../services/ApiService';
 import BlockchainService from '../services/BlockchainService';
-import { FaUserCheck, FaUserTimes, FaUserClock, FaFingerprint, FaHistory, 
-         FaCheckCircle, FaTimesCircle, FaTimes, 
-         FaEdit, FaLink } from 'react-icons/fa';
+import { FaUserCheck, FaUserTimes, FaUserClock, FaFingerprint, FaHistory, FaCheckCircle, FaTimesCircle, FaTimes, FaEdit, FaLink } from 'react-icons/fa';
+import './UserDetailModal.css';
 
 const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [userData, setUserData] = useState(user);
+  const [activeTab, setActiveTab] = useState('details');
   const [newFacemeshHash, setNewFacemeshHash] = useState('');
   const [versionHistory, setVersionHistory] = useState([]);
   const [isEdit, setIsEdit] = useState(user.isEdit || false);
@@ -19,46 +19,99 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
 
   useEffect(() => {
     fetchUserDetails();
-  }, [user.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user.id]);
 
   const fetchUserDetails = async () => {
     setLoading(true);
     setError(null);
     try {
-      console.log('Fetching details for user ID:', user.id);
-      
-      // Fetch detailed user data from API
       const response = await ApiService.getUserById(user.id);
-      console.log('API response:', response);
-      
-      // The API returns an object with user, biometricData, professionalRecords, and recentActivity
-      // Extract the user data from the response
       if (response && response.user) {
-        setUserData(response.user);
-        console.log('User data set:', response.user);
+        // Normalize biometric hash data to ensure consistency
+        const userData = response.user;
+        let biometricDataForHistory = null;
         
-        // Set version history from the professional records in the response
-        if (response.professionalRecords && Array.isArray(response.professionalRecords)) {
-          setVersionHistory(response.professionalRecords);
-          console.log('Version history set:', response.professionalRecords);
+        // Check if biometric data is available and has facemesh_hash
+        if (response.biometricData && response.biometricData.length > 0) {
+          const latestBiometricData = response.biometricData[0]; // Get the most recent biometric data
+          biometricDataForHistory = latestBiometricData;
+          
+          // Debug log to verify data structure
+          console.log('Raw API biometric data:', response.biometricData);
+          
+          // Normalize facemesh hash from multiple possible sources
+          if (latestBiometricData?.facemesh_hash) {
+            userData.facemesh_hash = latestBiometricData.facemesh_hash;
+          } else if (latestBiometricData?.biometricHash) {
+            userData.facemesh_hash = latestBiometricData.biometricHash;
+          } else if (latestBiometricData?.facemeshHash) {
+            userData.facemesh_hash = latestBiometricData.facemeshHash;
+          }
+          
+          // If there's a blockchain transaction hash, add it too
+          if (latestBiometricData?.blockchain_tx_hash) {
+            userData.blockchain_tx_hash = latestBiometricData.blockchain_tx_hash;
+          }
+          
+          console.log('Processed user data with facemesh:', userData);
+          
+          // Add the facemesh hash to the user data object
+          userData.biometricHash = userData.facemesh_hash;
+          userData.facemeshHash = userData.facemesh_hash;
+        }
+        
+        // If biometricHash exists but facemesh_hash doesn't, copy it over
+        if (userData.biometricHash && !userData.facemesh_hash) {
+          userData.facemesh_hash = userData.biometricHash;
+        }
+        // If facemeshHash exists but facemesh_hash doesn't, copy it over
+        if (userData.facemeshHash && !userData.facemesh_hash) {
+          userData.facemesh_hash = userData.facemeshHash;
+        }
+        
+        setUserData(userData);
+        
+        // Handle version history
+        if (response.professionalRecords && Array.isArray(response.professionalRecords) && response.professionalRecords.length > 0) {
+          // Normalize biometric hash data in professional records
+          const normalizedRecords = response.professionalRecords.map(record => {
+            if (record.biometricHash && !record.facemesh_hash) {
+              record.facemesh_hash = record.biometricHash;
+            }
+            if (record.facemeshHash && !record.facemesh_hash) {
+              record.facemesh_hash = record.facemeshHash;
+            }
+            return record;
+          });
+          setVersionHistory(normalizedRecords);
+        } else if (biometricDataForHistory && biometricDataForHistory.facemesh_hash) {
+          // Create an initial version history entry from biometric data if no professional records exist
+          const initialVersion = {
+            id: 1,
+            facemesh_hash: biometricDataForHistory.facemesh_hash,
+            biometricHash: biometricDataForHistory.facemesh_hash,
+            facemeshHash: biometricDataForHistory.facemesh_hash,
+            updated_by: 'System',
+            created_at: biometricDataForHistory.created_at,
+            blockchain_tx_hash: biometricDataForHistory.blockchain_tx_hash || null,
+            record_type: 'Initial Biometric Registration',
+            description: 'Initial biometric data registration'
+          };
+          setVersionHistory([initialVersion]);
         }
       } else {
-        console.error('Invalid API response format:', response);
         setError('Invalid user data received from the server');
       }
-      
-      setLoading(false);
     } catch (err) {
       console.error('Error fetching user details:', err);
       setError('Failed to load user details. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
 
   const handleVerifyUser = async () => {
-    // Validate user data before proceeding
     if (!userData || !userData.id) {
-      console.error('Verification error: Missing user ID', { userData });
       setError('Cannot verify user: Missing user ID. Please try refreshing the page.');
       return;
     }
@@ -68,14 +121,9 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
     setBlockchainSuccess(null);
     
     try {
-      console.log('Verifying user with ID:', userData.id);
-      
-      // First attempt blockchain verification
-      setBlockchainLoading(true);
       let txHash = null;
       
       try {
-        // Initialize blockchain service if needed
         if (!BlockchainService.initialized) {
           await BlockchainService.initialize();
         }
@@ -91,16 +139,10 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
       } catch (blockchainErr) {
         console.error('Blockchain verification error:', blockchainErr);
         setBlockchainError('Blockchain error: ' + blockchainErr.message);
-      } finally {
-        setBlockchainLoading(false);
       }
       
-      // Now call the API to verify the user
-      console.log('Calling API to verify user:', userData.id);
       const apiResult = await ApiService.verifyIdentity(userData.id);
-      console.log('API verification result:', apiResult);
-        
-      // Create updated user object with new verification status
+      
       const updatedUser = {
         ...userData,
         verification_status: 'VERIFIED',
@@ -111,19 +153,15 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
           updatedUser.txHash = txHash;
         }
         
-        // Update local state
         setUserData(updatedUser);
         
-        // Notify parent component
         if (onUserUpdated) {
           onUserUpdated(updatedUser);
         }
         
-        // Show success message
         setError(null);
         setSuccess('User verified successfully' + (txHash ? ' and recorded on blockchain.' : '.'));
     } catch (error) {
-      console.error('Verification error:', error);
       setError('Failed to verify user: ' + error.message);
     } finally {
       setLoading(false);
@@ -131,42 +169,27 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
   };
 
   const handleRejectUser = async () => {
-    // Validate user data before proceeding
     if (!userData || !userData.id) {
-      console.error('Rejection error: Missing user ID', { userData });
       setError('Cannot reject user: Missing user ID. Please try refreshing the page.');
       return;
     }
     
     setLoading(true);
     try {
-      console.log('Rejecting user with ID:', userData.id);
+      const apiResult = await ApiService.rejectIdentity(userData.id, 'Rejected by admin');
       
-      // Update in the database
-      try {
-        const apiResult = await ApiService.rejectIdentity(userData.id, 'Rejected by admin');
-        console.log('API rejection result:', apiResult);
+      const updatedUser = {
+        ...userData,
+        verification_status: 'REJECTED',
+        updated_at: new Date().toISOString()
+      };
         
-        // Create updated user object with new verification status
-        const updatedUser = {
-          ...userData,
-          verification_status: 'REJECTED',
-          updated_at: new Date().toISOString()
-        };
-        
-        // Update UI and notify parent component
         setUserData(updatedUser);
+        
         if (onUserUpdated) {
-          console.log('Notifying parent of user update:', updatedUser);
           onUserUpdated(updatedUser);
         }
-      } catch (apiErr) {
-        console.error('API rejection error:', apiErr);
-        setError('API error: ' + apiErr.message);
-        throw apiErr; // Re-throw to be caught by outer catch
-      }
     } catch (err) {
-      console.error('Error rejecting user:', err);
       setError('Failed to reject user. Please try again.');
     } finally {
       setLoading(false);
@@ -179,9 +202,7 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
       return;
     }
     
-    // Validate user data before proceeding
     if (!userData || !userData.id) {
-      console.error('Update facemesh error: Missing user ID', { userData });
       setError('Cannot update biometric data: Missing user ID. Please try refreshing the page.');
       return;
     }
@@ -192,14 +213,10 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
     setBlockchainSuccess(null);
     
     try {
-      console.log('Updating biometric hash for user ID:', userData.id);
-      
       let txHash = null;
       
-      // If wallet address exists, attempt blockchain update
       if (userData.wallet_address) {
         try {
-          // Initialize blockchain service if needed
           if (!BlockchainService.initialized) {
             await BlockchainService.initialize();
           }
@@ -218,54 +235,46 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
         } catch (blockchainErr) {
           console.error('Blockchain update error:', blockchainErr);
           setBlockchainError('Blockchain error: ' + blockchainErr.message);
-          // Continue with API update even if blockchain fails
         }
       } else {
         console.warn('No wallet address provided, skipping blockchain update');
       }
       
-      // Update in the database
-      try {
-        console.log('Calling API to update biometric data:', userData.id);
-        const apiResult = await ApiService.updateBiometricData(userData.id, newFacemeshHash);
-        console.log('API update result:', apiResult);
-        
-        // Create updated user object
-        const updatedUser = {
-          ...userData,
-          verification_status: 'PENDING', // Reset to pending after update
-          updated_at: new Date().toISOString()
-        };
-        
-        if (txHash) {
-          updatedUser.blockchain_tx_hash = txHash;
-        }
-        
-        // Add to version history
-        const newVersion = {
-          id: versionHistory.length + 1,
-          facemesh_hash: newFacemeshHash,
-          updated_by: 'Current Admin',
-          created_at: new Date().toISOString(),
-          blockchain_tx_hash: txHash,
-        };
-        
-        setVersionHistory([newVersion, ...versionHistory]);
+      // Update user data with new facemesh hash
+      const apiResult = await ApiService.updateBiometricData(userData.id, newFacemeshHash);
+      
+      const updatedUser = {
+        ...userData,
+        facemesh_hash: newFacemeshHash,
+        biometricHash: newFacemeshHash, // Add both property names for consistency
+        facemeshHash: newFacemeshHash,  // Add both property names for consistency
+        verification_status: 'PENDING',
+        updated_at: new Date().toISOString()
+      };
+      
+      if (txHash) {
+        updatedUser.blockchain_tx_hash = txHash;
+      }
+      
+      const newVersion = {
+        id: versionHistory.length + 1,
+        facemesh_hash: newFacemeshHash,
+        biometricHash: newFacemeshHash,
+        facemeshHash: newFacemeshHash,
+        updated_by: 'Current Admin',
+        created_at: new Date().toISOString(),
+        blockchain_tx_hash: txHash,
+      };
+      
+      setVersionHistory([newVersion, ...versionHistory]);
         setUserData(updatedUser);
         setNewFacemeshHash('');
         setIsEdit(false);
         
         if (onUserUpdated) {
-          console.log('Notifying parent of user update:', updatedUser);
           onUserUpdated(updatedUser);
         }
-      } catch (apiErr) {
-        console.error('API update error:', apiErr);
-        setError('API error: ' + apiErr.message);
-        throw apiErr; // Re-throw to be caught by outer catch
-      }
     } catch (err) {
-      console.error('Error updating facemesh:', err);
       setError('Failed to update facemesh hash. Please try again.');
     } finally {
       setLoading(false);
@@ -273,14 +282,12 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
     }
   };
 
-  // Helper function to format dates safely
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     
     try {
       const date = new Date(dateString);
       
-      // Check if date is valid
       if (isNaN(date.getTime())) {
         console.warn('Invalid date:', dateString);
         return 'N/A';
@@ -299,325 +306,221 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
     }
   };
 
-  // Truncate hash for display
   const truncateHash = (hash) => {
     if (!hash) return 'N/A';
-    return `${hash.substring(0, 10)}...${hash.substring(hash.length - 8)}`;
+    // Return the full hash instead of truncating it
+    return hash;
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-        {/* Modal Header */}
-        <div className="modal-header">
-          <h2 className="modal-title">
-            {isEdit ? (
-              <>
-                <FaEdit className="modal-title-icon" /> 
-                Update User Details
-              </>
-            ) : (
-              <>
-                <FaFingerprint className="modal-title-icon" /> 
-                User Identity Details
-              </>
-            )}
-          </h2>
-          <button onClick={onClose} className="modal-close-button" aria-label="Close">
-            <FaTimes />
-          </button>
-        </div>
-
-        {/* Modal Body */}
-        <div className="modal-body">
-          {loading ? (
-            <div className="loading-container">
-              <div className="loading-spinner">
-                <div className="spinner"></div>
-              </div>
+    <div className="user-detail-modal">
+      <div className="modal-header">
+        <h2>User Details</h2>
+        <button onClick={onClose}><FaTimes /></button>
+      </div>
+      <div className="modal-content">
+        {loading ? (
+          <div>Loading...</div>
+        ) : error ? (
+          <div>{error}</div>
+        ) : (
+          <div>
+            <div className="tab-navigation">
+              <button onClick={() => setActiveTab('details')}>Details</button>
+              <button onClick={() => setActiveTab('documents')}>Documents</button>
+              <button onClick={() => setActiveTab('verification')}>Verification</button>
+              <button onClick={() => setActiveTab('history')}>Version History</button>
             </div>
-          ) : error ? (
-            <div className="error-message">
-              <i className="icon-alert-triangle"></i>
-              {error}
-            </div>
-          ) : (
-            <>
-              {/* User Information */}
-              <div className="user-info-grid">
-                <div className="user-info-section">
-                  <div className="user-info-header">
-                    <h3 className="section-title">Basic Information</h3>
-                    <div className="user-status-badge">
-                      {userData.verification_status === 'VERIFIED' && (
-                        <span className="status-badge verified">
-                          <FaUserCheck className="status-icon" />
-                          Verified Identity
-                        </span>
-                      )}
-                      {userData.verification_status === 'REJECTED' && (
-                        <span className="status-badge rejected">
-                          <FaUserTimes className="status-icon" />
-                          Rejected Identity
-                        </span>
-                      )}
-                      {(userData.verification_status === 'PENDING' || !userData.verification_status) && (
-                        <span className="status-badge pending">
-                          <FaUserClock className="status-icon" />
-                          Pending Verification
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="info-grid">
-                    <div className="info-item">
-                      <div className="info-label">Full Name</div>
-                      <div className="info-value">{userData.name}</div>
-                    </div>
-                    <div className="info-item">
-                      <div className="info-label">Unique ID</div>
-                      <div className="info-value highlight">{userData.government_id || 'N/A'}</div>
-                    </div>
-                    <div className="info-item full-width">
-                      <div className="info-label">Wallet Address</div>
-                      <div className="info-value hash-value">
-                        <code>{userData.wallet_address || 'N/A'}</code>
+            <div className="tab-content">
+              {activeTab === 'details' && (
+                <div>
+                  <div className="user-info-section">
+                    <h3 className="section-title">User Information</h3>
+                    <div className="info-list">
+                      <div className="info-item">
+                        <p className="info-label">User ID</p>
+                        <p className="info-value">{userData.id}</p>
+                      </div>
+                      <div className="info-item">
+                        <p className="info-label">Name</p>
+                        <p className="info-value">{userData.name || 'N/A'}</p>
+                      </div>
+                      <div className="info-item">
+                        <p className="info-label">Email</p>
+                        <p className="info-value">{userData.email || 'N/A'}</p>
+                      </div>
+                      <div className="info-item">
+                        <p className="info-label">Registration Date</p>
+                        <p className="info-value">{formatDate(userData.created_at)}</p>
+                      </div>
+                      <div className="info-item">
+                        <p className="info-label">Last Updated</p>
+                        <p className="info-value">{formatDate(userData.updated_at)}</p>
                       </div>
                     </div>
-                    <div className="info-item">
-                      <div className="info-label">Registration Date</div>
-                      <div className="info-value">{formatDate(userData.created_at)}</div>
-                    </div>
-                    <div className="info-item">
-                      <div className="info-label">Last Updated</div>
-                      <div className="info-value">{formatDate(userData.updated_at)}</div>
-                    </div>
                   </div>
-                </div>
-
-                <div className="user-info-section">
-                  <div className="biometric-section">
-                    <h3 className="section-title">
-                      <FaFingerprint className="section-icon" />
-                      Biometric Data
-                    </h3>
-                    <div className="biometric-data-container">
-                      <div className="info-item full-width">
-                        <div className="info-label">Facemesh Hash</div>
-                        <div className="info-value hash-value">
-                          <code>
-                            {userData.biometricData && userData.biometricData[0] ? 
-                              userData.biometricData[0].facemesh_hash || 'No hash available' : 
-                              'No biometric data available'}
-                          </code>
-                          <div className="hash-note">SHA-256 hash of the user's facial biometric data</div>
-                        </div>
+                  <div className="user-info-section">
+                    <h3 className="section-title">Biometric Information</h3>
+                    <div className="info-list">
+                      <div className="info-item">
+                        <p className="info-label">Facemesh Hash</p>
+                        <p className="info-value">{truncateHash(
+                          userData.facemesh_hash ||
+                          (userData.biometricData && userData.biometricData.length > 0 && userData.biometricData[0].facemesh_hash) ||
+                          'N/A')}
+                        </p>
                       </div>
-                      
-                      {userData.biometricData && userData.biometricData[0] && userData.biometricData[0].blockchain_tx_hash && (
-                        <div className="info-item full-width">
-                          <div className="info-label">
-                            <FaLink className="info-icon" />
-                            Blockchain Transaction
-                          </div>
-                          <div className="info-value hash-value">
-                            <code>{userData.biometricData[0].blockchain_tx_hash}</code>
-                            <div className="hash-note">Transaction hash on the blockchain network</div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {blockchainSuccess && (
-                        <div className="blockchain-status success">
-                          <FaCheckCircle className="blockchain-icon" />
-                          <span>{blockchainSuccess}</span>
-                        </div>
-                      )}
-                      
-                      {blockchainError && (
-                        <div className="blockchain-status error">
-                          <FaTimesCircle className="blockchain-icon" />
-                          <span>{blockchainError}</span>
+                      {userData.blockchain_tx_hash && (
+                        <div className="info-item">
+                          <p className="info-label">Blockchain Transaction</p>
+                          <p className="info-value">
+                            <a 
+                              href={`https://testnet.snowtrace.io/tx/${userData.blockchain_tx_hash}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                            >
+                              {truncateHash(userData.blockchain_tx_hash)}
+                            </a>
+                          </p>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
-
-                <div className="user-info-section">
-                  <h3 className="section-title">Verification Status</h3>
-                  <div className="info-list">
-                    <div className="info-item">
-                      <p className="info-label">Verification Status</p>
-                      <div className="info-value">
-                        {userData.status === 'verified' && (
-                          <span className="status-badge verified">
-                            <i className="icon-check"></i>
-                            Verified
-                          </span>
-                        )}
-                        {userData.status === 'rejected' && (
-                          <span className="status-badge rejected">
-                            <i className="icon-x"></i>
-                            Rejected
-                          </span>
-                        )}
-                        {userData.status === 'pending' && (
-                          <span className="status-badge pending">
-                            <i className="icon-clock"></i>
-                            Pending
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="info-item">
-                      <p className="info-label">Last Updated</p>
-                      <p className="info-value">{formatDate(userData.lastUpdated)}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Blockchain Status Messages */}
-              {blockchainLoading && (
-                <div className="blockchain-status loading">
-                  <div className="loading-spinner small"></div>
-                  <span>Processing blockchain transaction...</span>
-                </div>
               )}
-              
-              {blockchainError && (
-                <div className="blockchain-status error">
-                  <i className="icon-alert-triangle"></i>
-                  <span>{blockchainError}</span>
-                </div>
+              {activeTab === 'documents' && (
+                <div>Documents Content</div>
               )}
-              
-              {blockchainSuccess && (
-                <div className="blockchain-status success">
-                  <i className="icon-check-circle"></i>
-                  <span>{blockchainSuccess}</span>
-                </div>
-              )}
-
-              {/* Update Facemesh Section */}
-              {isEdit && (
-                <div className="edit-section">
-                  <h3 className="section-title">Update Facemesh Data</h3>
-                  <div className="form-group">
-                    <label htmlFor="newFacemeshHash">New Facemesh Hash</label>
-                    <input
-                      type="text"
-                      id="newFacemeshHash"
-                      value={newFacemeshHash}
-                      onChange={(e) => setNewFacemeshHash(e.target.value)}
-                      placeholder="Enter new facemesh hash..."
-                      className="form-input hash-input"
-                    />
-                    <p className="form-help">
-                      Enter the new facemesh hash generated from the biometric system
-                    </p>
-                  </div>
-                  <div className="form-actions">
-                    <button
-                      onClick={() => setIsEdit(false)}
-                      className="button secondary"
-                      disabled={loading}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleUpdateFacemesh}
-                      className="button primary"
-                      disabled={loading || !newFacemeshHash.trim()}
-                    >
-                      {loading ? 'Updating...' : 'Update Facemesh'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Version History */}
-              <div className="history-section">
-                <h3 className="section-title">
-                  <FaHistory className="section-icon" />
-                  Version History
-                </h3>
-                
-                {versionHistory.length === 0 ? (
-                  <div className="no-history-message">
-                    No version history available for this user
-                  </div>
-                ) : (
-                  <div className="version-history-list">
-                    {versionHistory.map((version, index) => (
-                      <div key={index} className="version-item">
-                        <div className="version-header">
-                          <span className="version-number">Version {versionHistory.length - index}</span>
-                          <span className="version-date">{formatDate(version.created_at || version.timestamp)}</span>
-                        </div>
-                        <div className="version-details">
-                          <div className="version-detail-item">
-                            <span className="detail-label">Biometric Hash:</span>
-                            <code className="detail-value">{truncateHash(version.facemesh_hash || version.biometricHash || 'N/A')}</code>
-                          </div>
-                          <div className="version-detail-item">
-                            <span className="detail-label">Updated By:</span>
-                            <span className="detail-value">{version.updated_by || version.updatedBy || 'System'}</span>
-                          </div>
-                          {(version.blockchain_tx_hash || version.txHash) && (
-                            <div className="version-detail-item">
-                              <span className="detail-label">Blockchain TX:</span>
-                              <a 
-                                href={`https://etherscan.io/tx/${version.blockchain_tx_hash || version.txHash}`} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="blockchain-link"
-                              >
-                                <FaLink className="link-icon" />
-                                {truncateHash(version.blockchain_tx_hash || version.txHash)}
-                              </a>
-                            </div>
+              {activeTab === 'verification' && (
+                <div>
+                  <div className="verification-status-section">
+                    <h3 className="section-title">Verification Status</h3>
+                    <div className="info-list">
+                      <div className="info-item">
+                        <p className="info-label">Verification Status</p>
+                        <p className="info-value">
+                          {userData.verification_status === 'VERIFIED' && (
+                            <span className="status-verified">Verified</span>
                           )}
-                        </div>
+                          {userData.verification_status === 'REJECTED' && (
+                            <span className="status-rejected">Rejected</span>
+                          )}
+                          {userData.verification_status === 'PENDING' && (
+                            <span className="status-pending">Pending</span>
+                          )}
+                        </p>
                       </div>
-                    ))}
+                      <div className="info-item">
+                        <p className="info-label">Last Updated</p>
+                        <p className="info-value">{formatDate(userData.verified_at)}</p>
+                      </div>
+                      {userData.verified_by_username && (
+                        <div className="info-item">
+                          <p className="info-label">Verified By</p>
+                          <p className="info-value">{userData.verified_by_username}</p>
+                        </div>
+                      )}
+                      {userData.verification_notes && (
+                        <div className="info-item">
+                          <p className="info-label">Verification Notes</p>
+                          <p className="info-value">{userData.verification_notes}</p>
+                        </div>
+                      )}
+                      {userData.verification_status === 'VERIFIED' && (
+                        <div className="info-item">
+                          <p className="info-label">Verification Method</p>
+                          <p className="info-value">Biometric + Document Verification</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Modal Footer */}
-        {!isEdit && (
-          <div className="modal-footer">
-            <div>
-              <button
-                onClick={() => setIsEdit(true)}
-                className="button secondary"
-                disabled={loading}
-              >
-                Edit Facemesh
-              </button>
+                </div>
+              )}
+              {activeTab === 'history' && (
+                <div>
+                  <div className="user-info-section">
+                    <h3 className="section-title">Version History</h3>
+                    <div className="info-list">
+                      {versionHistory.length === 0 ? (
+                        <div>No version history available for this user</div>
+                      ) : (
+                        <div>
+                          {versionHistory.map((version, index) => (
+                            <div className="version-item" key={index}>
+                              <div className="version-header">
+                                <p className="version-title">{version.record_type || `Version ${versionHistory.length - index}`}</p>
+                                <p className="version-date">{formatDate(version.created_at || version.timestamp)}</p>
+                              </div>
+                              {version.description && (
+                                <div className="version-description">
+                                  <p>{version.description}</p>
+                                </div>
+                              )}
+                              <div className="version-details">
+                                <p className="version-label">Facemesh Hash:</p>
+                                <p className="version-value">{truncateHash(version.facemesh_hash)}</p>
+                              </div>
+                              {version.blockchain_tx_hash && (
+                                <div className="version-details">
+                                  <p className="version-label">Blockchain TX:</p>
+                                  <p className="version-value">
+                                    <a 
+                                      href={`https://testnet.snowtrace.io/tx/${version.blockchain_tx_hash}`} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                    >
+                                      {truncateHash(version.blockchain_tx_hash)}
+                                    </a>
+                                  </p>
+                                </div>
+                              )}
+                              {version.updated_by && (
+                                <div className="version-details">
+                                  <p className="version-label">Updated By:</p>
+                                  <p className="version-value">{version.updated_by}</p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="action-buttons">
-              <button
-                onClick={handleRejectUser}
-                className="button danger"
-                disabled={loading || userData.verification_status === 'REJECTED'}
-              >
-                {loading ? 'Processing...' : 'Reject Identity'}
-              </button>
-              <button
-                onClick={handleVerifyUser}
-                className="button success"
-                disabled={loading || userData.verification_status === 'VERIFIED'}
-              >
-                {loading ? 'Processing...' : 'Verify Identity'}
-              </button>
-            </div>
+          </div>
+        )}
+      </div>
+      <div className="modal-footer">
+        {isEdit ? (
+          <div>
+            <input 
+              type="text" 
+              value={newFacemeshHash} 
+              onChange={(e) => setNewFacemeshHash(e.target.value)} 
+              placeholder="Enter new facemesh hash..."
+            />
+            <button onClick={handleUpdateFacemesh}>Update Facemesh</button>
+            <button onClick={() => setIsEdit(false)}>Cancel</button>
+          </div>
+        ) : (
+          <div>
+            <button 
+              onClick={handleVerifyUser} 
+              disabled={userData.verification_status === 'VERIFIED'}
+              className={userData.verification_status === 'VERIFIED' ? 'button-disabled' : ''}
+            >
+              {userData.verification_status === 'VERIFIED' ? 'Already Verified' : 'Verify'}
+            </button>
+            <button 
+              onClick={handleRejectUser}
+              disabled={userData.verification_status === 'REJECTED'}
+              className={userData.verification_status === 'REJECTED' ? 'button-disabled' : ''}
+            >
+              Reject
+            </button>
+            <button onClick={() => setIsEdit(true)}>Edit Facemesh</button>
           </div>
         )}
       </div>

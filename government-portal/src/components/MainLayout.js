@@ -4,8 +4,8 @@ import { useAuth } from '../utils/AuthContext';
 import { useTheme } from '../utils/ThemeContext';
 import { FaChevronLeft, FaChevronRight, FaTachometerAlt, 
          FaHistory, FaCog, FaSignOutAlt, FaCode, FaToggleOn, FaToggleOff,
-         FaShieldAlt, FaBell, FaUserShield, FaIdCard,
-         FaSun, FaMoon } from 'react-icons/fa';
+         FaShieldAlt, FaBell, FaUserShield, FaIdCard, FaFileAlt, FaCertificate,
+         FaSun, FaMoon, FaFingerprint } from 'react-icons/fa';
 
 const MainLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -66,6 +66,24 @@ const MainLayout = ({ children }) => {
               >
                 <FaIdCard className="nav-icon" />
                 {sidebarOpen && <span>User Records</span>}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/professional-records"
+                className={({ isActive }) => isActive ? 'active' : ''}
+              >
+                <FaCertificate className="nav-icon" />
+                {sidebarOpen && <span>Professional Records</span>}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/face-verification"
+                className={({ isActive }) => isActive ? 'active' : ''}
+              >
+                <FaFingerprint className="nav-icon" />
+                {sidebarOpen && <span>Face Verification</span>}
               </NavLink>
             </li>
             <li>

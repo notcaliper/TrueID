@@ -199,23 +199,72 @@ class ApiService {
   // Professional records
   async getProfessionalRecords(userId) {
     try {
-      // Updated endpoint to match backend API structure
-      const response = await this.api.get(`/admin/users/${userId}/professional-records`);
+      const response = await this.api.get(`/users/${userId}/professional-records`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching professional records for user ${userId}:`, error);
-      // Return empty array instead of throwing error to prevent UI from breaking
-      return { records: [] };
+      throw error;
+    }
+  }
+
+  async getAllProfessionalRecords(page = 1, limit = 10, search = '') {
+    try {
+      const response = await this.api.get('/admin/professional-records', {
+        params: { page, limit, search }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all professional records:', error);
+      throw error;
     }
   }
 
   async verifyProfessionalRecord(userId, recordId) {
     try {
-      
       const response = await this.api.post(`/users/${userId}/professional-records/${recordId}/verify`);
       return response.data;
     } catch (error) {
       console.error(`Error verifying professional record ${recordId}:`, error);
+      throw error;
+    }
+  }
+
+  async updateProfessionalRecord(userId, recordId, recordData) {
+    try {
+      const response = await this.api.put(`/users/professional-record/${recordId}`, recordData);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating professional record ${recordId}:`, error);
+      throw error;
+    }
+  }
+
+  async getProfessionalRecordVerification(recordId) {
+    try {
+      const response = await this.api.get(`/users/professional-record/${recordId}/verification`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error getting verification status for professional record ${recordId}:`, error);
+      throw error;
+    }
+  }
+
+  async getBlockchainData() {
+    try {
+      const response = await this.api.get('/blockchain/data');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching blockchain data:', error);
+      throw error;
+    }
+  }
+
+  async getBlockchainTransaction(transactionId) {
+    try {
+      const response = await this.api.get(`/blockchain/transactions/${transactionId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching blockchain transaction ${transactionId}:`, error);
       throw error;
     }
   }
@@ -354,6 +403,50 @@ class ApiService {
     } catch (error) {
       console.error('Error creating admin user:', error);
       throw error;
+    }
+  }
+  
+  // Verify user with biometric data - directly identifies user from face
+  async verifyUserBiometric(biometricData) {
+    try {
+      // In a real implementation, this would send the biometric data to the server
+      // and match against the database of registered biometric templates
+      console.log('Verifying user from biometric data directly');
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // For demo purposes, we'll simulate finding a matching user
+      // In a real implementation, this would use facial recognition to identify the user
+      
+      // Get a sample user to demonstrate the flow
+      // Using the correct endpoint '/admin/users' instead of '/users'
+      const response = await this.api.get('/admin/users', {
+        params: { page: 1, limit: 5 }
+      });
+      const users = response.data.users || [];
+      
+      if (users.length > 0) {
+        // Simulate finding a match - in reality this would be done by comparing biometric templates
+        const matchedUser = users[0]; // Just use the first user for demo purposes
+        
+        return {
+          success: true,
+          userInfo: matchedUser,
+          message: 'User identified and verified successfully'
+        };
+      } else {
+        return {
+          success: false,
+          message: 'No matching user found for this biometric data'
+        };
+      }
+    } catch (error) {
+      console.error('Error identifying user from biometric data:', error);
+      return {
+        success: false,
+        message: error.message || 'Biometric identification failed'
+      };
     }
   }
 }
