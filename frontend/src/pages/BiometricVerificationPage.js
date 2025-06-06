@@ -55,10 +55,17 @@ const BiometricVerificationPage = () => {
           )}
           
           {user ? (
-            <BiometricVerification 
-              userId={user.id} 
-              onVerificationComplete={handleVerificationComplete} 
-            />
+            <>
+              <Typography variant="body2" color="text.secondary" paragraph align="center" sx={{ mb: 3 }}>
+                Position your face in the center of the camera frame. The system will detect your face
+                using brightness, contrast, and edge detection. A green rectangle will appear when your face is detected.
+              </Typography>
+              
+              <BiometricVerification 
+                userId={user.id} 
+                onVerificationComplete={handleVerificationComplete}
+              />
+            </>
           ) : (
             <Alert severity="warning" sx={{ width: '100%' }}>
               You must be logged in to use biometric verification.
