@@ -19,10 +19,12 @@ import {
   FormHelperText,
   FormControl,
   InputLabel,
-  OutlinedInput
+  OutlinedInput,
+  Divider
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import BiometricVerification from '../components/BiometricVerification';
 
 const steps = ['Account Information', 'Biometric Data (Optional)', 'Review'];
 
@@ -57,40 +59,6 @@ const Register = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
-  };
-
-  // Simulate facemesh capture
-  const captureFacemesh = async () => {
-    setFacemeshCapturing(true);
-    setLocalError('');
-    
-    try {
-      // In a real app, this would use a camera and ML model to capture facial biometrics
-      // For demo purposes, we'll simulate this with a timeout and mock data
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock facemesh data (in a real app, this would be actual biometric data)
-      const mockFacemeshData = {
-        landmarks: Array.from({ length: 68 }, () => ({
-          x: Math.random() * 100,
-          y: Math.random() * 100,
-          z: Math.random() * 50
-        })),
-        timestamp: Date.now()
-      };
-      
-      setFormData({
-        ...formData,
-        facemeshData: mockFacemeshData
-      });
-      
-      return true;
-    } catch (err) {
-      setLocalError('Failed to capture biometric data. Please try again.');
-      return false;
-    } finally {
-      setFacemeshCapturing(false);
-    }
   };
 
   const handleClickShowPassword = () => {
@@ -279,26 +247,46 @@ const Register = () => {
               <Typography variant="body2" color="text.secondary" paragraph>
                 This will be used for identity verification purposes only, not for login. You will log in with your username and password. Please ensure you are in a well-lit environment and look directly at the camera.
               </Typography>
-              <Button
-                fullWidth
-                variant="outlined"
-                color={formData.facemeshData ? "success" : "primary"}
-                onClick={captureFacemesh}
-                disabled={facemeshCapturing}
-                startIcon={facemeshCapturing ? <CircularProgress size={20} /> : null}
-                sx={{ mt: 2 }}
-              >
-                {formData.facemeshData 
-                  ? "Biometric Data Captured ✓" 
-                  : facemeshCapturing 
-                    ? "Capturing..." 
-                    : "Capture Biometric Data (Optional)"}
-              </Button>
-              {!formData.facemeshData && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-                  You can skip this step if you don't want to provide biometric data now.
-                </Typography>
+              
+              {/* Use our enhanced BiometricVerification component */}
+              <Box sx={{ mt: 2, border: '1px solid #eee', borderRadius: 2, p: 2 }}>
+                <BiometricVerification 
+                  userId="registration" 
+                  onVerificationComplete={(success) => {
+                    if (success) {
+                      // Create mock facemesh data for registration
+                      const mockFacemeshData = {
+                        landmarks: Array.from({ length: 68 }, () => ({
+                          x: Math.random() * 100,
+                          y: Math.random() * 100,
+                          z: Math.random() * 50
+                        })),
+                        timestamp: Date.now()
+                      };
+                      
+                      setFormData({
+                        ...formData,
+                        facemeshData: mockFacemeshData
+                      });
+                    }
+                  }}
+                  // For registration, we'll use a verification override that always succeeds
+                  verifyBiometricOverride={(userId, facialFeatures) => {
+                    console.log('Registration: Simulating successful biometric capture');
+                    return Promise.resolve({ success: true, verified: true });
+                  }}
+                />
+              </Box>
+              
+              {formData.facemeshData && (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  Biometric data successfully captured! ✓
+                </Alert>
               )}
+              
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+                You can skip this step if you don't want to provide biometric data now.
+              </Typography>
             </Grid>
           </Grid>
         );

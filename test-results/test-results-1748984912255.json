@@ -1,0 +1,94 @@
+{
+  "testId": 1748984912255,
+  "startTime": "2025-06-03T21:08:32.255Z",
+  "endTime": "2025-06-03T21:09:20.511Z",
+  "duration": 48.256,
+  "results": {
+    "Registering new user": {
+      "timestamp": "2025-06-03T21:08:32.267Z",
+      "status": "success",
+      "success": true,
+      "message": "User registered with ID: 54"
+    },
+    "Getting user profile and wallet information": {
+      "timestamp": "2025-06-03T21:09:14.732Z",
+      "status": "started",
+      "success": true
+    },
+    "Getting user profile and wallet": {
+      "timestamp": "2025-06-03T21:08:33.673Z",
+      "status": "success",
+      "success": true,
+      "message": "Profile retrieved successfully"
+    },
+    "Checking biometric status": {
+      "timestamp": "2025-06-03T21:08:33.673Z",
+      "status": "started",
+      "success": true
+    },
+    "Verifying biometric data": {
+      "timestamp": "2025-06-03T21:08:33.733Z",
+      "status": "started",
+      "success": true
+    },
+    "Admin login": {
+      "timestamp": "2025-06-03T21:08:59.612Z",
+      "status": "success",
+      "success": true,
+      "message": "Admin login successful"
+    },
+    "Admin verifying user": {
+      "timestamp": "2025-06-03T21:08:59.812Z",
+      "status": "success",
+      "success": true,
+      "message": "Admin verification successful"
+    },
+    "Testing professional records": {
+      "timestamp": "2025-06-03T21:09:12.702Z",
+      "status": "success",
+      "success": true,
+      "message": "Added and updated professional records"
+    },
+    "Checking blockchain status": {
+      "timestamp": "2025-06-03T21:09:18.703Z",
+      "status": "success",
+      "success": true,
+      "message": "Identity is not yet on blockchain"
+    },
+    "User logout": {
+      "timestamp": "2025-06-03T21:09:14.531Z",
+      "status": "success",
+      "success": true,
+      "message": "User logout successful"
+    },
+    "User login": {
+      "timestamp": "2025-06-03T21:09:14.531Z",
+      "status": "success",
+      "success": true,
+      "message": "User login successful"
+    },
+    "Getting verification status": {
+      "timestamp": "2025-06-03T21:09:17.580Z",
+      "status": "success",
+      "success": true,
+      "message": "Verification status retrieved successfully"
+    },
+    "Transferring to blockchain": {
+      "timestamp": "2025-06-03T21:09:17.613Z",
+      "status": "success",
+      "success": true,
+      "message": "Blockchain transfer completed successfully"
+    },
+    "Blockchain transfer and status check": {
+      "timestamp": "2025-06-03T21:09:20.511Z",
+      "status": "success",
+      "success": true,
+      "message": "Blockchain transfer and status check successful"
+    }
+  },
+  "user": {
+    "username": "testuser_1748984912255",
+    "email": "testuser_1748984912255@example.com",
+    "governmentId": "GOV1748984912255"
+  }
+}
