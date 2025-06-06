@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../utils/AuthContext';
 import { useTheme } from '../utils/ThemeContext';
-import { FaChevronLeft, FaChevronRight, FaTachometerAlt, 
-         FaHistory, FaCog, FaSignOutAlt, FaCode, FaToggleOn, FaToggleOff,
-         FaShieldAlt, FaBell, FaUserShield, FaIdCard, FaFileAlt, FaCertificate,
-         FaSun, FaMoon, FaFingerprint } from 'react-icons/fa';
+import { RiMenuFoldLine, RiMenuUnfoldLine, RiDashboardLine, RiFileUserLine,
+         RiShieldUserLine, RiAccountCircleLine, RiAwardLine, RiBillLine,
+         RiSettingsLine, RiLogoutBoxLine, RiSunLine, RiMoonLine, RiUser3Line,
+         RiNotificationLine } from 'react-icons/ri';
 
 const MainLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -33,65 +33,65 @@ const MainLayout = ({ children }) => {
       {/* Sidebar */}
       <div className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
-          <h2 className="sidebar-title">
-            <FaShieldAlt className="logo-icon" />
-            TrueID Admin
+          <h2 className="sidebar-title" title="TrueID Admin">
+            <RiShieldUserLine className="logo-icon" />
           </h2>
-          {devMode && sidebarOpen && <span className="dev-badge"><FaCode /> DEV</span>}
+          {devMode && sidebarOpen && <span className="dev-badge"><RiAccountCircleLine /> DEV</span>}
           <button 
             onClick={toggleSidebar}
             className="sidebar-toggle"
             aria-label="Toggle sidebar"
           >
-            {sidebarOpen ? <FaChevronLeft /> : <FaChevronRight />}
+            {sidebarOpen ? <RiMenuFoldLine /> : <RiMenuUnfoldLine />}
           </button>
         </div>
 
         <nav className="sidebar-nav">
           {sidebarOpen && <div className="nav-section-title">MAIN NAVIGATION</div>}
           <ul>
-            <li>
+            <li title="Dashboard">
               <NavLink
                 to="/dashboard"
                 className={({ isActive }) => isActive ? 'active' : ''}
               >
-                <FaTachometerAlt className="nav-icon" />
+                {!sidebarOpen && <span className="tooltip">Dashboard</span>}
+                <RiDashboardLine className="nav-icon" />
                 {sidebarOpen && <span>Dashboard</span>}
               </NavLink>
             </li>
-            <li>
+            <li title="User Records">
               <NavLink
                 to="/records"
                 className={({ isActive }) => isActive ? 'active' : ''}
               >
-                <FaIdCard className="nav-icon" />
+                <RiFileUserLine className="nav-icon" />
                 {sidebarOpen && <span>User Records</span>}
               </NavLink>
             </li>
-            <li>
+            <li title="Professional Records">
               <NavLink
                 to="/professional-records"
                 className={({ isActive }) => isActive ? 'active' : ''}
               >
-                <FaCertificate className="nav-icon" />
+                <RiAwardLine className="nav-icon" />
                 {sidebarOpen && <span>Professional Records</span>}
               </NavLink>
             </li>
-            <li>
+            <li title="Face Verification">
               <NavLink
                 to="/face-verification"
                 className={({ isActive }) => isActive ? 'active' : ''}
               >
-                <FaFingerprint className="nav-icon" />
+                <RiUser3Line className="nav-icon" />
                 {sidebarOpen && <span>Face Verification</span>}
               </NavLink>
             </li>
-            <li>
+            <li title="Activity Logs">
               <NavLink
                 to="/activity-logs"
                 className={({ isActive }) => isActive ? 'active' : ''}
               >
-                <FaHistory className="nav-icon" />
+                <RiBillLine className="nav-icon" />
                 {sidebarOpen && <span>Activity Logs</span>}
               </NavLink>
             </li>
@@ -102,7 +102,7 @@ const MainLayout = ({ children }) => {
                 to="/settings"
                 className={({ isActive }) => isActive ? 'active' : ''}
               >
-                <FaCog className="nav-icon" />
+                <RiSettingsLine className="nav-icon" />
                 {sidebarOpen && <span>Settings</span>}
               </NavLink>
             </li>
@@ -114,7 +114,7 @@ const MainLayout = ({ children }) => {
                   className="dev-mode-menu-button"
                   onClick={toggleDevControls}
                 >
-                  <FaCode className="nav-icon" />
+                  <RiAccountCircleLine className="nav-icon" />
                   <span>Developer Tools</span>
                 </button>
               </li>
@@ -128,7 +128,7 @@ const MainLayout = ({ children }) => {
             className="logout-button"
             aria-label="Logout"
           >
-            <FaSignOutAlt className="nav-icon" />
+            <RiLogoutBoxLine className="nav-icon" />
             {sidebarOpen && <span>Logout</span>}
           </button>
         </div>
@@ -139,93 +139,28 @@ const MainLayout = ({ children }) => {
         {/* Header */}
         <header className="main-header">
           <div className="header-left">
-            <h1>
-              <FaUserShield className="header-icon" />
-              TrueID Government Portal
-            </h1>
+            <button className="menu-toggle" onClick={toggleSidebar} aria-label="Toggle menu">
+              {sidebarOpen ? <RiMenuFoldLine /> : <RiMenuUnfoldLine />}
+            </button>
+            <h1>Government Portal</h1>
           </div>
           
           <div className="header-right">
             {/* Theme Toggle Button */}
-            <div className="header-icon-button theme-toggle" onClick={toggleTheme} title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
-              {isDarkMode ? <FaSun /> : <FaMoon />}
+            <div className="header-icon-button theme-toggle" onClick={toggleTheme} title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
+              {isDarkMode ? <RiSunLine /> : <RiMoonLine />}
             </div>
             
             {/* Notification Icon */}
-            <div className="header-icon-button">
-              <FaBell />
+            <div className="header-icon-button" title="Notifications">
+              <RiNotificationLine />
               <span className="notification-badge">3</span>
             </div>
             
-            {/* Developer Mode Indicator - Always visible when dev mode is active */}
-            {devMode && (
-              <div className="dev-mode-indicator" onClick={toggleDevControls}>
-                <FaCode className="dev-icon" />
-                <span>Developer Mode</span>
-              </div>
-            )}
-          
-          {/* Developer Controls Panel - Only visible when toggled */}
-          {showDevControls && devMode && (
-            <div className="dev-controls-panel">
-              <div className="dev-controls-header">
-                <h3>
-                  <FaCode className="dev-controls-icon" />
-                  Developer Controls
-                </h3>
-                <button 
-                  className="dev-controls-close" 
-                  onClick={toggleDevControls}
-                  aria-label="Close developer controls"
-                >
-                  &times;
-                </button>
-              </div>
-              
-              <div className="dev-controls-body">
-                <div className="dev-control-item">
-                  <span className="dev-control-label">Developer Mode</span>
-                  <button 
-                    className="dev-mode-toggle-button" 
-                    onClick={toggleDevMode}
-                    aria-label="Toggle developer mode"
-                  >
-                    {devMode ? 
-                      <FaToggleOn className="toggle-icon on" /> : 
-                      <FaToggleOff className="toggle-icon off" />
-                    }
-                    <span>{devMode ? 'Enabled' : 'Disabled'}</span>
-                  </button>
-                </div>
-                
-                <div className="dev-info-item">
-                  <span className="dev-info-label">User ID:</span>
-                  <span className="dev-info-value">{currentUser?.id || 'dev-admin'}</span>
-                </div>
-                
-                <div className="dev-info-item">
-                  <span className="dev-info-label">Current Path:</span>
-                  <span className="dev-info-value">{location.pathname}</span>
-                </div>
-              </div>
-            </div>
-          )}
-          
             {/* User Profile */}
-            {currentUser && (
-              <div className="user-profile">
-                <div className="user-avatar">
-                  {currentUser.name?.charAt(0).toUpperCase() || 'A'}
-                </div>
-                <div className="user-details">
-                  <p className="user-name">{currentUser.name || 'Admin'}</p>
-                  <p className="user-role">
-                    {devMode ? 'Developer' : 'Government Official'}
-                    {devMode && <span className="dev-badge-small"><FaCode /></span>}
-                  </p>
-                </div>
-              </div>
-            )}
+            <div className="header-avatar" title={currentUser?.username}>
+              <RiAccountCircleLine />
+            </div>
           </div>
         </header>
 

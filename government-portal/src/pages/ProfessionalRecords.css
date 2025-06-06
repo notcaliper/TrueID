@@ -1,0 +1,547 @@
+/* Styles for Professional Records page (extracted from inline JSX) */
+
+/* Color palette
+   Primary: #3b82f6 (blue)
+   Success: #10b981 (green)
+   Error:   #ef4444 (red)
+   Background: white
+   Text: #1f2937 (dark gray)
+*/
+
+body {
+  background: white;
+  color: #1f2937;
+}
+
+.professional-records-page {
+  padding: 24px;
+  color: #1f2937;
+  background: white;
+}
+
+.page-title {
+  margin-bottom: 24px;
+  color: #1f2937;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+/* Search & filter */
+.search-container {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #3b82f6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.search-form {
+  flex: 1;
+  min-width: 300px;
+}
+
+.search-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid #3b82f6;
+  background: white;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.search-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.search-button:hover {
+  background: #1f2937;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+}
+
+.refresh-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.auto-refresh-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1f2937;
+}
+
+.auto-refresh-toggle input {
+  margin-right: 4px;
+}
+
+.refresh-interval select {
+  padding: 8px;
+  border-radius: 6px;
+  background: white;
+  border: 1px solid #3b82f6;
+  color: #1f2937;
+}
+
+.refresh-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refresh-button:hover {
+  background: #1f2937;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Messages */
+.error-message,
+.success-message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-message {
+  background: white;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+}
+
+.success-message {
+  background: white;
+  color: #10b981;
+  border: 1px solid #10b981;
+}
+
+/* Loader */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #3b82f6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #1f2937;
+  border-radius: 50%;
+  border-top-color: #3b82f6;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+/* Table */
+.records-container {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #3b82f6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.records-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #3b82f6;
+  background: white;
+}
+
+.records-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #1f2937;
+}
+
+.records-count {
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.no-records-message {
+  padding: 32px;
+  text-align: center;
+  color: #1f2937;
+}
+
+.records-table-container {
+  overflow-x: auto;
+}
+
+.records-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.records-table th {
+  background: #3b82f6;
+  color: white;
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid #3b82f6;
+}
+
+.records-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #3b82f6;
+  color: #1f2937;
+}
+
+.records-table tr:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid #3b82f6;
+}
+
+.user-info .user-name {
+  font-weight: 500;
+}
+
+.user-info .user-id {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.verified {
+  background: white;
+  color: #10b981;
+  border: 1px solid #10b981;
+}
+
+.status-badge.rejected {
+  background: white;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+}
+
+.status-badge.pending {
+  background: white;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+}
+
+.status-badge.large {
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+/* Blockchain status */
+.blockchain-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.blockchain-status.on-chain {
+  color: #10b981;
+}
+
+.blockchain-status.off-chain {
+  color: white;
+  opacity: 0.7;
+}
+
+/* Action buttons */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.action-button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-button:hover {
+  background: white;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+}
+
+/* Pagination */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  gap: 8px;
+  border-top: 1px solid #3b82f6;
+}
+
+.pagination-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination-button:hover:not(:disabled) {
+  background: white;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+}
+
+.pagination-button:disabled {
+  background: white;
+  color: #1f2937;
+  border: 1px solid #1f2937;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 4px;
+}
+
+.page-number {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  color: #1f2937;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.page-number.active {
+  background: #3b82f6;
+  color: white;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-container {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid #3b82f6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #3b82f6;
+  background: white;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #1f2937;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #1f2937;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-section {
+  margin-bottom: 24px;
+}
+
+.modal-section h3 {
+  font-size: 16px;
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: #3b82f6;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.status-container {
+  margin-top: 8px;
+}
+
+.blockchain-status-container {
+  background: white;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.blockchain-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.blockchain-info.on-chain {
+  color: #10b981;
+}
+
+.blockchain-info.off-chain {
+  color: #1f2937;
+}
+
+.blockchain-tx {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.tx-label {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.tx-link {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.tx-link:hover {
+  text-decoration: underline;
+}
+
+.blockchain-actions {
+  margin-top: 16px;
+}
+
+.blockchain-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.blockchain-button:hover {
+  background: white;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+}
