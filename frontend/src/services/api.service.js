@@ -117,6 +117,14 @@ export const userAPI = {
   getProfessionalRecords: () => {
     return API.get('/users/professional-records');
   },
+  uploadProfessionImage: (formData) => {
+    return API.post('/profession/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getProfessionVerificationStatus: () => {
+    return API.get('/profession/status');
+  },
   updateFacemesh: (facemeshData) => {
     return API.put('/users/update-facemesh', { facemeshData });
   },
