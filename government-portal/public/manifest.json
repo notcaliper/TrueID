@@ -1,6 +1,6 @@
 {
-  "short_name": "TrueID Portal",
-  "name": "TrueID Government Portal",
+  "short_name": "TrueID Admin",
+  "name": "TrueID Admin",
   "icons": [
     {
       "src": "favicon.ico",

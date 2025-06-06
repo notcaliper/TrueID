@@ -1,16 +1,16 @@
 /* Base styles */
 :root {
   /* Light theme variables */
-  --color-primary: #1976D2;
-  --color-secondary: #0D47A1;
-  --color-accent: #FF5722;
+  --color-primary: #2D9CDB;
+  --color-secondary: #135D9D;
+  --color-accent: #27AE60;
   --color-success: #4CAF50;
   --color-warning: #FFC107;
   --color-danger: #F44336;
   --color-text: #333333;
   --color-text-light: #757575;
   --color-border: #E0E0E0;
-  --color-background: #F5F7FA;
+  --color-background: #F0F2F5;
   --color-card-background: #FFFFFF;
   --color-header-background: #FFFFFF;
   --color-sidebar-gradient-start: #1E3A8A;
@@ -22,7 +22,8 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
 }
 
 /* Dark theme variables */
@@ -69,6 +70,28 @@ body {
   min-height: 100vh;
   background-color: #F5F7FA;
 }
+
+/* Minimalist layout and utilities */
+.main-layout { display: flex; min-height: 100vh; background: var(--color-background); }
+.sidebar { margin: 1rem; background: transparent; box-shadow: var(--shadow-lg); border-radius: var(--radius-xl); overflow: hidden; position: relative; }
+.sidebar.open { width: 280px; }
+.sidebar.closed { width: 64px; }
+.sidebar-nav .nav-icon { font-size: 1.5rem; color: var(--color-text-light); }
+.sidebar .tooltip { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); background: var(--color-text); color: #fff; padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; white-space: nowrap; display: none; }
+.sidebar li:hover .tooltip { display: block; }
+.main-content { flex: 1; padding: 2rem; }
+.main-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
+.menu-toggle { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--color-text); }
+.header-icon-button { position: relative; margin-left: 1rem; cursor: pointer; font-size: 1.5rem; color: var(--color-text); }
+.notification-badge { position: absolute; top: -0.25rem; right: -0.25rem; background: var(--color-accent); color: #fff; border-radius: 50%; font-size: 0.75rem; width: 1.25rem; height: 1.25rem; display: flex; align-items: center; justify-content: center; }
+.header-avatar { font-size: 1.75rem; margin-left: 1rem; cursor: pointer; color: var(--color-text); }
+
+/* Sections, Cards, Grids */
+.section { background: var(--color-card-background); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); padding: 1.5rem; margin-bottom: 2rem; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+.stat-card { background: var(--color-card-background); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); padding: 1rem; display: flex; flex-direction: column; justify-content: space-between; }
+.activity-card { background: var(--color-card-background); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); padding: 1rem; margin-bottom: 1rem; }
+.quick-action-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
 
 /* Sidebar Styles */
 .sidebar {
@@ -818,7 +841,6 @@ body {
 .search-input-container {
   flex: 1;
   position: relative;
-  min-width: 250px;
 }
 
 .search-input {
