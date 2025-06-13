@@ -1434,6 +1434,7 @@ exports.checkBlockchainExpiry = async (req, res) => {
     res.status(500).json({ message: 'Server error while checking blockchain expiry status' });
   }
 };
+
 /**
  * Get activity logs for a specific user
  * @param {Object} req - Express request object
@@ -1496,6 +1497,7 @@ exports.getUserActivityLogs = async (req, res) => {
     res.status(500).json({ message: 'Server error while retrieving user activity logs' });
   }
 };
+
 /**
  * Get detailed dashboard statistics
  * @param {Object} req - Express request object
@@ -1556,6 +1558,7 @@ exports.getDetailedDashboardStats = async (req, res) => {
     res.status(500).json({ message: 'Server error while retrieving detailed dashboard statistics' });
   }
 };
+
 /**
  * Get all professional records
  * @param {Object} req - Express request object
@@ -1599,6 +1602,46 @@ exports.getAllProfessionalRecords = async (req, res) => {
     res.status(500).json({ message: 'Server error while retrieving professional records' });
   }
 };
+
+/**
+ * Get professional record by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getProfessionalRecordById = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { id } = req.params;
+  const recordId = parseInt(id, 10);
+
+  if (Number.isNaN(recordId)) {
+    return res.status(400).json({ message: 'Invalid professional record ID' });
+  }
+
+  try {
+    // Fetch the professional record details along with user and verifier info
+    const result = await db.query(
+      `SELECT pr.*, 
+              u.name AS user_name, u.email AS user_email, u.government_id, 
+              a.username AS verified_by_username
+       FROM professional_records pr
+       LEFT JOIN users u ON pr.user_id = u.id
+       LEFT JOIN admins a ON pr.verified_by = a.id
+       WHERE pr.id = $1`,
+      [recordId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Professional record not found' });
+    }
+
+    res.status(200).json({ record: result.rows[0] });
+  } catch (error) {
+    logger.error('Get professional record by ID error:', error);
+    res.status(500).json({ message: 'Server error while retrieving professional record' });
+  }
+};
+
 /**
  * Get professional records for a specific user
  * @param {Object} req - Express request object
@@ -1635,5 +1678,103 @@ exports.getUserProfessionalRecords = async (req, res) => {
   } catch (error) {
     logger.error('Get user professional records error:', error);
     res.status(500).json({ message: 'Server error while retrieving user professional records' });
+  }
+};
+
+/**
+ * Update professional record status
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.updateProfessionalRecordStatus = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { id } = req.params;
+  const recordId = parseInt(id, 10);
+
+  if (Number.isNaN(recordId)) {
+    return res.status(400).json({ message: 'Invalid professional record ID' });
+  }
+
+  const { status, notes } = req.body;
+  const adminId = req.admin.id;
+
+  // Validate status
+  if (!['VERIFIED', 'REJECTED', 'DEACTIVATED'].includes(status)) {
+    return res.status(400).json({ message: 'Invalid status. Must be VERIFIED, REJECTED, or DEACTIVATED' });
+  }
+
+  try {
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Update professional record
+      const result = await client.query(
+        `UPDATE professional_records
+         SET verification_status = $1,
+             verified_by = $2,
+             verified_at = NOW(),
+             verification_remarks = $3,
+             updated_at = NOW()
+         WHERE id = $4
+         RETURNING id, user_id, title, institution, verification_status`,
+        [status, adminId, notes, recordId]
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error('Professional record not found');
+      }
+
+      const record = result.rows[0];
+
+      // Log the action
+      await client.query(
+        `INSERT INTO audit_logs (
+          admin_id,
+          user_id,
+          action,
+          entity_type,
+          entity_id,
+          details,
+          ip_address
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          adminId,
+          record.user_id,
+          'PROFESSIONAL_RECORD_STATUS_UPDATED',
+          'professional_records',
+          id,
+          JSON.stringify({
+            status,
+            notes,
+            title: record.title,
+            institution: record.institution
+          }),
+          req.ip
+        ]
+      );
+
+      await client.query('COMMIT');
+
+      res.status(200).json({
+        message: 'Professional record status updated successfully',
+        record: {
+          id: record.id,
+          status: record.verification_status,
+          verifiedAt: new Date(),
+          verifiedBy: adminId
+        }
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    logger.error('Update professional record status error:', error);
+    res.status(500).json({ message: 'Server error while updating professional record status' });
   }
 };

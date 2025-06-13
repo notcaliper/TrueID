@@ -56,6 +56,13 @@ router.get('/expiry', authenticateUser, blockchainController.getBlockchainExpiry
 router.get('/verify/:hash', blockchainController.verifyDocumentHash);
 
 /**
+ * @route POST /api/blockchain/verify/:id
+ * @desc Verify a professional record on blockchain (Admin)
+ * @access Admin
+ */
+router.post('/verify/:id', authenticateAdmin, blockchainController.verifyProfessionalRecord);
+
+/**
  * @route GET /api/blockchain/transactions
  * @desc Get blockchain transactions for a user
  * @access User

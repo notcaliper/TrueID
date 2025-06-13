@@ -3,6 +3,7 @@
  * Handles interactions with the blockchain
  */
 const blockchainService = require('../services/blockchain.service');
+const ethers = require('ethers');
 
 /**
  * Record user identity on blockchain
@@ -378,7 +379,7 @@ exports.recordProfessionalRecord = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, avax_address FROM users WHERE id = $1',
+      'SELECT id, avax_address, biometric_hash FROM users WHERE id = $1',
       [userId]
     );
     
@@ -406,6 +407,20 @@ exports.recordProfessionalRecord = async (req, res) => {
     }
     
     const record = recordResult.rows[0];
+
+    // Check if identity exists on blockchain
+    const isIdentityRegistered = await blockchainService.isIdentityRegistered(user.avax_address);
+    
+    if (!isIdentityRegistered) {
+      // Create identity on blockchain first
+      await blockchainService.registerIdentity(
+        process.env.ADMIN_PRIVATE_KEY,
+        user.biometric_hash || ethers.utils.id('default_biometric'),
+        record.data_hash
+      );
+      
+      logger.info(`Created blockchain identity for user ${userId}`);
+    }
     
     // Record on blockchain
     const startTimestamp = Math.floor(new Date(record.start_date).getTime() / 1000);
@@ -420,7 +435,7 @@ exports.recordProfessionalRecord = async (req, res) => {
     
     // Update record with blockchain transaction hash
     await db.query(
-      'UPDATE professional_records SET blockchain_tx_hash = $1 WHERE id = $2',
+      'UPDATE professional_records SET blockchain_tx_hash = $1, on_blockchain = true WHERE id = $2',
       [result.transactionHash, recordId]
     );
     
@@ -781,5 +796,48 @@ exports.getBlockchainExpiry = async (req, res) => {
   } catch (error) {
     logger.error('Get blockchain expiry error:', error);
     res.status(500).json({ message: 'Server error while retrieving blockchain expiry information' });
+  }
+};
+
+/**
+ * Verify a professional record on the blockchain by record ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.verifyProfessionalRecord = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { id } = req.params;
+
+  try {
+    // Get professional record and ensure it has been recorded on blockchain
+    const recordResult = await db.query(
+      `SELECT id, data_hash, on_blockchain, blockchain_tx_hash, user_id, title, institution, year
+       FROM professional_records WHERE id = $1`,
+      [id]
+    );
+
+    if (recordResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Professional record not found' });
+    }
+
+    const record = recordResult.rows[0];
+
+    if (!record.on_blockchain || !record.blockchain_tx_hash) {
+      return res.status(400).json({ message: 'Professional record is not on blockchain' });
+    }
+
+    // Verify hash on blockchain using existing service/helper
+    const verification = await blockchainService.verifyDocumentHash(record.data_hash);
+
+    res.status(200).json({
+      message: 'Blockchain verification successful',
+      recordId: record.id,
+      verified: verification.verified ?? verification,
+      details: verification
+    });
+  } catch (error) {
+    logger.error('Verify professional record on blockchain error:', error);
+    res.status(500).json({ message: 'Server error while verifying professional record on blockchain' });
   }
 };

@@ -311,11 +311,9 @@ exports.addProfessionalRecord = async (walletAddress, dataHash, startTimestamp, 
     
     // Add professional record on blockchain
     const tx = await contract.addProfessionalRecord(
-      walletAddress,
       dataHashBytes,
       startTimestamp,
-      endTimestamp,
-      { gasLimit: 300000 }
+      endTimestamp
     );
     
     // Wait for transaction to be mined

@@ -197,9 +197,13 @@ class ApiService {
   }
 
   // Professional records
+  /**
+   * Get professional records for a specific user (admin endpoint)
+   * @param {string|number} userId
+   */
   async getProfessionalRecords(userId) {
     try {
-      const response = await this.api.get(`/users/${userId}/professional-records`);
+      const response = await this.api.get(`/admin/users/${userId}/professional-records`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching professional records for user ${userId}:`, error);
@@ -219,9 +223,35 @@ class ApiService {
     }
   }
 
+  async getProfessionalRecord(recordId) {
+    try {
+      const response = await this.api.get(`/admin/professional-records/${recordId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching professional record ${recordId}:`, error);
+      throw error;
+    }
+  }
+
+  async updateProfessionalRecordStatus(recordId, data) {
+    try {
+      const response = await this.api.put(
+        `/admin/professional-records/${recordId}/status`,
+        data
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating professional record status ${recordId}:`, error);
+      throw error;
+    }
+  }
+
   async verifyProfessionalRecord(userId, recordId) {
     try {
-      const response = await this.api.post(`/users/${userId}/professional-records/${recordId}/verify`);
+      const response = await this.api.post(
+        `/admin/professional-records/${recordId}/verify`,
+        { userId }
+      );
       return response.data;
     } catch (error) {
       console.error(`Error verifying professional record ${recordId}:`, error);
@@ -229,42 +259,91 @@ class ApiService {
     }
   }
 
-  async updateProfessionalRecord(userId, recordId, recordData) {
+  // Document Management
+  async getDocuments(professionalRecordId) {
     try {
-      const response = await this.api.put(`/users/professional-record/${recordId}`, recordData);
+      const response = await this.api.get(`/documents/admin/professional-record/${professionalRecordId}`);
       return response.data;
     } catch (error) {
-      console.error(`Error updating professional record ${recordId}:`, error);
+      console.error('Error fetching documents:', error);
       throw error;
     }
   }
 
-  async getProfessionalRecordVerification(recordId) {
+  async verifyDocument(documentId, data) {
     try {
-      const response = await this.api.get(`/users/professional-record/${recordId}/verification`);
+      const response = await this.api.put(`/documents/verify/${documentId}`, data);
       return response.data;
     } catch (error) {
-      console.error(`Error getting verification status for professional record ${recordId}:`, error);
+      console.error('Error verifying document:', error);
       throw error;
     }
   }
 
-  async getBlockchainData() {
+  async getDocument(documentId) {
     try {
-      const response = await this.api.get('/blockchain/data');
+      const response = await this.api.get(`/documents/admin/${documentId}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching blockchain data:', error);
+      console.error('Error fetching document:', error);
       throw error;
     }
   }
 
-  async getBlockchainTransaction(transactionId) {
+  async uploadDocument(formData, onUploadProgress) {
     try {
-      const response = await this.api.get(`/blockchain/transactions/${transactionId}`);
+      const response = await this.api.post('/admin/documents/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          if (onUploadProgress) {
+            onUploadProgress(percentCompleted);
+          }
+        }
+      });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching blockchain transaction ${transactionId}:`, error);
+      console.error('Error uploading document:', error);
+      throw error;
+    }
+  }
+
+  // Blockchain Integration
+  async getBlockchainStatus(recordId) {
+    try {
+      const response = await this.api.get(`/admin/blockchain/status/${recordId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching blockchain status:', error);
+      throw error;
+    }
+  }
+
+  async verifyOnBlockchain(recordId) {
+    try {
+      // First get the professional record details
+      const { record } = await this.getProfessionalRecord(recordId);
+      
+      if (!record) {
+        throw new Error('Professional record not found');
+      }
+
+      // Check if record is already on blockchain
+      if (!record.on_blockchain) {
+        // Record the professional record on blockchain first
+        await this.api.post('/blockchain/professional-record', {
+          userId: record.user_id,
+          recordId: parseInt(recordId, 10)  // Ensure recordId is a number
+        });
+      }
+      
+      // Then verify it
+      const response = await this.api.post(`/blockchain/verify/${recordId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error verifying on blockchain:', error);
       throw error;
     }
   }
@@ -447,6 +526,23 @@ class ApiService {
         success: false,
         message: error.message || 'Biometric identification failed'
       };
+    }
+  }
+
+  // Error handling
+  handleError(error) {
+    if (error.response) {
+      // Server responded with error
+      console.error('API Error Response:', error.response.data);
+      throw new Error(error.response.data.message || 'Server error occurred');
+    } else if (error.request) {
+      // Request made but no response
+      console.error('API No Response:', error.request);
+      throw new Error('No response from server');
+    } else {
+      // Error in request setup
+      console.error('API Request Error:', error.message);
+      throw new Error('Error setting up request');
     }
   }
 }

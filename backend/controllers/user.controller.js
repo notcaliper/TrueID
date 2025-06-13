@@ -294,7 +294,7 @@ exports.getProfessionalRecords = async (req, res) => {
   try {
     const result = await db.query(
       `SELECT id, record_type, institution, title, description, 
-              start_date, end_date, is_current, is_verified, 
+              start_date, end_date, is_current, verification_status, 
               verified_by, verified_at, blockchain_tx_hash, 
               created_at, updated_at
        FROM professional_records
@@ -303,8 +303,14 @@ exports.getProfessionalRecords = async (req, res) => {
       [userId]
     );
     
+    // Transform the records to ensure consistent field names and status
+    const records = result.rows.map(record => ({
+      ...record,
+      verification_status: record.verification_status || (record.is_verified ? 'VERIFIED' : 'PENDING')
+    }));
+    
     res.status(200).json({
-      records: result.rows
+      records: records
     });
   } catch (error) {
     logger.error('Get professional records error:', error);
@@ -502,7 +508,7 @@ exports.updateFacemesh = async (req, res) => {
     const facemeshHash = generateFacemeshHash(facemeshData);
     
     // Use a transaction for atomicity
-    const client = await db.getClient();
+    const client = await db.pool.connect();
     
     try {
       await client.query('BEGIN');
@@ -856,7 +862,7 @@ exports.transferToBlockchain = async (req, res) => {
     }
     
     // Start a transaction
-    const client = await db.connect();
+    const client = await db.pool.connect();
     
     try {
       await client.query('BEGIN');

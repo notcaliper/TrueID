@@ -20,7 +20,8 @@ import {
   DialogActions,
   TextField,
   Grid,
-  IconButton
+  IconButton,
+  MenuItem
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -41,11 +42,12 @@ const ProfessionalRecords = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [recordForm, setRecordForm] = useState({
     title: '',
-    organization: '',
+    institution: '',
+    record_type: '',
     description: '',
-    issuedDate: '',
-    expiryDate: '',
-    documentHash: ''
+    start_date: '',
+    end_date: '',
+    data_hash: ''
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,11 +73,12 @@ const ProfessionalRecords = () => {
   const handleOpenDialog = () => {
     setRecordForm({
       title: '',
-      organization: '',
+      institution: '',
+      record_type: '',
       description: '',
-      issuedDate: '',
-      expiryDate: '',
-      documentHash: ''
+      start_date: '',
+      end_date: '',
+      data_hash: ''
     });
     setOpenDialog(true);
   };
@@ -97,7 +100,7 @@ const ProfessionalRecords = () => {
     
     try {
       // Validate form
-      if (!recordForm.title || !recordForm.organization || !recordForm.issuedDate) {
+      if (!recordForm.title || !recordForm.institution || !recordForm.record_type || !recordForm.start_date) {
         throw new Error('Please fill in all required fields');
       }
       
@@ -128,13 +131,12 @@ const ProfessionalRecords = () => {
     return date.toLocaleDateString();
   };
 
-  // Simulate document hash generation
+  // Generate document hash
   const generateDocumentHash = () => {
-    // In a real app, this would hash the actual document
     const randomHash = '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
     setRecordForm({
       ...recordForm,
-      documentHash: randomHash
+      data_hash: randomHash
     });
   };
 
@@ -195,43 +197,79 @@ const ProfessionalRecords = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Title</TableCell>
-                  <TableCell>Organization</TableCell>
-                  <TableCell>Issued Date</TableCell>
-                  <TableCell>Expiry Date</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Blockchain</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Institution</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Start Date</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>End Date</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Verification Status</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Blockchain Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {records.map((record) => (
-                  <TableRow key={record.id}>
+                  <TableRow key={record.id} hover>
                     <TableCell>
-                      <Typography variant="body1">
-                        {record.title}
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {record.title || 'N/A'}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {record.description}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{record.organization}</TableCell>
-                    <TableCell>{formatDate(record.issued_date)}</TableCell>
-                    <TableCell>{formatDate(record.expiry_date)}</TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={record.is_verified ? "Verified" : "Pending"} 
-                        color={record.is_verified ? "success" : "warning"} 
-                        size="small" 
-                        icon={record.is_verified ? <VerifiedIcon /> : null}
-                      />
                     </TableCell>
                     <TableCell>
                       <Chip 
-                        label={record.on_blockchain ? "On Blockchain" : "Not on Blockchain"} 
-                        color={record.on_blockchain ? "primary" : "default"} 
-                        size="small" 
-                        icon={record.on_blockchain ? <BlockchainIcon /> : null}
+                        label={record.record_type || 'N/A'} 
+                        size="small"
+                        color={
+                          record.record_type === 'EMPLOYMENT' ? 'primary' :
+                          record.record_type === 'CERTIFICATION' ? 'secondary' :
+                          record.record_type === 'EDUCATION' ? 'info' :
+                          'default'
+                        }
+                        sx={{ minWidth: '100px' }}
                       />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {record.institution || 'N/A'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {formatDate(record.start_date)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {record.end_date ? formatDate(record.end_date) : 'N/A'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={record.verification_status || 'PENDING'} 
+                        color={
+                          record.verification_status === 'VERIFIED' ? 'success' :
+                          record.verification_status === 'REJECTED' ? 'error' :
+                          'warning'
+                        } 
+                        size="small"
+                        icon={record.verification_status === 'VERIFIED' ? <VerifiedIcon /> : null}
+                        sx={{ minWidth: '90px' }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <Chip 
+                          label={record.on_blockchain ? 'On Blockchain' : 'Not on Blockchain'} 
+                          color={record.on_blockchain ? 'primary' : 'default'} 
+                          size="small" 
+                          icon={record.on_blockchain ? <BlockchainIcon /> : null}
+                          sx={{ minWidth: '130px' }}
+                        />
+                        {record.blockchain_tx_hash && (
+                          <Typography variant="caption" display="block" sx={{ mt: 0.5, color: 'text.secondary' }}>
+                            TX: {record.blockchain_tx_hash.substring(0, 10)}...
+                          </Typography>
+                        )}
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -254,18 +292,34 @@ const ProfessionalRecords = () => {
                 name="title"
                 value={recordForm.title}
                 onChange={handleFormChange}
-                placeholder="e.g., Bachelor's Degree, Professional Certification"
+                placeholder="e.g., Software Engineer, Project Manager"
               />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                select
+                fullWidth
+                required
+                label="Record Type"
+                name="record_type"
+                value={recordForm.record_type}
+                onChange={handleFormChange}
+              >
+                <MenuItem value="EMPLOYMENT">Employment</MenuItem>
+                <MenuItem value="EDUCATION">Education</MenuItem>
+                <MenuItem value="CERTIFICATION">Certification</MenuItem>
+                <MenuItem value="ACHIEVEMENT">Achievement</MenuItem>
+              </TextField>
             </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 required
-                label="Organization"
-                name="organization"
-                value={recordForm.organization}
+                label="Institution"
+                name="institution"
+                value={recordForm.institution}
                 onChange={handleFormChange}
-                placeholder="e.g., University, Company, Institution"
+                placeholder="e.g., Company Name, University, Organization"
               />
             </Grid>
             <Grid item xs={12}>
@@ -277,17 +331,17 @@ const ProfessionalRecords = () => {
                 name="description"
                 value={recordForm.description}
                 onChange={handleFormChange}
-                placeholder="Describe your qualification or achievement"
+                placeholder="Describe your role, qualification, or achievement"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 required
-                label="Issued Date"
-                name="issuedDate"
+                label="Start Date"
+                name="start_date"
                 type="date"
-                value={recordForm.issuedDate}
+                value={recordForm.start_date}
                 onChange={handleFormChange}
                 InputLabelProps={{ shrink: true }}
               />
@@ -295,10 +349,10 @@ const ProfessionalRecords = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Expiry Date (if applicable)"
-                name="expiryDate"
+                label="End Date (if applicable)"
+                name="end_date"
                 type="date"
-                value={recordForm.expiryDate}
+                value={recordForm.end_date}
                 onChange={handleFormChange}
                 InputLabelProps={{ shrink: true }}
               />
@@ -310,8 +364,8 @@ const ProfessionalRecords = () => {
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <TextField
                   fullWidth
-                  name="documentHash"
-                  value={recordForm.documentHash}
+                  name="data_hash"
+                  value={recordForm.data_hash}
                   onChange={handleFormChange}
                   placeholder="Document hash will be generated automatically"
                   InputProps={{

@@ -114,8 +114,21 @@ export const userAPI = {
   addProfessionalRecord: (recordData) => {
     return API.post('/users/professional-record', recordData);
   },
-  getProfessionalRecords: () => {
-    return API.get('/users/professional-records');
+  getProfessionalRecords: async () => {
+    try {
+      const response = await API.get('/users/professional-records');
+      // Transform the data to ensure consistent field names
+      if (response.data && response.data.records) {
+        response.data.records = response.data.records.map(record => ({
+          ...record,
+          verification_status: record.verification_status || 'PENDING'
+        }));
+      }
+      return response;
+    } catch (error) {
+      console.error('Error fetching professional records:', error);
+      throw error;
+    }
   },
   uploadProfessionImage: (formData) => {
     return API.post('/profession/upload', formData, {
