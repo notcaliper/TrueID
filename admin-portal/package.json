@@ -4,7 +4,7 @@
   "description": "Government portal for the Decentralized Biometric Identity System",
   "main": "index.js",
   "scripts": {
-    "start": "PORT=8000 react-scripts start",
+    "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
