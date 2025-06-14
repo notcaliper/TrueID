@@ -484,6 +484,17 @@ class ApiService {
       throw error;
     }
   }
+
+  // List all professional records for a specific user (used after biometric identification)
+  async listUserProfessionalRecords(userId) {
+    try {
+      if (!userId) throw new Error('userId is required');
+      const response = await this.api.get(`/admin/users/${userId}/professional-records`);
+      return response.data; // Assumes API returns { records: [...] } or an array
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
   
   // Verify user with biometric data - directly identifies user from face
   async verifyUserBiometric(biometricData) {
@@ -526,6 +537,44 @@ class ApiService {
         success: false,
         message: error.message || 'Biometric identification failed'
       };
+    }
+  }
+
+  // Document management
+  async listProfessionalRecordDocuments(recordId) {
+    try {
+      if (!recordId) throw new Error('recordId is required');
+      const response = await this.api.get(`/documents/admin/professional-record/${recordId}`);
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async uploadDocument(formData, onProgress) {
+    try {
+      const response = await this.api.post('/admin/documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (event) => {
+          if (onProgress && event.total) {
+            const percent = Math.round((event.loaded * 100) / event.total);
+            onProgress(percent);
+          }
+        }
+      });
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async verifyDocument(documentId, payload) {
+    try {
+      if (!documentId) throw new Error('documentId is required');
+      const response = await this.api.put(`/admin/documents/verify/${documentId}`, payload);
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
     }
   }
 

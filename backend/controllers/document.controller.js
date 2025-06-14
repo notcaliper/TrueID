@@ -302,7 +302,12 @@ exports.getDocument = async (req, res) => {
               vr.status as verification_request_status,
               pr.id as professional_record_id,
               pr.title as professional_record_title,
-              pr.institution as professional_record_institution
+              pr.institution as professional_record_institution,
+              CASE 
+                WHEN d.mime_type LIKE 'image/%' THEN true
+                WHEN d.mime_type = 'application/pdf' THEN true
+                ELSE false
+              END as is_previewable
        FROM document_records d
        LEFT JOIN admins a ON d.verified_by = a.id
        LEFT JOIN verification_requests vr ON d.id = vr.record_id AND vr.record_type = 'DOCUMENT'
@@ -318,6 +323,14 @@ exports.getDocument = async (req, res) => {
 
     const document = result.rows[0];
 
+    // Check if file exists
+    const filePath = path.join(process.cwd(), document.file_path);
+    try {
+      await fs.promises.access(filePath, fs.constants.F_OK);
+    } catch (err) {
+      return res.status(404).json({ message: 'Document file not found' });
+    }
+
     res.status(200).json({
       message: 'Document retrieved successfully',
       document: {
@@ -326,6 +339,7 @@ exports.getDocument = async (req, res) => {
         fileUrl: document.file_url,
         fileSize: document.file_size,
         mimeType: document.mime_type,
+        isPreviewable: document.is_previewable,
         verificationStatus: document.verification_status,
         verificationDate: document.verification_date,
         verifiedBy: document.verified_by_username,

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import ApiService from '../services/ApiService';
 import BiometricVerificationAdmin from '../components/BiometricVerificationAdmin';
-import { FaFingerprint, FaUserCheck, FaIdCard, FaCamera } from 'react-icons/fa';
+import { FaFingerprint, FaUserCheck, FaCamera } from 'react-icons/fa';
 
 const formatDate = (date) => {
   if (!date) return 'N/A';
@@ -15,6 +16,7 @@ const truncateHash = (hash) => {
 const FaceVerification = () => {
   const [scanning, setScanning] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
+  const [professionalRecords, setProfessionalRecords] = useState([]);
   const [error, setError] = useState(null);
 
   const handleStartScan = () => {
@@ -23,9 +25,19 @@ const FaceVerification = () => {
     setVerificationResult(null);
   };
 
-  const handleVerificationComplete = (userInfo) => {
+  const handleVerificationComplete = async (userInfo) => {
     setVerificationResult(userInfo);
     setScanning(false);
+    // Fetch professional records for this user
+    try {
+      const res = await ApiService.listUserProfessionalRecords(userInfo.id);
+      // API may return { records: [...] } or an array directly
+      const records = Array.isArray(res) ? res : res.records || [];
+      setProfessionalRecords(records);
+    } catch (err) {
+      console.error('Error fetching professional records:', err);
+      setError('Could not fetch professional records');
+    }
   };
 
   const handleVerificationError = (errorMessage) => {
@@ -36,6 +48,7 @@ const FaceVerification = () => {
   const handleReset = () => {
     setScanning(false);
     setVerificationResult(null);
+    setProfessionalRecords([]);
     setError(null);
   };
 
@@ -89,6 +102,12 @@ const FaceVerification = () => {
               <span className="detail-label">Name:</span>
               <span className="detail-value">{verificationResult.name}</span>
             </div>
+            {verificationResult.username && (
+              <div className="detail-row">
+                <span className="detail-label">Username:</span>
+                <span className="detail-value">{verificationResult.username}</span>
+              </div>
+            )}
             <div className="detail-row">
               <span className="detail-label">User ID:</span>
               <span className="detail-value">{verificationResult.id}</span>
@@ -102,6 +121,10 @@ const FaceVerification = () => {
               <span className="detail-value">{verificationResult.email}</span>
             </div>
             <div className="detail-row">
+              <span className="detail-label">Created At:</span>
+              <span className="detail-value">{formatDate(verificationResult.created_at)}</span>
+            </div>
+            <div className="detail-row">
               <span className="detail-label">Verification Status:</span>
               <span className="detail-value status-badge">
                 {verificationResult.verification_status || 'PENDING'}
@@ -109,7 +132,31 @@ const FaceVerification = () => {
             </div>
           </div>
           
-          {/* New Biometric Verification Details Section */}
+          <div className="records-section">
+            <h2>Professional Records</h2>
+            {professionalRecords.length === 0 ? (
+              <p>No professional records found.</p>
+            ) : (
+              professionalRecords.map((record, idx) => (
+                <div key={record.id} className="record-card">
+                  <h3>Record #{idx + 1}</h3>
+                  <div className="record-details-grid">
+                    <p><strong>ID:</strong> {record.id}</p>
+                    <p><strong>Type:</strong> {record.type}</p>
+                    <p><strong>Institution:</strong> {record.institution}</p>
+                    <p><strong>Title:</strong> {record.title}</p>
+                    <p><strong>Start Date:</strong> {formatDate(record.start_date)}</p>
+                    <p><strong>End Date:</strong> {record.end_date ? formatDate(record.end_date) : 'N/A'}</p>
+                    <p><strong>Verification Status:</strong> {record.verification_status}</p>
+                    <p><strong>On Blockchain:</strong> {record.blockchain_tx_hash ? 'Yes' : 'No'}</p>
+                    <p><strong>Blockchain TX:</strong> {record.blockchain_tx_hash ? truncateHash(record.blockchain_tx_hash) : 'N/A'}</p>
+                    <p><strong>Created At:</strong> {formatDate(record.created_at)}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          
           <div className="verification-details">
             <h2>Biometric Verification Details</h2>
             <div className="details-list">
@@ -117,26 +164,26 @@ const FaceVerification = () => {
                 <span className="detail-label">Government ID:</span>
                 <span className="detail-value">{verificationResult.government_id || 'N/A'}</span>
               </div>
-              <div className="detail-item">
-                <span className="detail-label">Facemesh Hash:</span>
-                <span className="detail-value font-mono text-sm">
-                  {verificationResult?.facemesh_hash ? 
-                    truncateHash(verificationResult.facemesh_hash) : 
-                    'N/A'}
-                </span>
-              </div>
-              <div className="detail-item">
-                <span className="detail-label">Verification Score:</span>
-                <span className={`detail-value ${
-                  verificationResult?.verification_score > 90 ? 'text-green-500' : 
-                  verificationResult?.verification_score > 70 ? 'text-yellow-500' : 
-                  'text-red-500'
-                }`}>
-                  {verificationResult?.verification_score !== undefined ? 
-                    `${verificationResult.verification_score}%` : 
-                    'Not scored'}
-                </span>
-              </div>
+              {verificationResult?.facemesh_hash && (
+                <div className="detail-item">
+                  <span className="detail-label">Facemesh Hash:</span>
+                  <span className="detail-value font-mono text-sm">
+                    {truncateHash(verificationResult.facemesh_hash)}
+                  </span>
+                </div>
+              )}
+              {verificationResult?.verification_score !== undefined && (
+                <div className="detail-item">
+                  <span className="detail-label">Verification Score:</span>
+                  <span className={`detail-value ${
+                    verificationResult.verification_score > 90 ? 'text-green-500' : 
+                    verificationResult.verification_score > 70 ? 'text-yellow-500' : 
+                    'text-red-500'
+                  }`}>
+                    {`${verificationResult.verification_score}%`}
+                  </span>
+                </div>
+              )}
               <div className="detail-item">
                 <span className="detail-label">Verification Status:</span>
                 <span className={`detail-value ${
@@ -396,6 +443,41 @@ const FaceVerification = () => {
           color: #e5e7eb;
           font-size: 14px;
           font-family: monospace;
+        }
+
+        /* Professional Records Styles */
+        .records-section {
+          margin-top: 32px;
+        }
+
+        .record-card {
+          background: #111827;
+          border-radius: 8px;
+          padding: 16px;
+          margin-bottom: 20px;
+          border: 1px solid #374151;
+        }
+
+        .record-card h3 {
+          margin-top: 0;
+          margin-bottom: 12px;
+          color: #93c5fd;
+        }
+
+        .record-details-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+          gap: 8px 16px;
+        }
+
+        .record-details-grid p {
+          margin: 4px 0;
+          color: #e5e7eb;
+          font-size: 14px;
+        }
+
+        .record-details-grid strong {
+          color: #9ca3af;
         }
       `}</style>
     </div>

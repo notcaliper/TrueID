@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import dayjs from 'dayjs';
 import {
   Box,
   Table,
@@ -30,7 +31,13 @@ import {
   Divider,
   TablePagination,
   Link,
-  Tooltip
+  Tooltip,
+  Tabs,
+  Tab,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -41,14 +48,22 @@ import {
   CloudUpload as CloudUploadIcon,
   Download as DownloadIcon,
   Preview as PreviewIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Fingerprint as FingerprintIcon,
+  Link as LinkIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { LoadingButton } from '@mui/lab';
 import ApiService from '../services/ApiService';
-import BlockchainService from '../services/BlockchainService';
 import { debounce } from 'lodash';
 
 const ProfessionalRecords = () => {
+  // Helper for date formatting
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    return dayjs(date).isValid() ? dayjs(date).format('YYYY-MM-DD') : 'N/A';
+  };
+
   // State management
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,19 +87,108 @@ const ProfessionalRecords = () => {
   const [verificationNotes, setVerificationNotes] = useState('');
   const [adminNotes, setAdminNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [tabValue, setTabValue] = useState(0);
+  const [previewDocUrl, setPreviewDocUrl] = useState(null);
+  const [previewDocType, setPreviewDocType] = useState(null);
+  const [hashDetails, setHashDetails] = useState(null);
+
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  // Custom TabPanel component
+  function TabPanel(props) {
+    const { children, value, index, ...other } = props;
+    return (
+      <div
+        role="tabpanel"
+        hidden={value !== index}
+        id={`tabpanel-${index}`}
+        aria-labelledby={`tab-${index}`}
+        {...other}
+      >
+        {value === index && (
+          <Box sx={{ p: 3 }}>
+            {children}
+          </Box>
+        )}
+      </div>
+    );
+  }
+
+  // Calculate record hash using Web Crypto API
+  const calculateRecordHash = async (record) => {
+    const dataToHash = {
+      userId: record.user_id || record.userId,
+      title: record.title,
+      organization: record.organization || record.institution,
+      startDate: record.start_date || record.startDate,
+      endDate: record.end_date || record.endDate,
+      description: record.description,
+      jobTitle: record.job_title || record.jobTitle,
+      companyName: record.company_name || record.companyName,
+      employmentType: record.employment_type || record.employmentType
+    };
+    
+    const sortedData = Object.keys(dataToHash)
+      .sort()
+      .reduce((obj, key) => {
+        if (dataToHash[key] !== undefined && dataToHash[key] !== null) {
+          obj[key] = dataToHash[key];
+        }
+        return obj;
+      }, {});
+
+    try {
+      // Convert the data to a string
+      const jsonString = JSON.stringify(sortedData);
+      // Convert string to Uint8Array
+      const encoder = new TextEncoder();
+      const data = encoder.encode(jsonString);
+      
+      // Calculate SHA-256 hash using Web Crypto API
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      
+      // Convert buffer to hex string
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      setHashDetails({
+        hash: hashHex,
+        sourceData: sortedData
+      });
+
+      return hashHex;
+    } catch (error) {
+      console.error('Error calculating hash:', error);
+      return null;
+    }
+  };
 
   // Fetch records with debouncing for search
   const debouncedFetch = useMemo(
     () => debounce(async (searchTerm, pageNum, limit) => {
-    setLoading(true);
+      setLoading(true);
       try {
         const response = await ApiService.getAllProfessionalRecords(pageNum + 1, limit, searchTerm);
         if (response && response.records) {
-          setRecords(response.records);
-          setTotalRecords(response.total || response.records.length);
-          setTotalPages(response.totalPages || Math.ceil(response.records.length / rowsPerPage));
+          const withUsers = await Promise.all(response.records.map(async (rec) => {
+            if (!rec.user && (rec.userId || rec.user_id)) {
+              try {
+                const user = await ApiService.getUserById(rec.userId || rec.user_id);
+                return { ...rec, user };
+              } catch (err) {
+                console.error('Failed to fetch user:', err);
+                return rec;
+              }
             }
-          } catch (err) {
+            return rec;
+          }));
+          setRecords(withUsers);
+          setTotalRecords(response.total || withUsers.length);
+          setTotalPages(response.totalPages || Math.ceil(response.records.length / rowsPerPage));
+        }
+      } catch (err) {
         setError('Failed to fetch records: ' + err.message);
       } finally {
         setLoading(false);
@@ -110,22 +214,58 @@ const ProfessionalRecords = () => {
     return () => interval && clearInterval(interval);
   }, [autoRefresh, refreshInterval, searchQuery, page, rowsPerPage, debouncedFetch]);
 
-  // Fetch linked documents when a record is selected
+  // Preview document handler
+  const handlePreviewDocument = async (doc) => {
+    try {
+      const response = await ApiService.getDocument(doc.id);
+      if (response.document) {
+        const { mimeType, fileUrl, isPreviewable } = response.document;
+        
+        if (!isPreviewable) {
+          setError('This document type cannot be previewed. You can download it instead.');
+          return;
+        }
+        
+        setPreviewDocType(mimeType);
+        setPreviewDocUrl(`${process.env.REACT_APP_API_URL}${fileUrl}`);
+      }
+    } catch (error) {
+      console.error('Error fetching document:', error);
+      setError('Failed to load document preview');
+    }
+  };
+
+  // Fetch linked documents for a professional record
   const fetchLinkedDocuments = useCallback(async (recordId) => {
     try {
-      const response = await ApiService.getDocuments(recordId);
-      setLinkedDocuments(response.documents || []);
+      const docs = await ApiService.listProfessionalRecordDocuments(recordId);
+      setLinkedDocuments(Array.isArray(docs) ? docs : (docs.documents || []));
     } catch (err) {
-      setError(`Failed to fetch linked documents: ${err.message}`);
+      setError('Failed to fetch linked documents: ' + err.message);
     }
   }, []);
 
-  // Handle record selection and modal open
-  const handleViewRecord = useCallback((record) => {
-    setSelectedRecord(record);
-    setOpenModal(true);
-    fetchLinkedDocuments(record.id);
+  // Handle record selection
+  const handleViewRecord = useCallback(async (record) => {
+    try {
+      setSelectedRecord(record);
+      setOpenModal(true);
+      await fetchLinkedDocuments(record.id);
+      await calculateRecordHash(record);
+      setTabValue(0);
+    } catch (error) {
+      console.error('Error viewing record:', error);
+      setError('Failed to load record details');
+    }
   }, [fetchLinkedDocuments]);
+
+  // Handle modal close
+  const handleCloseModal = useCallback(() => {
+    setOpenModal(false);
+    setAdminNotes('');
+    setSelectedRecord(null);
+    setHashDetails(null);
+  }, []);
 
   // Handle file upload
   const handleFileUpload = async (event) => {
@@ -179,9 +319,8 @@ const ProfessionalRecords = () => {
       const result = await ApiService.verifyOnBlockchain(recordId);
       if (result.success) {
         setSuccess('Record verified on blockchain successfully');
-        // Refresh the record data to get updated blockchain status
-        const updatedRecordResponse = await ApiService.getProfessionalRecord(recordId);
-        setSelectedRecord(updatedRecordResponse.record || updatedRecordResponse);
+        const updatedRecord = await ApiService.getProfessionalRecord(recordId);
+        setSelectedRecord(updatedRecord);
       } else {
         setError('Blockchain verification failed');
       }
@@ -193,19 +332,15 @@ const ProfessionalRecords = () => {
   };
 
   // Add handler for admin actions
-  const handleAdminAction = async (recordId, status) => {
+  const handleAdminVerify = async (recordId, status) => {
     setActionLoading(true);
     try {
-      const currentUser = await ApiService.getCurrentUser();
       await ApiService.updateProfessionalRecordStatus(recordId, {
         status,
-        notes: adminNotes,
-        verifiedBy: currentUser.id
+        notes: adminNotes
       });
       setSuccess('Record status updated successfully');
-      // Refresh the records list
       debouncedFetch(searchQuery, page, rowsPerPage);
-      // Close the modal if open
       setOpenModal(false);
       setAdminNotes('');
     } catch (err) {
@@ -223,6 +358,8 @@ const ProfessionalRecords = () => {
           return 'success';
         case 'REJECTED':
           return 'error';
+        case 'PENDING':
+          return 'warning';
         default:
           return 'default';
       }
@@ -237,44 +374,133 @@ const ProfessionalRecords = () => {
     );
   };
 
+  // Document Preview Modal
+  const DocumentPreviewModal = ({ open, onClose }) => {
+    if (!open) return null;
+
+    const handleDownload = () => {
+      if (previewDocUrl) {
+        window.open(previewDocUrl, '_blank');
+      }
+    };
+
+    return (
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          style: {
+            height: '80vh',
+            maxHeight: '80vh',
+          },
+        }}
+      >
+        <DialogTitle>
+          Document Preview
+          <Box sx={{ position: 'absolute', right: 8, top: 8, display: 'flex', gap: 1 }}>
+            <IconButton
+              aria-label="download"
+              onClick={handleDownload}
+              sx={{ color: 'primary.main' }}
+            >
+              <DownloadIcon />
+            </IconButton>
+            <IconButton
+              aria-label="close"
+              onClick={onClose}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {previewDocType?.startsWith('image/') ? (
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: 'calc(80vh - 100px)',
+              }}
+            >
+              <img
+                src={previewDocUrl}
+                alt="Document Preview"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                }}
+                onError={() => setError('Failed to load image')}
+              />
+            </Box>
+          ) : previewDocType === 'application/pdf' ? (
+            <Box
+              sx={{
+                height: 'calc(80vh - 100px)',
+                '& iframe': {
+                  border: 'none',
+                  width: '100%',
+                  height: '100%',
+                }
+              }}
+            >
+              <iframe
+                src={previewDocUrl}
+                title="PDF Preview"
+                onError={() => setError('Failed to load PDF')}
+              />
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: 'calc(80vh - 100px)',
+                gap: 2,
+              }}
+            >
+              <Typography variant="body1" color="text.secondary" align="center">
+                Preview not available for this file type.
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<DownloadIcon />}
+                onClick={handleDownload}
+              >
+                Download File
+              </Button>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
         Professional Records Management
       </Typography>
-
+      
       {/* Search and Controls */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
         <TextField
           label="Search"
           variant="outlined"
           size="small"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           InputProps={{
             startAdornment: <SearchIcon sx={{ mr: 1 }} />
           }}
           sx={{ width: 300 }}
         />
-
-        <FormControl size="small" sx={{ minWidth: 150 }}>
-          <InputLabel>Auto-refresh</InputLabel>
-          <Select
-            value={autoRefresh ? refreshInterval : ''}
-            onChange={(e) => {
-              setRefreshInterval(e.target.value);
-              setAutoRefresh(!!e.target.value);
-            }}
-            label="Auto-refresh"
-          >
-            <MenuItem value="">Off</MenuItem>
-            <MenuItem value={15000}>15 seconds</MenuItem>
-            <MenuItem value={30000}>30 seconds</MenuItem>
-            <MenuItem value={60000}>1 minute</MenuItem>
-            <MenuItem value={300000}>5 minutes</MenuItem>
-          </Select>
-        </FormControl>
-
+        
         <Button
           startIcon={<RefreshIcon />}
           onClick={() => debouncedFetch(searchQuery, page, rowsPerPage)}
@@ -294,12 +520,12 @@ const ProfessionalRecords = () => {
               <TableCell>Organization</TableCell>
               <TableCell>Date Range</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Blockchain</TableCell>
+              <TableCell>Hash Status</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-      {loading ? (
+            {loading ? (
               <TableRow>
                 <TableCell colSpan={7} align="center">
                   <CircularProgress />
@@ -317,26 +543,32 @@ const ProfessionalRecords = () => {
                   <TableCell>
                     <Typography variant="subtitle2">{record.user?.name}</Typography>
                     <Typography variant="caption" color="textSecondary">
-                      {record.user?.governmentId}
+                      {record.user?.government_id}
                     </Typography>
                   </TableCell>
                   <TableCell>{record.title}</TableCell>
-                  <TableCell>{record.organization}</TableCell>
+                  <TableCell>{record.organization || record.institution}</TableCell>
                   <TableCell>
-                    {new Date(record.startDate).toLocaleDateString()} -{' '}
-                    {record.endDate ? new Date(record.endDate).toLocaleDateString() : 'Present'}
+                    {formatDate(record.start_date || record.startDate)} -{' '}
+                    {record.end_date || record.endDate ? formatDate(record.end_date || record.endDate) : 'Present'}
                   </TableCell>
                   <TableCell>
-                    <StatusChip status={record.verificationStatus} />
+                    <StatusChip status={record.verification_status || record.verificationStatus} />
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      label={record.onBlockchain ? 'On Chain' : 'Not on Chain'}
-                      color={record.onBlockchain ? 'success' : 'default'}
-                    />
+                    <Tooltip title={record.data_hash || 'No hash available'}>
+                      <Chip
+                        icon={<FingerprintIcon />}
+                        label={record.data_hash ? 'Hashed' : 'Not Hashed'}
+                        color={record.data_hash ? 'success' : 'default'}
+                      />
+                    </Tooltip>
                   </TableCell>
                   <TableCell>
-                    <IconButton onClick={() => handleViewRecord(record)} color="primary">
+                    <IconButton 
+                      onClick={() => handleViewRecord(record)} 
+                      color="primary"
+                    >
                       <VisibilityIcon />
                     </IconButton>
                   </TableCell>
@@ -361,7 +593,7 @@ const ProfessionalRecords = () => {
       {/* Record Detail Modal */}
       <Dialog
         open={openModal}
-        onClose={() => setOpenModal(false)}
+        onClose={handleCloseModal}
         maxWidth="md"
         fullWidth
       >
@@ -370,297 +602,235 @@ const ProfessionalRecords = () => {
             <DialogTitle>
               Professional Record Details
               <IconButton
-                onClick={() => setOpenModal(false)}
+                onClick={handleCloseModal}
                 sx={{ position: 'absolute', right: 8, top: 8 }}
               >
                 &times;
               </IconButton>
             </DialogTitle>
             <DialogContent dividers>
-              <Grid container spacing={3}>
-              {/* User Information */}
-                <Grid item xs={12}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        User Information
-                      </Typography>
-                      <Grid container spacing={2}>
-                        <Grid item xs={6}>
-                          <Typography variant="subtitle2" color="textSecondary">
-                            Name
-                          </Typography>
-                          <Typography>{selectedRecord.user?.name}</Typography>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Typography variant="subtitle2" color="textSecondary">
-                            Government ID
-                          </Typography>
-                          <Typography>{selectedRecord.user?.governmentId}</Typography>
-                        </Grid>
-                      </Grid>
-                    </CardContent>
-                  </Card>
-                </Grid>
+              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                <Tabs value={tabValue} onChange={handleTabChange}>
+                  <Tab label="Details" />
+                  <Tab label="Hash Information" />
+                  <Tab label="Documents" />
+                  <Tab label="Verification" />
+                </Tabs>
+              </Box>
               
-              {/* Record Information */}
-                <Grid item xs={12}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        Record Information
-                      </Typography>
-                      <Grid container spacing={2}>
-                        <Grid item xs={6}>
-                          <Typography variant="subtitle2" color="textSecondary">
-                            Title
-                          </Typography>
-                          <Typography>{selectedRecord.title}</Typography>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Typography variant="subtitle2" color="textSecondary">
-                            Organization
-                          </Typography>
-                          <Typography>{selectedRecord.organization}</Typography>
-                        </Grid>
-                        <Grid item xs={12}>
-                          <Typography variant="subtitle2" color="textSecondary">
-                            Description
-                          </Typography>
-                          <Typography>{selectedRecord.description}</Typography>
-                        </Grid>
-                      </Grid>
-                    </CardContent>
-                  </Card>
+              <TabPanel value={tabValue} index={0}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6">User Information</Typography>
+                        <Typography>Name: {selectedRecord.user?.name}</Typography>
+                        <Typography>Government ID: {selectedRecord.user?.government_id}</Typography>
+                        <Typography>Email: {selectedRecord.user?.email}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6">Record Details</Typography>
+                        <Typography>Title: {selectedRecord.title}</Typography>
+                        <Typography>Organization: {selectedRecord.organization || selectedRecord.institution}</Typography>
+                        <Typography>Description: {selectedRecord.description}</Typography>
+                        <Typography>Period: {formatDate(selectedRecord.start_date)} - {selectedRecord.end_date ? formatDate(selectedRecord.end_date) : 'Present'}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
                 </Grid>
+              </TabPanel>
 
-                {/* Admin Actions Section - Add this before Blockchain Status */}
-                <Grid item xs={12}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="h6">
-                          Verification Status
-                        </Typography>
-                        <Chip
-                          label={selectedRecord.verificationStatus || 'PENDING'}
-                          color={
-                            selectedRecord.verificationStatus === 'VERIFIED' ? 'success' :
-                            selectedRecord.verificationStatus === 'REJECTED' ? 'error' :
-                            selectedRecord.verificationStatus === 'DEACTIVATED' ? 'warning' : 
-                            'default'
-                          }
-                          icon={
-                            selectedRecord.verificationStatus === 'VERIFIED' ? <CheckCircleIcon /> :
-                            selectedRecord.verificationStatus === 'REJECTED' ? <ErrorIcon /> :
-                            null
+              <TabPanel value={tabValue} index={1}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6">Hash Information</Typography>
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="subtitle1">Current Data Hash</Typography>
+                      <Typography
+                        sx={{
+                          bgcolor: 'grey.100',
+                          p: 2,
+                          borderRadius: 1,
+                          fontFamily: 'monospace',
+                          wordBreak: 'break-all'
+                        }}
+                      >
+                        {selectedRecord.data_hash || 'Not available'}
+                      </Typography>
+                    </Box>
+
+                    {hashDetails && (
+                      <>
+                        <Box sx={{ mt: 3 }}>
+                          <Typography variant="subtitle1">Calculated Hash</Typography>
+                          <Typography
+                            sx={{
+                              bgcolor: 'grey.100',
+                              p: 2,
+                              borderRadius: 1,
+                              fontFamily: 'monospace',
+                              wordBreak: 'break-all'
+                            }}
+                          >
+                            {hashDetails.hash}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ mt: 3 }}>
+                          <Typography variant="subtitle1">Source Data for Hash</Typography>
+                          <pre
+                            style={{
+                              backgroundColor: '#f5f5f5',
+                              padding: '16px',
+                              borderRadius: '4px',
+                              overflow: 'auto'
+                            }}
+                          >
+                            {JSON.stringify(hashDetails.sourceData, null, 2)}
+                          </pre>
+                        </Box>
+                      </>
+                    )}
+
+                    {selectedRecord.blockchain_tx_hash && (
+                      <Box sx={{ mt: 3 }}>
+                        <Typography variant="subtitle1">Blockchain Transaction</Typography>
+                        <Link
+                          href={`https://testnet.snowtrace.io/tx/${selectedRecord.blockchain_tx_hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                        >
+                          <LinkIcon />
+                          View on Explorer
+                        </Link>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabPanel>
+
+              <TabPanel value={tabValue} index={2}>
+                <Typography variant="h6" gutterBottom>Linked Documents</Typography>
+                {linkedDocuments.length > 0 ? (
+                  <List>
+                    {linkedDocuments.map((doc) => (
+                      <ListItem key={doc.id}>
+                        <ListItemText
+                          primary={doc.original_name}
+                          secondary={
+                            <>
+                              <Typography variant="body2">
+                                Status: <StatusChip status={doc.verification_status} />
+                              </Typography>
+                              <Typography variant="body2">
+                                Hash: {doc.file_hash || 'Not available'}
+                              </Typography>
+                              {doc.blockchain_tx_hash && (
+                                <Typography variant="body2">
+                                  Blockchain TX: {doc.blockchain_tx_hash}
+                                </Typography>
+                              )}
+                            </>
                           }
                         />
-                      </Box>
+                        <ListItemSecondaryAction>
+                          <Tooltip title="Download">
+                            <IconButton edge="end" href={doc.file_url} download>
+                              <DownloadIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Typography>No documents found</Typography>
+                )}
+              </TabPanel>
 
-                      <TextField
-                        label="Admin Notes"
-                        multiline
-                        rows={3}
-                        fullWidth
-                        value={adminNotes}
-                        onChange={(e) => setAdminNotes(e.target.value)}
-                        placeholder="Add notes about your verification decision..."
-                        sx={{ mb: 2 }}
-                      />
-
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        <LoadingButton
-                          variant="contained"
-                          color="success"
-                          startIcon={<CheckCircleIcon />}
-                          onClick={() => handleAdminAction(selectedRecord.id, 'VERIFIED')}
-                          loading={actionLoading}
-                          disabled={selectedRecord.verificationStatus === 'VERIFIED'}
-                        >
-                          Verify
-                        </LoadingButton>
-
-                        <LoadingButton
-                          variant="contained"
-                          color="error"
-                          startIcon={<ErrorIcon />}
-                          onClick={() => handleAdminAction(selectedRecord.id, 'REJECTED')}
-                          loading={actionLoading}
-                          disabled={selectedRecord.verificationStatus === 'REJECTED'}
-                        >
-                          Reject
-                        </LoadingButton>
-
-                        <LoadingButton
-                          variant="contained"
-                          color="warning"
-                          onClick={() => handleAdminAction(selectedRecord.id, 'DEACTIVATED')}
-                          loading={actionLoading}
-                          disabled={selectedRecord.verificationStatus === 'DEACTIVATED'}
-                        >
-                          Deactivate
-                        </LoadingButton>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              
-              {/* Blockchain Status */}
-                <Grid item xs={12}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        Blockchain Status
-                      </Typography>
-                  {selectedRecord.onBlockchain ? (
-                        <>
-                          <Chip
-                            label="Verified on Blockchain"
-                            color="success"
-                            icon={<CheckCircleIcon />}
-                          />
-                      {selectedRecord.blockchainTxHash && (
-                            <Box mt={1}>
-                              <Link
-                            href={`https://testnet.snowtrace.io/tx/${selectedRecord.blockchainTxHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                              >
-                                View Transaction
-                              </Link>
-                            </Box>
-                          )}
-                              </>
-                            ) : (
-                        <LoadingButton
-                          loading={blockchainLoading}
-                          onClick={() => handleBlockchainVerify(selectedRecord.id)}
-                          variant="contained"
-                          disabled={selectedRecord.verificationStatus !== 'VERIFIED'}
-                        >
-                          Verify on Blockchain
-                        </LoadingButton>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Document Section */}
-                <Grid item xs={12}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="h6">
-                          Uploaded Documents
-                        </Typography>
-                        {linkedDocuments.length > 0 && (
-                          <Chip
-                            label={`${linkedDocuments.length} document${linkedDocuments.length !== 1 ? 's' : ''}`}
-                            color="primary"
-                            size="small"
-                          />
-                        )}
-                      </Box>
-
-                      {linkedDocuments.length === 0 ? (
-                        <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
-                          <Typography>No documents uploaded yet</Typography>
-                        </Box>
-                      ) : (
+              <TabPanel value={tabValue} index={3}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6">Verification Status</Typography>
                         <Box sx={{ mt: 2 }}>
-                          {linkedDocuments.map((doc) => (
-                            <Box 
-                              key={doc.id} 
-                              sx={{ 
-                                mb: 2, 
-                                p: 2, 
-                                border: 1, 
-                                borderColor: 'divider', 
-                                borderRadius: 1,
-                                '&:hover': {
-                                  bgcolor: 'action.hover'
-                                }
-                              }}
-                            >
-                              <Grid container spacing={2} alignItems="center">
-                                <Grid item xs={12} sm={4}>
-                                  <Typography variant="subtitle2" sx={{ wordBreak: 'break-word' }}>
-                                    {doc.fileName}
-                                  </Typography>
-                                  <Typography variant="caption" color="textSecondary" display="block">
-                                    Uploaded: {new Date(doc.createdAt).toLocaleDateString()}
-                                  </Typography>
-                                  {doc.verifiedBy && (
-                                    <Typography variant="caption" color="textSecondary" display="block">
-                                      Verified by: {doc.verifiedBy}
-                                    </Typography>
-                                  )}
-                                </Grid>
-                                <Grid item xs={12} sm={4}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <StatusChip status={doc.verificationStatus} />
-                                    {doc.verificationNotes && (
-                                      <Tooltip title={doc.verificationNotes}>
-                                        <IconButton size="small">
-                                          <InfoIcon fontSize="small" />
-                                        </IconButton>
-                                      </Tooltip>
-                                    )}
-                                  </Box>
-                                </Grid>
-                                <Grid item xs={12} sm={4}>
-                                  <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                    <Tooltip title="Preview Document">
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => window.open(doc.fileUrl, '_blank')}
-                                      >
-                                        <PreviewIcon />
-                                      </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Download Document">
-                                      <IconButton
-                                        size="small"
-                                        href={doc.fileUrl}
-                                        download
-                                      >
-                                        <DownloadIcon />
-                                      </IconButton>
-                                    </Tooltip>
-                                    {doc.verificationStatus === 'PENDING' && (
-                                      <LoadingButton
-                                        size="small"
-                                        variant="outlined"
-                                        onClick={() => handleVerifyDocument(doc.id)}
-                                        loading={actionLoading}
-                                      >
-                                        Verify
-                                      </LoadingButton>
-                                    )}
-                                  </Box>
-                                </Grid>
-                              </Grid>
-                            </Box>
-                          ))}
+                          <StatusChip status={selectedRecord.verification_status} />
                         </Box>
-                      )}
-                    </CardContent>
-                  </Card>
+                        
+                        {selectedRecord.verification_status !== 'VERIFIED' && (
+                          <Box sx={{ mt: 3 }}>
+                            <TextField
+                              fullWidth
+                              multiline
+                              rows={4}
+                              label="Admin Notes"
+                              value={adminNotes}
+                              onChange={(e) => setAdminNotes(e.target.value)}
+                              variant="outlined"
+                            />
+                            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                              <LoadingButton
+                                variant="contained"
+                                color="success"
+                                loading={actionLoading}
+                                onClick={() => handleAdminVerify(selectedRecord.id, 'VERIFIED')}
+                                startIcon={<CheckCircleIcon />}
+                              >
+                                Verify
+                              </LoadingButton>
+                              <LoadingButton
+                                variant="contained"
+                                color="error"
+                                loading={actionLoading}
+                                onClick={() => handleAdminVerify(selectedRecord.id, 'REJECTED')}
+                                startIcon={<ErrorIcon />}
+                              >
+                                Reject
+                              </LoadingButton>
+                            </Box>
+                          </Box>
+                        )}
+
+                        {selectedRecord.verification_status === 'VERIFIED' && !selectedRecord.blockchain_tx_hash && (
+                          <Box sx={{ mt: 3 }}>
+                            <LoadingButton
+                              variant="contained"
+                              color="primary"
+                              loading={blockchainLoading}
+                              onClick={() => handleBlockchainVerify(selectedRecord.id)}
+                              startIcon={<CloudUploadIcon />}
+                            >
+                              Verify on Blockchain
+                            </LoadingButton>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
                 </Grid>
-              </Grid>
+              </TabPanel>
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => {
-                setOpenModal(false);
-                setAdminNotes('');
-              }}>
-                Close
-              </Button>
+              <Button onClick={handleCloseModal}>Close</Button>
             </DialogActions>
           </>
         )}
       </Dialog>
+
+      {/* Add the DocumentPreviewModal component */}
+      <DocumentPreviewModal
+        open={Boolean(previewDocUrl)}
+        onClose={() => {
+          setPreviewDocUrl(null);
+          setPreviewDocType(null);
+        }}
+      />
 
       {/* Snackbar for messages */}
       <Snackbar

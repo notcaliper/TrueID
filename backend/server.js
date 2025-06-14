@@ -10,6 +10,7 @@ const dbService = require('./services/db.service');
 const config = require('./config/config');
 const path = require('path');
 const fs = require('fs');
+const cors = require('cors');
 
 // Create Express app
 const app = express();
