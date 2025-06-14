@@ -83,8 +83,53 @@ export const authAPI = {
   refreshToken: (refreshToken) => {
     return API.post('/user/refresh-token', { refreshToken });
   },
-  verifyBiometric: (verificationData) => {
-    return API.post('/user/verify-biometric', verificationData);
+  verifyBiometric: async (verificationData) => {
+    try {
+      console.log('Sending biometric verification data:', {
+        userId: verificationData.userId,
+        hasData: !!verificationData.facemeshData
+      });
+      
+      const response = await API.post('/user/verify-biometric', verificationData);
+      console.log('Biometric verification response:', response.data);
+      
+      // Ensure we have a properly structured response
+      if (!response.data) {
+        throw new Error('Invalid response from server');
+      }
+      
+      return {
+        success: true,
+        verified: response.data.verified || response.data.success,
+        message: response.data.message,
+        score: response.data.score
+      };
+    } catch (error) {
+      console.error('Biometric verification error:', error);
+      
+      // Handle different types of errors
+      if (error.response) {
+        // Server responded with error
+        const message = error.response.data?.message || 'Server verification failed';
+        return {
+          success: false,
+          error: message,
+          details: error.response.data
+        };
+      } else if (error.request) {
+        // Request made but no response
+        return {
+          success: false,
+          error: 'No response from server. Please check your connection.'
+        };
+      } else {
+        // Other errors
+        return {
+          success: false,
+          error: error.message || 'Failed to process biometric verification'
+        };
+      }
+    }
   },
 };
 
@@ -121,6 +166,8 @@ export const userAPI = {
       if (response.data && response.data.records) {
         response.data.records = response.data.records.map(record => ({
           ...record,
+          // Map backend field names to frontend expectations
+          organization: record.organization || record.institution || 'Unknown Organization',
           verification_status: record.verification_status || 'PENDING'
         }));
       }
@@ -172,6 +219,25 @@ export const blockchainAPI = {
   },
   verifyDocumentHash: (hash) => {
     return API.get(`/blockchain/verify/${hash}`);
+  },
+};
+
+// Document API calls
+export const documentAPI = {
+  /**
+   * Upload a document (PDF, image, etc.) and optionally link it to a professional record
+   * @param {File} file - the file to upload
+   * @param {number} professionalRecordId - ID of the professional record to associate (optional)
+   */
+  uploadDocument: (file, professionalRecordId) => {
+    const formData = new FormData();
+    formData.append('document', file);
+    if (professionalRecordId) {
+      formData.append('professionalRecordId', professionalRecordId);
+    }
+    return API.post('/documents/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
   },
 };
 

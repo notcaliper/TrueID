@@ -141,7 +141,9 @@ const Layout = () => {
             onClick={handleProfileMenuOpen}
             color="inherit"
           >
-            <Avatar alt={user?.name || 'User'} src="/static/images/avatar/1.jpg" />
+            <Avatar alt={user?.name || 'User'} src={user?.avatarUrl || undefined} sx={{ bgcolor: 'primary.main' }}>
+              {(!user?.avatarUrl && user?.name) ? user.name.charAt(0) : null}
+            </Avatar>
           </IconButton>
           <Menu
             id="menu-appbar"

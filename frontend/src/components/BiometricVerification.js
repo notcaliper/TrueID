@@ -121,6 +121,9 @@ const BiometricVerification = ({ onComplete, onVerificationComplete, userId, ver
     
     // Get canvas context and draw the current video frame
     const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return; // Canvas context not available yet
+    }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
     // Create OpenCV matrices directly without using imread or matFromImageData
@@ -282,7 +285,9 @@ const BiometricVerification = ({ onComplete, onVerificationComplete, userId, ver
         ? await verifyBiometricOverride(userId, facialFeatures)
         : await verifyBiometric(userId, facialFeatures);
       
-      if (result.success && result.verified) {
+      console.log('Verification result:', result); // Add logging
+      
+      if (result.success && (result.verified === undefined || result.verified)) {
         setVerificationStatus('success');
         // Call both callback props if they exist
         if (onVerificationComplete) {
@@ -294,8 +299,10 @@ const BiometricVerification = ({ onComplete, onVerificationComplete, userId, ver
         // Stop the camera after successful verification
         stopCamera();
       } else {
+        const errorMsg = result.error || 'Biometric verification failed. Please try again.';
+        console.error('Verification failed:', errorMsg); // Add logging
         setVerificationStatus('failed');
-        setError('Biometric verification failed. Please try again.');
+        setError(errorMsg);
         if (onVerificationComplete) {
           onVerificationComplete(false);
         }
@@ -303,6 +310,7 @@ const BiometricVerification = ({ onComplete, onVerificationComplete, userId, ver
       
       return result.success;
     } catch (err) {
+      console.error('Error during biometric verification:', err); // Add logging
       const errorMessage = err.message || 'Failed to capture or verify biometric data. Please try again.';
       setError(errorMessage);
       setVerificationStatus('failed');
@@ -439,6 +447,15 @@ const BiometricVerification = ({ onComplete, onVerificationComplete, userId, ver
             disabled
           >
             Verified ✓
+          </Button>
+        )}
+        {verificationStatus === 'failed' && (
+          <Button
+            variant="contained"
+            color="error"
+            disabled
+          >
+            Not Matched ✗
           </Button>
         )}
       </Box>

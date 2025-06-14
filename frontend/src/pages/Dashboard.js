@@ -225,10 +225,20 @@ const Dashboard = () => {
       promises.push(professionalRecordsPromise);
       
       // 4. Wallet Balance - always force refresh to get real-time balance
-      let walletBalancePromise = Promise.resolve({ data: '0', success: true });
-      if (user?.walletAddress) {
-        console.log('Fetching balance for wallet:', user.walletAddress);
-        walletBalancePromise = walletService.getBalance(user.walletAddress, true) // Always force refresh
+      // Determine wallet address: prefer one already in auth context, otherwise fetch profile
+      let resolvedWalletAddress = user?.walletAddress || null;
+      if (!resolvedWalletAddress) {
+        try {
+          const profileResp = await userAPI.getProfile();
+          resolvedWalletAddress = profileResp.data?.user?.walletAddress || null;
+        } catch (err) {
+          console.error('Failed to fetch profile for wallet address:', err);
+        }
+      }
+      let walletBalancePromise = Promise.resolve({ data: '0', success: true }); // default
+      if (resolvedWalletAddress) {
+        console.log('Fetching balance for wallet:', resolvedWalletAddress);
+        walletBalancePromise = walletService.getBalance(resolvedWalletAddress, true) // Always force refresh
           .then(balance => {
             console.log('Received balance:', balance);
             // Convert balance to a number and ensure it's valid
@@ -345,6 +355,7 @@ const Dashboard = () => {
         
         // Process wallet and transaction data
         const newWalletBalance = walletBalance.success ? walletBalance.data : prev.walletBalance;
+        const newWalletAddress = resolvedWalletAddress || prev.walletAddress;
         const transactions = transactionsResponse.success ? transactionsResponse.data : prev.transactions;
         
         // Process biometric status
@@ -364,7 +375,8 @@ const Dashboard = () => {
         return {
           verificationStatus,
           verificationDetails,
-          walletBalance,
+          walletBalance: newWalletBalance,
+          walletAddress: newWalletAddress,
           blockchainStatus,
           blockchainDetails,
           professionalRecords,
@@ -470,16 +482,15 @@ const Dashboard = () => {
     }
   };
 
-  if (initialLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  // Show biometric detail box only if we have actual information to display
+  const hasBiometricDetails = dashboardData?.biometricStatus?.facemeshExists && (
+    dashboardData.biometricStatus.lastVerified ||
+    dashboardData.biometricStatus.verificationCount > 0 ||
+    dashboardData.biometricStatus.biometricDetails?.verificationScore
+  );
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ px: { xs: 2, md: 4 }, py: 3, maxWidth: '1200px', mx: 'auto' }}>
       {/* Backend connection status */}
       <Box sx={{ mb: 3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -541,7 +552,7 @@ const Dashboard = () => {
       
       <ConnectionTest />
       
-      <Paper sx={{ p: 3, mb: 3 }}>
+      <Paper sx={{ p: 3, mb: 2 }}>
         <Box display="flex" alignItems="center" mb={2}>
           <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
             {user?.name?.charAt(0) || 'U'}
@@ -555,7 +566,7 @@ const Dashboard = () => {
         </Typography>
       </Paper>
       
-      <Paper sx={{ p: 3, mb: 3 }}>
+      <Paper sx={{ p: 3, mb: 2 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             Identity Status
@@ -643,7 +654,7 @@ const Dashboard = () => {
                   })()} AVAX
                 </Typography>
                 {refreshing && (
-                  <Box sx={{ position: 'absolute', top: 0, right: 0, display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
                     <CircularProgress size={16} sx={{ mr: 0.5 }} />
                     <Typography variant="caption" color="text.secondary">
                       Updating...
@@ -715,7 +726,7 @@ const Dashboard = () => {
                   sx={{ mb: 1 }}
                 />
                 {refreshing && (
-                  <Box sx={{ position: 'absolute', top: 0, right: 0, display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
                     <CircularProgress size={16} sx={{ mr: 0.5 }} />
                     <Typography variant="caption" color="text.secondary">
                       Updating...
@@ -791,12 +802,12 @@ const Dashboard = () => {
               </Box>
               <Box sx={{ position: 'relative' }}>
                 <Chip 
-                  label={dashboardData.biometricStatus?.verified ? "Verified" : "Not Verified"} 
-                  color={dashboardData.biometricStatus?.verified ? "success" : "default"} 
+                  label={(dashboardData.biometricStatus?.verified || dashboardData.biometricStatus?.biometricDetails?.verificationStatus === 'VERIFIED') ? "Verified" : "Not Verified"} 
+                  color={(dashboardData.biometricStatus?.verified || dashboardData.biometricStatus?.biometricDetails?.verificationStatus === 'VERIFIED') ? "success" : "default"} 
                   sx={{ mb: 1 }}
                 />
                 {refreshing && (
-                  <Box sx={{ position: 'absolute', top: 0, right: 0, display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
                     <CircularProgress size={16} sx={{ mr: 0.5 }} />
                     <Typography variant="caption" color="text.secondary">
                       Updating...
@@ -809,6 +820,7 @@ const Dashboard = () => {
               </Typography>
               
               {dashboardData.biometricStatus?.facemeshExists ? (
+                hasBiometricDetails ? (
                 <Box sx={{ mt: 1.5, bgcolor: 'background.default', p: 1.5, borderRadius: 1 }}>
                   {dashboardData.biometricStatus.lastVerified && (
                     <Typography variant="caption" component="div">
@@ -826,6 +838,7 @@ const Dashboard = () => {
                     </Typography>
                   )}
                 </Box>
+              ) : null
               ) : (
                 <Typography variant="body2" color="text.secondary">
                   No biometric data has been registered yet. Please complete the verification process.
@@ -863,7 +876,7 @@ const Dashboard = () => {
               <Box sx={{ position: 'relative' }}>
                 <Typography variant="h4">{dashboardData.professionalRecords}</Typography>
                 {refreshing && (
-                  <Box sx={{ position: 'absolute', top: 0, right: 0, display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
                     <CircularProgress size={16} sx={{ mr: 0.5 }} />
                     <Typography variant="caption" color="text.secondary">
                       Updating...
@@ -944,7 +957,7 @@ const Dashboard = () => {
                   sx={{ mb: 1 }}
                 />
                 {refreshing && (
-                  <Box sx={{ position: 'absolute', top: 0, right: 0, display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
                     <CircularProgress size={16} sx={{ mr: 0.5 }} />
                     <Typography variant="caption" color="text.secondary">
                       Updating...
@@ -1007,7 +1020,7 @@ const Dashboard = () => {
       </Grid>
       
       {!dashboardData.blockchainStatus && dashboardData.verificationStatus === 'VERIFIED' && (
-        <Paper sx={{ p: 3, mt: 3 }}>
+        <Paper sx={{ p: 3, mt: 2 }}>
           <Typography variant="h6" gutterBottom>
             Transfer Your Identity to Blockchain
           </Typography>
