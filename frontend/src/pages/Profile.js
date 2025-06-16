@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { userAPI } from '../services/api.service';
+import ProfessionUploadForm from '../components/ProfessionUploadForm';
 
 const Profile = () => {
   const { user, setUser } = useAuth();
@@ -255,6 +256,8 @@ const Profile = () => {
           </Paper>
         </Grid>
       </Grid>
+      {/* profession upload section */}
+      <ProfessionUploadForm />
     </Box>
   );
 };

@@ -131,10 +131,37 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      const response = await authAPI.verifyBiometric({ userId, facemeshData });
-      return { success: true, verified: response.data.verified };
+      // Format the request data to match backend expectations
+      const requestData = {
+        userId: userId,
+        facemeshData: {
+          landmarks: facemeshData.landmarks,
+          timestamp: facemeshData.timestamp,
+          imageData: facemeshData.imageData
+        }
+      };
+
+      console.log('Sending biometric verification request:', {
+        userId: requestData.userId,
+        hasLandmarks: !!requestData.facemeshData.landmarks,
+        timestamp: requestData.facemeshData.timestamp
+      });
+
+      const response = await authAPI.verifyBiometric(requestData);
+      console.log('Biometric verification response:', response);
+
+      if (response.success) {
+        return {
+          success: true,
+          verified: response.verified,
+          message: response.message
+        };
+      } else {
+        throw new Error(response.error || 'Verification failed');
+      }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Biometric verification failed.';
+      const errorMessage = err.message || 'Biometric verification failed.';
+      console.error('Biometric verification error:', errorMessage);
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {

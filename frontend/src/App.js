@@ -15,8 +15,8 @@ import ProfessionalRecords from './pages/ProfessionalRecords';
 import BlockchainStatus from './pages/BlockchainStatus';
 import BiometricVerificationPage from './pages/BiometricVerificationPage';
 import NotFound from './pages/NotFound';
-import TestPage from './pages/TestPage';
-import TestBiometric from './pages/TestBiometric';
+
+
 
 // Components
 import Layout from './components/Layout';
@@ -69,8 +69,6 @@ function App() {
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/test" element={<TestPage />} />
-            <Route path="/test-biometric" element={<TestBiometric />} />
             
             {/* Protected routes */}
             <Route path="/" element={

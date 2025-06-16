@@ -134,6 +134,20 @@ router.post('/blockchain/check-expiry', authenticateAdmin, adminController.check
 router.get('/professional-records', authenticateAdmin, adminController.getAllProfessionalRecords);
 
 /**
+ * @route GET /api/admin/professional-records/:id
+ * @desc Get professional record by ID
+ * @access Admin
+ */
+router.get('/professional-records/:id', authenticateAdmin, adminController.getProfessionalRecordById);
+
+/**
+ * @route PUT /api/admin/professional-records/:id/status
+ * @desc Update professional record status
+ * @access Admin
+ */
+router.put('/professional-records/:id/status', authenticateAdmin, adminController.updateProfessionalRecordStatus);
+
+/**
  * @route GET /api/admin/users/:id/professional-records
  * @desc Get professional records for a specific user
  * @access Admin

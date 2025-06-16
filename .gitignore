@@ -80,7 +80,176 @@ android-app/**/*.iml
 android-app/google-services.json
 
 # Keystore files
-*.jks
+*.jks/**
+ * Cleanup script for TrueID repository
+ * Removes cache files, temporary data, and prepares for GitHub
+ */
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+// Directories to clean
+const dirsToClean = [
+  // Node modules and cache
+  'node_modules',
+  'backend/node_modules',
+  'frontend/node_modules',
+  'government-portal/node_modules',
+  '.npm',
+  '.yarn',
+  
+  // Build and cache directories
+  'backend/blockchain/cache',
+  'backend/blockchain/artifacts',
+  'backend/blockchain/typechain',
+  'backend/blockchain/typechain-types',
+  'backend/blockchain/.openzeppelin',
+  'backend/coverage',
+  'frontend/build',
+  'frontend/coverage',
+  'government-portal/build',
+  'government-portal/coverage',
+  
+  // Android build files
+  'android-app/build',
+  'android-app/app/build',
+  'android-app/.gradle',
+  'android-app/captures',
+  'android-app/.externalNativeBuild',
+  'android-app/.cxx',
+  'android-app/bin',
+  'android-app/gen',
+  'android-app/out',
+  
+  // Logs and temporary files
+  'logs',
+  '.logs',
+  'tmp',
+  '.tmp',
+  'temp',
+  '.temp'
+];
+
+// Files to clean
+const filesToClean = [
+  // Environment files
+  'backend/.env',
+  'backend/.env.local',
+  'backend/.env.development.local',
+  'backend/.env.test.local',
+  'backend/.env.production.local',
+  'backend/.env.blockchain',
+  'backend/.env.avalanche',
+  'backend/.env.hardhat',
+  'frontend/.env',
+  'frontend/.env.local',
+  'government-portal/.env',
+  'government-portal/.env.local',
+  
+  // Cache and lock files
+  'package-lock.json',
+  'yarn.lock',
+  'backend/package-lock.json',
+  'backend/yarn.lock',
+  'frontend/package-lock.json',
+  'frontend/yarn.lock',
+  'government-portal/package-lock.json',
+  'government-portal/yarn.lock',
+  
+  // IDE and editor files
+  '.idea',
+  '.vscode',
+  '*.sublime-workspace',
+  '*.sublime-project',
+  '*.code-workspace',
+  
+  // System files
+  '.DS_Store',
+  'Thumbs.db',
+  'desktop.ini',
+  
+  // Log files
+  '*.log',
+  'npm-debug.log*',
+  'yarn-debug.log*',
+  'yarn-error.log*',
+  
+  // Temporary files
+  '*.tmp',
+  '*.temp',
+  '*.bak',
+  '*.swp',
+  '*~'
+];
+
+// Function to safely remove directory
+function removeDir(dir) {
+  const fullPath = path.resolve(process.cwd(), dir);
+  if (fs.existsSync(fullPath)) {
+    console.log(`Removing directory: ${dir}`);
+    try {
+      fs.rmSync(fullPath, { recursive: true, force: true });
+    } catch (error) {
+      console.error(`Error removing ${dir}:`, error.message);
+    }
+  }
+}
+
+// Function to safely remove file
+function removeFile(file) {
+  const fullPath = path.resolve(process.cwd(), file);
+  if (fs.existsSync(fullPath)) {
+    console.log(`Removing file: ${file}`);
+    try {
+      fs.unlinkSync(fullPath);
+    } catch (error) {
+      console.error(`Error removing ${file}:`, error.message);
+    }
+  }
+}
+
+// Function to clean Git repository
+function cleanGit() {
+  console.log('\nCleaning Git repository...');
+  try {
+    // Remove untracked files and directories
+    execSync('git clean -fdx', { stdio: 'inherit' });
+    
+    // Reset any local changes
+    execSync('git reset --hard', { stdio: 'inherit' });
+    
+    console.log('Git repository cleaned successfully');
+  } catch (error) {
+    console.error('Error cleaning Git repository:', error.message);
+  }
+}
+
+// Main cleanup function
+function cleanup() {
+  console.log('Starting cleanup...\n');
+  
+  // Clean directories
+  console.log('Cleaning directories...');
+  dirsToClean.forEach(removeDir);
+  
+  // Clean files
+  console.log('\nCleaning files...');
+  filesToClean.forEach(removeFile);
+  
+  // Clean Git repository
+  cleanGit();
+  
+  console.log('\nCleanup completed!');
+  console.log('\nNext steps:');
+  console.log('1. Review the .gitignore file');
+  console.log('2. Run "git status" to check repository state');
+  console.log('3. Run "git add ." to stage changes');
+  console.log('4. Commit your changes with "git commit -m \'chore: clean repository\'"');
+  console.log('5. Push to GitHub with "git push"');
+}
+
+// Run cleanup
+cleanup();
 *.keystore
 
 # External native build folder generated in Android Studio 2.2 and later

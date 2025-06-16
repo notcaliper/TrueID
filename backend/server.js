@@ -8,6 +8,9 @@ const morgan = require('morgan');
 const helmet = require('helmet');
 const dbService = require('./services/db.service');
 const config = require('./config/config');
+const path = require('path');
+const fs = require('fs');
+const cors = require('cors');
 
 // Create Express app
 const app = express();
@@ -101,6 +104,8 @@ const adminRoutes = require('./routes/admin.routes');
 const blockchainRoutes = require('./routes/blockchain.routes');
 const networkRoutes = require('./routes/network.routes');
 const testRoutes = require('./routes/test.routes');
+const professionRoutes = require('./routes/profession.routes');
+const documentRoutes = require('./routes/document.routes');
 
 // Use routes
 app.use('/api/user', authRoutes); // Changed from '/api/auth' to '/api/user' to match frontend expectations
@@ -109,6 +114,15 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/network', networkRoutes);
 app.use('/api/test', testRoutes);
+app.use('/api/profession', professionRoutes);
+app.use('/api/documents', documentRoutes);
+
+// Create uploads directory if it doesn't exist
+const uploadDir = path.join(__dirname, 'uploads/documents');
+fs.mkdirSync(uploadDir, { recursive: true });
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
