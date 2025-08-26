@@ -1,0 +1,156 @@
+type Principal = principal;
+
+type RecordType = variant {
+  Employment;
+  Education;
+  Certification;
+  Volunteer;
+  Project;
+  Award;
+};
+
+type EndorsementStrength = variant {
+  Basic;
+  Intermediate;
+  Advanced;
+  Expert;
+};
+
+type ProfessionalRecord = record {
+  id: nat64;
+  user_principal: Principal;
+  record_type: RecordType;
+  data_hash: text;
+  title: text;
+  organization: text;
+  description: opt text;
+  start_date: nat64;
+  end_date: opt nat64;
+  location: opt text;
+  skills: vec text;
+  verifier: opt Principal;
+  is_verified: bool;
+  verification_date: opt nat64;
+  created_at: nat64;
+  updated_at: nat64;
+  metadata: vec record { text; text };
+};
+
+type CreateRecordRequest = record {
+  record_type: RecordType;
+  data_hash: text;
+  title: text;
+  organization: text;
+  description: opt text;
+  start_date: nat64;
+  end_date: opt nat64;
+  location: opt text;
+  skills: vec text;
+  metadata: vec record { text; text };
+};
+
+type UpdateRecordRequest = record {
+  record_id: nat64;
+  title: opt text;
+  organization: opt text;
+  description: opt text;
+  start_date: opt nat64;
+  end_date: opt nat64;
+  location: opt text;
+  skills: opt vec text;
+  metadata: opt vec record { text; text };
+};
+
+type VerificationRequest = record {
+  record_id: nat64;
+  verifier_principal: Principal;
+  evidence_hash: text;
+  notes: opt text;
+};
+
+type ProfessionalProfile = record {
+  user_principal: Principal;
+  records: vec ProfessionalRecord;
+  total_experience_months: nat64;
+  verified_records_count: nat64;
+  skills_summary: vec text;
+  last_updated: nat64;
+};
+
+type SkillEndorsement = record {
+  id: nat64;
+  user_principal: Principal;
+  skill: text;
+  endorser_principal: Principal;
+  endorser_title: text;
+  endorser_organization: text;
+  strength: EndorsementStrength;
+  notes: opt text;
+  created_at: nat64;
+};
+
+type ProfessionalError = variant {
+  NotFound;
+  AlreadyExists;
+  Unauthorized;
+  InvalidInput: text;
+  InvalidDateRange;
+  RecordNotFound;
+  VerificationFailed;
+  InternalError: text;
+};
+
+type RecordResult = variant {
+  Ok: ProfessionalRecord;
+  Err: ProfessionalError;
+};
+
+type ProfileResult = variant {
+  Ok: ProfessionalProfile;
+  Err: ProfessionalError;
+};
+
+type EndorsementResult = variant {
+  Ok: SkillEndorsement;
+  Err: ProfessionalError;
+};
+
+type RecordsResult = variant {
+  Ok: vec ProfessionalRecord;
+  Err: ProfessionalError;
+};
+
+type EndorsementsResult = variant {
+  Ok: vec SkillEndorsement;
+  Err: ProfessionalError;
+};
+
+type UnitResult = variant {
+  Ok;
+  Err: ProfessionalError;
+};
+
+service : {
+  // Record management
+  add_professional_record: (CreateRecordRequest) -> (RecordResult);
+  get_professional_record: (nat64) -> (RecordResult) query;
+  update_professional_record: (UpdateRecordRequest) -> (RecordResult);
+  delete_professional_record: (nat64) -> (UnitResult);
+  verify_professional_record: (VerificationRequest) -> (RecordResult);
+  
+  // Profile management
+  get_professional_profile: (Principal) -> (ProfileResult) query;
+  get_records_by_type: (Principal, RecordType) -> (RecordsResult) query;
+  
+  // Skill endorsements
+  add_skill_endorsement: (Principal, text, text, text, EndorsementStrength, opt text) -> (EndorsementResult);
+  get_skill_endorsements: (Principal) -> (EndorsementsResult) query;
+  
+  // Search functions
+  search_records_by_skill: (text) -> (vec ProfessionalRecord) query;
+  search_records_by_organization: (text) -> (vec ProfessionalRecord) query;
+  
+  // Utility functions
+  health_check: () -> (text) query;
+  get_canister_info: () -> (vec record { text; text }) query;
+}

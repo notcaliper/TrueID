@@ -1,0 +1,170 @@
+type Principal = principal;
+
+type LogSeverity = variant {
+  Info;
+  Warning;
+  Error;
+  Critical;
+};
+
+type ProposalType = variant {
+  SystemConfig;
+  CanisterUpgrade;
+  RoleAssignment;
+  FeatureToggle;
+  EmergencyAction;
+};
+
+type ProposalStatus = variant {
+  Active;
+  Passed;
+  Rejected;
+  Executed;
+  Expired;
+};
+
+type SystemStats = record {
+  total_users: nat64;
+  verified_users: nat64;
+  total_professional_records: nat64;
+  verified_professional_records: nat64;
+  total_verifications: nat64;
+  completed_verifications: nat64;
+  total_documents: nat64;
+  total_storage_bytes: nat64;
+  system_uptime: nat64;
+  canister_cycles: vec record { text; nat64 };
+};
+
+type SystemConfig = record {
+  max_file_size: nat64;
+  max_documents_per_user: nat64;
+  verification_timeout_hours: nat64;
+  auto_cleanup_enabled: bool;
+  maintenance_mode: bool;
+  rate_limiting_enabled: bool;
+  external_apis_enabled: bool;
+};
+
+type AuditLog = record {
+  id: nat64;
+  timestamp: nat64;
+  actor_principal: Principal;
+  action: text;
+  target: opt text;
+  details: vec record { text; text };
+  severity: LogSeverity;
+};
+
+type GovernanceProposal = record {
+  id: nat64;
+  proposer: Principal;
+  title: text;
+  description: text;
+  proposal_type: ProposalType;
+  created_at: nat64;
+  voting_deadline: nat64;
+  status: ProposalStatus;
+  votes_for: nat64;
+  votes_against: nat64;
+  voters: vec Principal;
+  execution_payload: opt text;
+};
+
+type CreateProposalRequest = record {
+  title: text;
+  description: text;
+  proposal_type: ProposalType;
+  voting_duration_hours: nat64;
+  execution_payload: opt text;
+};
+
+type CanisterStatus = record {
+  canister_id: Principal;
+  status: text;
+  cycles_balance: nat64;
+  memory_usage: nat64;
+  last_response_time: nat64;
+  error_count: nat64;
+  is_healthy: bool;
+};
+
+type NetworkHealth = record {
+  identity_canister_status: CanisterStatus;
+  professional_canister_status: CanisterStatus;
+  verification_canister_status: CanisterStatus;
+  storage_canister_status: CanisterStatus;
+  admin_canister_status: CanisterStatus;
+  overall_health_score: float64;
+  last_health_check: nat64;
+};
+
+type AdminError = variant {
+  Unauthorized;
+  NotFound;
+  InvalidInput: text;
+  ProposalNotActive;
+  AlreadyVoted;
+  InsufficientPermissions;
+  SystemInMaintenanceMode;
+  InternalError: text;
+};
+
+type SystemStatsResult = variant {
+  Ok: SystemStats;
+  Err: AdminError;
+};
+
+type SystemConfigResult = variant {
+  Ok: SystemConfig;
+  Err: AdminError;
+};
+
+type ProposalResult = variant {
+  Ok: GovernanceProposal;
+  Err: AdminError;
+};
+
+type ProposalsResult = variant {
+  Ok: vec GovernanceProposal;
+  Err: AdminError;
+};
+
+type AuditLogsResult = variant {
+  Ok: vec AuditLog;
+  Err: AdminError;
+};
+
+type NetworkHealthResult = variant {
+  Ok: NetworkHealth;
+  Err: AdminError;
+};
+
+type UnitResult = variant {
+  Ok;
+  Err: AdminError;
+};
+
+service : {
+  // System management
+  get_system_statistics: () -> (SystemStatsResult) query;
+  get_system_configuration: () -> (SystemConfigResult) query;
+  update_system_configuration: (SystemConfig) -> (UnitResult);
+  
+  // Governance
+  create_governance_proposal: (CreateProposalRequest) -> (ProposalResult);
+  vote_on_proposal: (nat64, bool) -> (UnitResult);
+  get_governance_proposals: () -> (ProposalsResult) query;
+  
+  // Monitoring and auditing
+  get_audit_log: (opt nat64) -> (AuditLogsResult) query;
+  perform_health_check: () -> (NetworkHealthResult);
+  get_network_health_status: () -> (NetworkHealthResult) query;
+  
+  // Emergency functions
+  emergency_shutdown: (text) -> (UnitResult);
+  
+  // Utility functions
+  health_check: () -> (text) query;
+  get_admin_canister_info: () -> (vec record { text; text }) query;
+}

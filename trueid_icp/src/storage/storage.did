@@ -1,0 +1,129 @@
+type Principal = principal;
+
+type PermissionType = variant {
+  Read;
+  Write;
+  Delete;
+  Share;
+  Admin;
+};
+
+type AccessPermission = record {
+  principal: Principal;
+  permission_type: PermissionType;
+  granted_by: Principal;
+  granted_at: nat64;
+  expires_at: opt nat64;
+};
+
+type UploadRequest = record {
+  file_name: text;
+  file_type: text;
+  data: blob;
+  encrypt: bool;
+  metadata: vec record { text; text };
+};
+
+type UploadResponse = record {
+  document_id: text;
+  content_hash: text;
+  file_size: nat64;
+  chunks_count: nat32;
+};
+
+type ShareRequest = record {
+  document_id: text;
+  target_principal: Principal;
+  permission_type: PermissionType;
+  expires_in_seconds: opt nat64;
+};
+
+type DocumentMetadata = record {
+  id: text;
+  file_name: text;
+  file_type: text;
+  file_size: nat64;
+  content_hash: text;
+  is_encrypted: bool;
+  created_at: nat64;
+  updated_at: nat64;
+  access_count: nat64;
+  metadata: vec record { text; text };
+};
+
+type StorageStats = record {
+  total_documents: nat64;
+  total_storage_bytes: nat64;
+  total_chunks: nat64;
+  unique_owners: nat64;
+  encrypted_documents: nat64;
+  public_documents: nat64;
+  average_file_size: nat64;
+  storage_utilization: float64;
+};
+
+type StorageError = variant {
+  NotFound;
+  Unauthorized;
+  InvalidInput: text;
+  FileTooLarge;
+  StorageQuotaExceeded;
+  EncryptionError;
+  ChunkNotFound;
+  PermissionDenied;
+  DocumentAlreadyExists;
+  InternalError: text;
+};
+
+type UploadResult = variant {
+  Ok: UploadResponse;
+  Err: StorageError;
+};
+
+type DownloadResult = variant {
+  Ok: blob;
+  Err: StorageError;
+};
+
+type MetadataResult = variant {
+  Ok: DocumentMetadata;
+  Err: StorageError;
+};
+
+type MetadataListResult = variant {
+  Ok: vec DocumentMetadata;
+  Err: StorageError;
+};
+
+type StatsResult = variant {
+  Ok: StorageStats;
+  Err: StorageError;
+};
+
+type UnitResult = variant {
+  Ok;
+  Err: StorageError;
+};
+
+service : {
+  // Document management
+  upload_document: (UploadRequest) -> (UploadResult);
+  download_document: (text) -> (DownloadResult);
+  get_document_metadata: (text) -> (MetadataResult) query;
+  delete_user_document: (text) -> (UnitResult);
+  
+  // Sharing and permissions
+  share_document: (ShareRequest) -> (UnitResult);
+  revoke_document_access: (text, Principal) -> (UnitResult);
+  
+  // User functions
+  get_user_document_list: (Principal) -> (MetadataListResult) query;
+  search_documents_by_type: (text) -> (MetadataListResult) query;
+  
+  // Admin functions
+  get_storage_statistics: () -> (StatsResult) query;
+  
+  // Utility functions
+  health_check: () -> (text) query;
+  get_canister_info: () -> (vec record { text; text }) query;
+}

@@ -1,0 +1,98 @@
+type Principal = principal;
+
+type VerificationLevel = variant {
+  None;
+  SelfVerified;
+  GovernmentVerified;
+  EnterpriseVerified;
+};
+
+type Role = variant {
+  User;
+  Government;
+  Admin;
+};
+
+type Identity = record {
+  principal: Principal;
+  biometric_hash: text;
+  professional_data_hash: text;
+  created_at: nat64;
+  updated_at: nat64;
+  updated_by: Principal;
+  is_verified: bool;
+  verification_level: VerificationLevel;
+  attributes: vec record { text; text };
+};
+
+type IdentityMetadata = record {
+  name: opt text;
+  email: opt text;
+  phone: opt text;
+  date_of_birth: opt text;
+  nationality: opt text;
+  additional_attributes: vec record { text; text };
+};
+
+type IdentityUpdate = record {
+  biometric_hash: opt text;
+  professional_data_hash: opt text;
+  metadata: opt IdentityMetadata;
+  attributes: opt vec record { text; text };
+};
+
+type UserRole = record {
+  principal: Principal;
+  role: Role;
+  granted_by: Principal;
+  granted_at: nat64;
+};
+
+type IdentityError = variant {
+  NotFound;
+  AlreadyExists;
+  Unauthorized;
+  InvalidInput: text;
+  InternalError: text;
+};
+
+type IdentityResult = variant {
+  Ok: Identity;
+  Err: IdentityError;
+};
+
+type BoolResult = variant {
+  Ok: bool;
+  Err: IdentityError;
+};
+
+type UnitResult = variant {
+  Ok;
+  Err: IdentityError;
+};
+
+type IdentitiesResult = variant {
+  Ok: vec record { Principal; Identity };
+  Err: IdentityError;
+};
+
+service : {
+  // Identity management
+  create_user_identity: (text, text, opt IdentityMetadata) -> (IdentityResult);
+  get_user_identity: (Principal) -> (IdentityResult) query;
+  update_user_identity: (Principal, IdentityUpdate) -> (IdentityResult);
+  verify_biometric_hash: (Principal, text) -> (BoolResult) query;
+  verify_user_identity: (Principal, VerificationLevel) -> (IdentityResult);
+  
+  // Role management
+  grant_role: (Principal, Role) -> (UnitResult);
+  revoke_role: (Principal) -> (UnitResult);
+  get_role: (Principal) -> (opt UserRole) query;
+  
+  // Admin functions
+  get_all_user_identities: () -> (IdentitiesResult) query;
+  
+  // Utility functions
+  health_check: () -> (text) query;
+  get_canister_info: () -> (vec record { text; text }) query;
+}

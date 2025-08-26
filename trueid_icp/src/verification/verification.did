@@ -1,0 +1,143 @@
+type Principal = principal;
+
+type VerificationType = variant {
+  Identity;
+  Document;
+  Employment;
+  Education;
+  Government;
+  Biometric;
+  ThirdParty;
+};
+
+type VerificationStatus = variant {
+  Pending;
+  InProgress;
+  Completed;
+  Failed;
+  Rejected;
+  Expired;
+};
+
+type VerificationResult = record {
+  is_valid: bool;
+  confidence_score: float64;
+  verification_details: vec record { text; text };
+  external_reference: opt text;
+  verifier_notes: opt text;
+};
+
+type VerificationRequest = record {
+  id: nat64;
+  requester_principal: Principal;
+  target_principal: Principal;
+  verification_type: VerificationType;
+  document_hash: text;
+  evidence_urls: vec text;
+  metadata: vec record { text; text };
+  status: VerificationStatus;
+  created_at: nat64;
+  updated_at: nat64;
+  completed_at: opt nat64;
+  verifier_principal: opt Principal;
+  verification_result: opt VerificationResult;
+};
+
+type CreateVerificationRequest = record {
+  target_principal: Principal;
+  verification_type: VerificationType;
+  document_hash: text;
+  evidence_urls: vec text;
+  metadata: vec record { text; text };
+};
+
+type ExternalApiConfig = record {
+  api_name: text;
+  endpoint_url: text;
+  api_key_hash: text;
+  timeout_seconds: nat64;
+  max_retries: nat32;
+  is_active: bool;
+};
+
+type VerificationAuditLog = record {
+  id: nat64;
+  verification_id: nat64;
+  action: text;
+  actor_principal: Principal;
+  timestamp: nat64;
+  details: vec record { text; text };
+};
+
+type VerificationStats = record {
+  total_requests: nat64;
+  completed_verifications: nat64;
+  failed_verifications: nat64;
+  average_completion_time: nat64;
+  success_rate: float64;
+  verification_types_breakdown: vec record { text; nat64 };
+};
+
+type VerificationError = variant {
+  NotFound;
+  Unauthorized;
+  InvalidInput: text;
+  ExternalApiError: text;
+  NetworkError: text;
+  TimeoutError;
+  InvalidResponse: text;
+  InsufficientEvidence;
+  VerificationExpired;
+  InternalError: text;
+};
+
+type VerificationRequestResult = variant {
+  Ok: VerificationRequest;
+  Err: VerificationError;
+};
+
+type VerificationRequestsResult = variant {
+  Ok: vec VerificationRequest;
+  Err: VerificationError;
+};
+
+type AuditLogsResult = variant {
+  Ok: vec VerificationAuditLog;
+  Err: VerificationError;
+};
+
+type ApiConfigsResult = variant {
+  Ok: vec ExternalApiConfig;
+  Err: VerificationError;
+};
+
+type StatsResult = variant {
+  Ok: VerificationStats;
+  Err: VerificationError;
+};
+
+type UnitResult = variant {
+  Ok;
+  Err: VerificationError;
+};
+
+service : {
+  // Verification management
+  create_verification: (CreateVerificationRequest) -> (VerificationRequestResult);
+  get_verification: (nat64) -> (VerificationRequestResult) query;
+  process_verification_with_api: (nat64, text) -> (VerificationRequestResult);
+  manual_verification: (nat64, bool, float64, text) -> (VerificationRequestResult);
+  
+  // User functions
+  get_user_verification_requests: (Principal) -> (VerificationRequestsResult) query;
+  get_verification_audit_log: (nat64) -> (AuditLogsResult) query;
+  
+  // Admin functions
+  configure_external_api: (ExternalApiConfig) -> (UnitResult);
+  get_api_configurations: () -> (ApiConfigsResult) query;
+  get_verification_statistics: () -> (StatsResult) query;
+  
+  // Utility functions
+  health_check: () -> (text) query;
+  get_canister_info: () -> (vec record { text; text }) query;
+}
