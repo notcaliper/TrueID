@@ -9,7 +9,6 @@
 [![Avalanche](https://img.shields.io/badge/Avalanche-Fuji-orange?logo=avalanche)](https://www.avax.network)
 [![Android](https://img.shields.io/badge/Android-SDK%2021+-3DDC84?logo=android)](https://developer.android.com)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/notcaliper/TrueID/pulls)
-[![Discord](https://img.shields.io/discord/1234567890?color=7289DA&label=Discord&logo=discord&logoColor=white)](https://discord.gg/trueid)
 
 <img src="docs/assets/trueid-logo.png" alt="TrueID Logo" width="300"/>
 
