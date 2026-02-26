@@ -603,14 +603,7 @@ REACT_APP_AVALANCHE_CONTRACT_ADDRESS=your_contract_address
         </a>
       </td>
       <td align="center">
-        <a href="https://discord.gg/trueid">
-          <img src="docs/assets/discord.png" width="50" alt="Discord"/>
-          <br/>
-          <sub>Discord Community</sub>
-        </a>
-      </td>
-      <td align="center">
-        <a href="mailto:support@trueid.dev">
+        <a href="mailto:akshaymanbhaw27@gmail.com">
           <img src="docs/assets/email.png" width="50" alt="Email"/>
           <br/>
           <sub>Email Support</sub>
@@ -626,6 +619,6 @@ REACT_APP_AVALANCHE_CONTRACT_ADDRESS=your_contract_address
   <img src="docs/assets/trueid-banner.png" alt="TrueID Banner" width="800"/>
   
   Made with ❤️ by Akshay
-  
+
   <sub>Copyright © 2026 TrueID. All rights reserved.</sub>
 </div>
