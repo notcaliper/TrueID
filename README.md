@@ -627,9 +627,5 @@ REACT_APP_AVALANCHE_CONTRACT_ADDRESS=your_contract_address
   
   Made with ❤️ by Akshay
   
-  [![Website](https://img.shields.io/badge/Website-trueid.dev-blue?style=for-the-badge)](https://trueid.dev)
-  [![Documentation](https://img.shields.io/badge/Docs-docs.trueid.dev-green?style=for-the-badge)](https://docs.trueid.dev)
-  [![Blog](https://img.shields.io/badge/Blog-blog.trueid.dev-orange?style=for-the-badge)](https://blog.trueid.dev)
-  
-  <sub>Copyright © 2024 TrueID. All rights reserved.</sub>
+  <sub>Copyright © 2026 TrueID. All rights reserved.</sub>
 </div>
