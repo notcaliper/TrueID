@@ -1,23 +1,32 @@
-# 🎯 TrueID: Decentralized Biometric Identity System
-
 <div align="center">
 
+<img src="docs/assets/trueid-logo.png" alt="TrueID Logo" width="200"/>
+
+# TrueID
+
+**Decentralized Biometric Identity System**
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node.js CI](https://img.shields.io/badge/Node.js-v14+-green.svg)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-v14+-green.svg)](https://nodejs.org)
 [![React](https://img.shields.io/badge/React-v18+-61DAFB?logo=react)](https://reactjs.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-v13+-336791?logo=postgresql)](https://www.postgresql.org)
 [![Avalanche](https://img.shields.io/badge/Avalanche-Fuji-orange?logo=avalanche)](https://www.avax.network)
 [![Android](https://img.shields.io/badge/Android-SDK%2021+-3DDC84?logo=android)](https://developer.android.com)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/notcaliper/TrueID/pulls)
 
-<img src="docs/assets/trueid-logo.png" alt="TrueID Logo" width="300"/>
+Secure biometric authentication backed by blockchain — tamper-proof, privacy-first, and built for scale.
 
-### 🔐 Secure • ⛓️ Decentralized • 🛡️ Privacy-Focused
-
-[![Watch the video](https://img.shields.io/badge/Watch-Demo%20Video-red?style=for-the-badge)](https://youtube.com/watch?v=demo)
-[![Try it now](https://img.shields.io/badge/Try-TrueID%20Demo-blue?style=for-the-badge)](https://demo.trueid.dev)
+[![Watch Demo](https://img.shields.io/badge/Watch-Demo%20Video-red?style=for-the-badge)](https://youtube.com/watch?v=demo)
+[![Try TrueID](https://img.shields.io/badge/Try-TrueID%20Demo-blue?style=for-the-badge)](https://demo.trueid.dev)
 
 </div>
+
+---
+
+## Overview
+
+TrueID combines biometric authentication with blockchain technology to create a tamper-proof, decentralized identity management system. Users register once, verify with their face, and carry a cryptographically-secured identity that no central authority can alter or revoke.
+
+---
 
 ## 📑 Table of Contents
 
@@ -612,6 +621,35 @@ REACT_APP_AVALANCHE_CONTRACT_ADDRESS=your_contract_address
     </tr>
   </table>
 </div>
+
+---
+
+## 🛠️ Backend Interactive Setup Tool
+
+TrueID provides an interactive setup wizard to simplify backend configuration, database setup, blockchain contract deployment, and admin creation.
+
+### 🚀 Quickstart (Recommended)
+
+```bash
+cd backend
+npm run setup
+# or
+node setup.js
+```
+
+**What the setup tool does:**
+- Installs all backend dependencies (if needed)
+- Asks for PostgreSQL connection info and tests the connection
+- Creates the database if it doesn't exist
+- Runs the schema and migrations
+- Configures JWT secrets (auto-generates or lets you enter your own)
+- Asks for Avalanche wallet private key and derives the address
+- Optionally deploys the smart contract to Avalanche Fuji testnet
+- Creates the initial admin account (argon2-hashed password)
+- Writes the complete `.env` file (backs up old one if present)
+- Prints a summary and next steps
+
+**You can re-run the setup tool any time to update your configuration.**
 
 ---
 
