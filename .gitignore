@@ -294,3 +294,9 @@ government-portal/Untitled-1.c
 *.rpm
 .cursor/
 .cursor/
+backend/.env.backup.1772115522897
+backend/.env.example
+backend/.env.new
+test-results/benchmark-1772116001353.json
+backend/.env.example
+backend/.env.example
