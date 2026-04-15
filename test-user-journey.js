@@ -31,8 +31,8 @@ const TEST_API = '/test';
 
 // Admin credentials (for testing)
 const ADMIN_CREDENTIALS = {
-  username: 'admin2',
-  password: 'SecurePass123'
+  username: 'admin',
+  password: 'Akshay^77'
 };
 
 // Super admin credentials (for testing admin creation)
