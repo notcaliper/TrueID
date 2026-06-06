@@ -1,0 +1,363 @@
+{
+  "testId": 1772116001353,
+  "date": "2026-02-26T14:26:48.877Z",
+  "server": "http://localhost:5000/api",
+  "benchmarks": {
+    "User Registration": {
+      "iterations": 1,
+      "successes": 1,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 522.47,
+        "max_ms": 522.47,
+        "mean_ms": 522.47,
+        "median_ms": 522.47,
+        "p95_ms": 522.47,
+        "p99_ms": 522.47,
+        "stddev_ms": null,
+        "throughput_ops_per_sec": 1.91
+      },
+      "rawTimings_ms": [
+        522.47
+      ]
+    },
+    "User Login": {
+      "iterations": 5,
+      "successes": 5,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 178.38,
+        "max_ms": 198.95,
+        "mean_ms": 183.72,
+        "median_ms": 180.41,
+        "p95_ms": 195.51,
+        "p99_ms": 198.26,
+        "stddev_ms": 7.7,
+        "throughput_ops_per_sec": 5.44
+      },
+      "rawTimings_ms": [
+        179.1,
+        180.41,
+        181.75,
+        178.38,
+        198.95
+      ]
+    },
+    "Biometric Status Check": {
+      "iterations": 5,
+      "successes": 5,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 70.46,
+        "max_ms": 79.19,
+        "mean_ms": 75.54,
+        "median_ms": 78.38,
+        "p95_ms": 79.13,
+        "p99_ms": 79.18,
+        "stddev_ms": 4.02,
+        "throughput_ops_per_sec": 13.24
+      },
+      "rawTimings_ms": [
+        79.19,
+        78.38,
+        70.46,
+        78.88,
+        70.8
+      ]
+    },
+    "Biometric Verification (Face Match)": {
+      "iterations": 5,
+      "successes": 5,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 80.41,
+        "max_ms": 92.45,
+        "mean_ms": 85.53,
+        "median_ms": 86.09,
+        "p95_ms": 91.48,
+        "p99_ms": 92.26,
+        "stddev_ms": 4.44,
+        "throughput_ops_per_sec": 11.69
+      },
+      "rawTimings_ms": [
+        92.45,
+        86.09,
+        80.41,
+        81.09,
+        87.59
+      ]
+    },
+    "Facemesh Data Update": {
+      "iterations": 3,
+      "successes": 3,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 178.63,
+        "max_ms": 236.49,
+        "mean_ms": 204.8,
+        "median_ms": 199.28,
+        "p95_ms": 232.77,
+        "p99_ms": 235.75,
+        "stddev_ms": 23.94,
+        "throughput_ops_per_sec": 4.88
+      },
+      "rawTimings_ms": [
+        236.49,
+        178.63,
+        199.28
+      ]
+    },
+    "Profile Fetch (GET)": {
+      "iterations": 10,
+      "successes": 10,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 104.51,
+        "max_ms": 129.22,
+        "mean_ms": 118.14,
+        "median_ms": 119.41,
+        "p95_ms": 126.88,
+        "p99_ms": 128.75,
+        "stddev_ms": 6.71,
+        "throughput_ops_per_sec": 8.46
+      },
+      "rawTimings_ms": [
+        104.51,
+        119.41,
+        109.17,
+        121.72,
+        117.63,
+        124.02,
+        129.22,
+        120.47,
+        119.41,
+        115.8
+      ]
+    },
+    "Verification Status Fetch": {
+      "iterations": 5,
+      "successes": 5,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 35.59,
+        "max_ms": 43.74,
+        "mean_ms": 40.15,
+        "median_ms": 40.25,
+        "p95_ms": 43.39,
+        "p99_ms": 43.67,
+        "stddev_ms": 2.76,
+        "throughput_ops_per_sec": 24.91
+      },
+      "rawTimings_ms": [
+        41.97,
+        43.74,
+        35.59,
+        40.25,
+        39.18
+      ]
+    },
+    "Professional Record — Create": {
+      "iterations": 3,
+      "successes": 3,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 79.58,
+        "max_ms": 88.47,
+        "mean_ms": 82.93,
+        "median_ms": 80.75,
+        "p95_ms": 87.7,
+        "p99_ms": 88.32,
+        "stddev_ms": 3.95,
+        "throughput_ops_per_sec": 12.06
+      },
+      "rawTimings_ms": [
+        88.47,
+        79.58,
+        80.75
+      ]
+    },
+    "Professional Record — List All": {
+      "iterations": 5,
+      "successes": 5,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 35.65,
+        "max_ms": 45.12,
+        "mean_ms": 41.85,
+        "median_ms": 42.72,
+        "p95_ms": 44.97,
+        "p99_ms": 45.09,
+        "stddev_ms": 3.36,
+        "throughput_ops_per_sec": 23.89
+      },
+      "rawTimings_ms": [
+        35.65,
+        42.72,
+        44.38,
+        45.12,
+        41.39
+      ]
+    },
+    "Professional Record — Update": {
+      "iterations": 3,
+      "successes": 0,
+      "failures": 3,
+      "successRate": "0.0%",
+      "stats": {
+        "min_ms": null,
+        "max_ms": null,
+        "mean_ms": null,
+        "median_ms": null,
+        "p95_ms": null,
+        "p99_ms": null,
+        "stddev_ms": null,
+        "throughput_ops_per_sec": null
+      },
+      "rawTimings_ms": []
+    },
+    "Admin Login": {
+      "iterations": 3,
+      "successes": 0,
+      "failures": 3,
+      "successRate": "0.0%",
+      "stats": {
+        "min_ms": null,
+        "max_ms": null,
+        "mean_ms": null,
+        "median_ms": null,
+        "p95_ms": null,
+        "p99_ms": null,
+        "stddev_ms": null,
+        "throughput_ops_per_sec": null
+      },
+      "rawTimings_ms": []
+    },
+    "Admin Dashboard Stats": {
+      "iterations": 3,
+      "successes": 0,
+      "failures": 3,
+      "successRate": "0.0%",
+      "stats": {
+        "min_ms": null,
+        "max_ms": null,
+        "mean_ms": null,
+        "median_ms": null,
+        "p95_ms": null,
+        "p99_ms": null,
+        "stddev_ms": null,
+        "throughput_ops_per_sec": null
+      },
+      "rawTimings_ms": []
+    },
+    "Admin Verify User (Full Pipeline)": {
+      "iterations": 1,
+      "successes": 0,
+      "failures": 1,
+      "successRate": "0.0%",
+      "stats": {
+        "min_ms": null,
+        "max_ms": null,
+        "mean_ms": null,
+        "median_ms": null,
+        "p95_ms": null,
+        "p99_ms": null,
+        "stddev_ms": null,
+        "throughput_ops_per_sec": null
+      },
+      "rawTimings_ms": []
+    },
+    "Blockchain Status Check": {
+      "iterations": 5,
+      "successes": 5,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 238.08,
+        "max_ms": 701.24,
+        "mean_ms": 396.07,
+        "median_ms": 262.03,
+        "p95_ms": 668.87,
+        "p99_ms": 694.77,
+        "stddev_ms": 190.3,
+        "throughput_ops_per_sec": 2.52
+      },
+      "rawTimings_ms": [
+        701.24,
+        238.08,
+        262.03,
+        539.4,
+        239.63
+      ]
+    },
+    "Blockchain Expiry Check": {
+      "iterations": 3,
+      "successes": 0,
+      "failures": 3,
+      "successRate": "0.0%",
+      "stats": {
+        "min_ms": null,
+        "max_ms": null,
+        "mean_ms": null,
+        "median_ms": null,
+        "p95_ms": null,
+        "p99_ms": null,
+        "stddev_ms": null,
+        "throughput_ops_per_sec": null
+      },
+      "rawTimings_ms": []
+    },
+    "Transaction History Fetch": {
+      "iterations": 3,
+      "successes": 3,
+      "failures": 0,
+      "successRate": "100.0%",
+      "stats": {
+        "min_ms": 79.75,
+        "max_ms": 86.34,
+        "mean_ms": 83.07,
+        "median_ms": 83.14,
+        "p95_ms": 86.02,
+        "p99_ms": 86.27,
+        "stddev_ms": 2.69,
+        "throughput_ops_per_sec": 12.04
+      },
+      "rawTimings_ms": [
+        86.34,
+        83.14,
+        79.75
+      ]
+    },
+    "Blockchain Identity Transfer": {
+      "iterations": 1,
+      "successes": 0,
+      "failures": 1,
+      "successRate": "0.0%",
+      "stats": {
+        "min_ms": null,
+        "max_ms": null,
+        "mean_ms": null,
+        "median_ms": null,
+        "p95_ms": null,
+        "p99_ms": null,
+        "stddev_ms": null,
+        "throughput_ops_per_sec": null
+      },
+      "rawTimings_ms": []
+    }
+  },
+  "summary": {
+    "totalOperations": 64,
+    "totalSuccesses": 50,
+    "totalFailures": 14,
+    "overallSuccessRate": "78.1%"
+  }
+}
