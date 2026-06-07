@@ -308,10 +308,10 @@ exports.loginUser = async (req, res) => {
   }
 
   try {
-    // Get user by username
+    // Get user by username (including MFA fields)
     const userResult = await db.query(
       `SELECT u.id, u.username, u.password, u.government_id, u.name, u.email, u.phone, u.avax_address, 
-              u.is_verified, u.verification_status
+              u.is_verified, u.verification_status, u.mfa_enabled, u.mfa_secret
        FROM users u
        WHERE u.username = $1`,
       [username]
@@ -344,7 +344,48 @@ exports.loginUser = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Generate token
+    // Check if MFA is enabled
+    if (user.mfa_enabled) {
+      // Generate temporary token for MFA verification
+      const crypto = require('crypto');
+      const tempToken = crypto.randomBytes(32).toString('hex');
+      
+      // Clean up old MFA sessions for this user
+      await db.query(
+        'DELETE FROM mfa_sessions WHERE user_id = $1 AND (expires_at < NOW() OR used_at IS NOT NULL)',
+        [user.id]
+      );
+      
+      // Create MFA session (expires in 5 minutes)
+      await db.query(
+        `INSERT INTO mfa_sessions (user_id, temp_token, expires_at, ip_address, user_agent, max_attempts)
+         VALUES ($1, $2, NOW() + INTERVAL '5 minutes', $3, $4, 3)`,
+        [user.id, tempToken, req.ip, req.headers['user-agent']]
+      );
+
+      // Log MFA pending
+      await db.query(
+        `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          user.id,
+          'MFA_PENDING',
+          'users',
+          user.id,
+          JSON.stringify({ method: 'password' }),
+          req.ip
+        ]
+      );
+
+      // Return temp token - frontend will redirect to MFA verification
+      return res.status(200).json({
+        mfaRequired: true,
+        tempToken: tempToken,
+        message: 'MFA verification required'
+      });
+    }
+
+    // Generate token (no MFA)
     const tokens = generateUserToken(user);
 
     // Store session

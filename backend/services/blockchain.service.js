@@ -38,9 +38,9 @@ const IdentityManagementABI = [
 ];
 
 // Role constants
-const USER_ROLE = ethers.utils.id("USER");
-const GOVERNMENT_ROLE = ethers.utils.id("GOVERNMENT");
-const ADMIN_ROLE = ethers.utils.id("ADMIN");
+const USER_ROLE = ethers.id("USER");
+const GOVERNMENT_ROLE = ethers.id("GOVERNMENT");
+const ADMIN_ROLE = ethers.id("ADMIN");
 
 /**
  * Get blockchain configuration - always use Avalanche Fuji Testnet
