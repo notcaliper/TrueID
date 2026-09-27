@@ -275,15 +275,11 @@ exports.getUserBlockchainStatus = async (req, res) => {
     }
     
     // Get network info
-    let network = 'Avalanche Fuji Testnet';
+    let network = 'Ethereum Sepolia Testnet';
     try {
       const networkInfo = blockchainService.getNetworkInfo();
-      if (networkInfo && 
-          ((isVerified && networkInfo.verifiedNetwork) || 
-           (!isVerified && networkInfo.pendingNetwork))) {
-        network = isVerified ? 
-          networkInfo.verifiedNetwork.networkName : 
-          networkInfo.pendingNetwork.networkName;
+      if (networkInfo && networkInfo.networkName) {
+        network = networkInfo.networkName;
       }
     } catch (networkError) {
       logger.warn('Error getting network info:', networkError);

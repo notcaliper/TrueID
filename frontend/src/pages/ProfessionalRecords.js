@@ -20,13 +20,10 @@ import {
   DialogActions,
   TextField,
   Grid,
-  IconButton,
   MenuItem
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   Verified as VerifiedIcon,
   Security as BlockchainIcon
 } from '@mui/icons-material';
@@ -34,6 +31,7 @@ import { useAuth } from '../context/AuthContext';
 import { userAPI, documentAPI } from '../services/api.service';
 
 const ProfessionalRecords = () => {
+  // eslint-disable-next-line no-unused-vars
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

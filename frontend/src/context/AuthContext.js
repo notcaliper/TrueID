@@ -12,6 +12,8 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [mfaPending, setMfaPending] = useState(false);
+  const [tempToken, setTempToken] = useState(null);
 
   // Check if user is already logged in on component mount
   useEffect(() => {
@@ -76,7 +78,11 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      const response = await authAPI.register(userData);
+      const payload = {
+        ...userData,
+        name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim()
+      };
+      const response = await authAPI.register(payload);
       const { user: newUser, tokens } = response.data;
       
       // Store tokens and user data
@@ -107,6 +113,14 @@ export const AuthProvider = ({ children }) => {
       }
       
       const response = await authAPI.login(credentials);
+      
+      // Check if MFA is required
+      if (response.data.mfaRequired) {
+        setMfaPending(true);
+        setTempToken(response.data.tempToken);
+        return { success: false, mfaRequired: true, tempToken: response.data.tempToken };
+      }
+      
       const { user: loggedInUser, tokens } = response.data;
       
       // Store tokens and user data
@@ -115,6 +129,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(loggedInUser));
       
       setUser(loggedInUser);
+      setMfaPending(false);
+      setTempToken(null);
       return { success: true, user: loggedInUser };
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Login failed. Please check your credentials.';
@@ -123,6 +139,43 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Verify MFA code during login
+  const verifyMFA = async (mfaToken) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (!tempToken) {
+        throw new Error('No MFA session available. Please login again.');
+      }
+      
+      const response = await authAPI.verifyMFALogin(tempToken, mfaToken);
+      const { user: loggedInUser, tokens } = response.data;
+      
+      // Store tokens and user data
+      localStorage.setItem('accessToken', tokens.accessToken);
+      localStorage.setItem('refreshToken', tokens.refreshToken);
+      localStorage.setItem('user', JSON.stringify(loggedInUser));
+      
+      setUser(loggedInUser);
+      setMfaPending(false);
+      setTempToken(null);
+      return { success: true, user: loggedInUser };
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message || 'MFA verification failed.';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cancel MFA login and reset state
+  const cancelMFALogin = () => {
+    setMfaPending(false);
+    setTempToken(null);
   };
   
   // Verify user biometric data (for verification purposes only, not login)
@@ -210,12 +263,16 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     error,
+    mfaPending,
+    tempToken,
     register,
     login,
     logout,
     refreshToken,
     isAuthenticated,
     verifyBiometric,
+    verifyMFA,
+    cancelMFALogin,
     setUser
   };
 

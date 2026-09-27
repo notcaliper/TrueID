@@ -45,6 +45,11 @@ async function compileContract() {
       }
     },
     settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200
+      },
+      evmVersion: 'cancun',
       outputSelection: {
         '*': {
           '*': ['abi', 'evm.bytecode']
@@ -95,9 +100,10 @@ async function deployContract() {
     
     console.log('Contract compiled successfully');
     
-    // Connect to the blockchain
-    const provider = new ethers.providers.JsonRpcProvider(BLOCKCHAIN_RPC_URL);
-    const wallet = new ethers.Wallet(ADMIN_PRIVATE_KEY, provider);
+    // Connect to the blockchain (supports both ethers v6 and v5)
+    const provider = ethers.JsonRpcProvider ? new ethers.JsonRpcProvider(BLOCKCHAIN_RPC_URL) : new ethers.providers.JsonRpcProvider(BLOCKCHAIN_RPC_URL);
+    const formattedKey = ADMIN_PRIVATE_KEY.startsWith('0x') ? ADMIN_PRIVATE_KEY : '0x' + ADMIN_PRIVATE_KEY;
+    const wallet = new ethers.Wallet(formattedKey, provider);
     
     console.log(`Deploying contract from address: ${wallet.address}`);
     
@@ -109,16 +115,22 @@ async function deployContract() {
     const contract = await factory.deploy();
     
     // Wait for the contract to be deployed
-    console.log(`Contract deployment transaction hash: ${contract.deployTransaction.hash}`);
+    const txHash = contract.deploymentTransaction ? contract.deploymentTransaction().hash : (contract.deployTransaction ? contract.deployTransaction.hash : 'unknown');
+    console.log(`Contract deployment transaction hash: ${txHash}`);
     console.log('Waiting for contract deployment to be confirmed...');
     
-    await contract.deployed();
+    if (contract.waitForDeployment) {
+      await contract.waitForDeployment();
+    } else if (contract.deployed) {
+      await contract.deployed();
+    }
     
-    console.log(`Contract deployed successfully at address: ${contract.address}`);
+    const deployedAddress = contract.getAddress ? await contract.getAddress() : contract.address;
+    console.log(`Contract deployed successfully at address: ${deployedAddress}`);
     
     // Save the contract address to a file
     const deploymentInfo = {
-      contractAddress: contract.address,
+      contractAddress: deployedAddress,
       deployedBy: wallet.address,
       deploymentTime: new Date().toISOString(),
       network: {
@@ -167,17 +179,19 @@ async function main() {
   console.log('Starting contract deployment process...');
   
   const contract = await deployContract();
+  const contractAddress = contract.getAddress ? await contract.getAddress() : contract.address;
   
   console.log('Contract deployment completed successfully');
-  console.log(`Contract address: ${contract.address}`);
+  console.log(`Contract address: ${contractAddress}`);
   
   // Grant GOVERNMENT_ROLE to the admin wallet
   console.log('Granting GOVERNMENT_ROLE to admin wallet...');
   
-  const GOVERNMENT_ROLE = ethers.utils.id("GOVERNMENT");
+  const GOVERNMENT_ROLE = ethers.id ? ethers.id("GOVERNMENT") : ethers.utils.id("GOVERNMENT");
   
   try {
-    const tx = await contract.grantRole(ADMIN_WALLET_ADDRESS || contract.signer.address, GOVERNMENT_ROLE);
+    const signerAddress = contract.runner ? await contract.runner.getAddress() : (contract.signer ? contract.signer.address : ADMIN_WALLET_ADDRESS);
+    const tx = await contract.grantRole(ADMIN_WALLET_ADDRESS || signerAddress, GOVERNMENT_ROLE);
     console.log(`Transaction hash: ${tx.hash}`);
     
     await tx.wait();

@@ -205,7 +205,7 @@ const FaceVerification = () => {
                   <span className="detail-label">Blockchain TX:</span>
                   <span className="detail-value">
                     <a 
-                      href={`https://testnet.snowtrace.io/tx/${verificationResult.blockchain_tx_hash}`}
+                      href={`https://sepolia.etherscan.io/tx/${verificationResult.blockchain_tx_hash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-400 hover:underline"

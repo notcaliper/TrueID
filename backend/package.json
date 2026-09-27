@@ -10,7 +10,10 @@
     "setup": "node setup.js",
     "db:setup": "node setup-database.js",
     "db:migrate": "node setup-database.js",
+    "blockchain:deploy": "node blockchain/deploy.js",
+    "blockchain:deploy:sepolia": "node blockchain/deploy.js",
     "blockchain:deploy:fuji": "npx hardhat run --network avalanche_fuji scripts/deploy-avalanche-proxy.js",
+    "blockchain:verify:sepolia": "npx hardhat verify --network sepolia",
     "blockchain:verify:fuji": "npx hardhat verify --network avalanche_fuji",
     "setup:avax-testnet": "bash ../setup-avax-testnet.sh"
   },

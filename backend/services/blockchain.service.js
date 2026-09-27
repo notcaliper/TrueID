@@ -10,14 +10,25 @@ const dotenv = require('dotenv');
 // Load environment variables
 dotenv.config();
 
-// Smart contract ABI
-const IdentityManagementABI = [
+// Ethers v6/v5 compatibility helpers
+const id = (val) => (ethers.id ? ethers.id(val) : ethers.utils.id(val));
+const formatEther = (val) => (ethers.formatEther ? ethers.formatEther(val) : ethers.utils.formatEther(val));
+const parseEther = (val) => (ethers.parseEther ? ethers.parseEther(val) : ethers.utils.parseEther(val));
+const isAddress = (val) => (ethers.isAddress ? ethers.isAddress(val) : ethers.utils.isAddress(val));
+const ZERO_ADDRESS = ethers.ZeroAddress || '0x0000000000000000000000000000000000000000';
+
+// Smart contract ABI (fallback or loaded from artifacts)
+let IdentityManagementABI = [
   // Events
   "event IdentityCreated(address indexed user, bytes32 biometricHash, uint256 timestamp)",
   "event IdentityUpdated(address indexed user, address indexed updatedBy, uint256 timestamp)",
   "event IdentityVerified(address indexed user, address indexed verifier, uint256 timestamp)",
+  "event IdentityRevoked(address indexed user, address indexed authority, string reason, uint256 timestamp)",
+  "event VerificationLevelUpdated(address indexed user, uint8 oldLevel, uint8 newLevel, address indexed authority)",
+  "event BiometricVerificationLogged(address indexed user, bytes32 sessionProofHash, uint256 timestamp)",
   "event ProfessionalRecordAdded(address indexed user, bytes32 dataHash, uint256 timestamp)",
-  "event ProfessionalRecordVerified(address indexed user, uint256 recordIndex, address verifier, uint256 timestamp)",
+  "event ProfessionalRecordVerified(address indexed user, uint256 recordIndex, address indexed verifier, uint256 timestamp)",
+  "event SoulboundBadgeIssued(address indexed recipient, uint256 indexed tokenId, string badgeType, uint256 timestamp)",
   "event RoleGranted(address indexed account, bytes32 indexed role, address indexed grantor)",
   "event RoleRevoked(address indexed account, bytes32 indexed role, address indexed revoker)",
   
@@ -26,40 +37,62 @@ const IdentityManagementABI = [
   "function updateBiometricHash(address user, bytes32 newBiometricHash) external",
   "function updateProfessionalData(bytes32 newProfessionalDataHash) external",
   "function verifyIdentity(address user) external",
+  "function setVerificationLevel(address user, uint8 level) external",
+  "function revokeIdentity(address user, string calldata reason) external",
+  "function logBiometricVerification(address user, bytes32 sessionProofHash) external",
   "function addProfessionalRecord(bytes32 dataHash, uint256 startDate, uint256 endDate) external",
+  "function addTypedProfessionalRecord(bytes32 dataHash, uint256 startDate, uint256 endDate, string calldata recordType) external",
   "function verifyProfessionalRecord(address user, uint256 recordIndex) external",
   "function grantRole(address account, bytes32 role) external",
   "function revokeRole(address account, bytes32 role) external",
   "function hasRole(address account, bytes32 role) external view returns (bool)",
   "function getBiometricHash(address user) external view returns (bytes32)",
   "function isIdentityVerified(address user) external view returns (bool)",
+  "function hasRegisteredIdentity(address user) external view returns (bool)",
+  "function getIdentitySummary(address user) external view returns (bytes32 biometricHash, bytes32 professionalDataHash, uint256 createdAt, uint256 updatedAt, bool isVerified, uint8 verificationLevel, uint256 lastBiometricCheck)",
   "function getProfessionalRecordCount(address user) external view returns (uint256)",
-  "function getProfessionalRecord(address user, uint256 recordIndex) external view returns (bytes32 dataHash, uint256 startDate, uint256 endDate, address verifier, bool isVerified, uint256 createdAt)"
+  "function getProfessionalRecord(address user, uint256 recordIndex) external view returns (bytes32 dataHash, uint256 startDate, uint256 endDate, address verifier, bool isVerified, uint256 createdAt)",
+  "function locked(uint256 tokenId) external view returns (bool)",
+  "function tokenURI(uint256 tokenId) external view returns (string)",
+  "function ownerOf(uint256 tokenId) external view returns (address)",
+  "function balanceOf(address owner) external view returns (uint256)",
+  "function getUserPrimaryBadge(address user) external view returns (uint256)"
 ];
 
+try {
+  const abiPath = path.resolve(__dirname, '..', 'blockchain', 'contracts', 'abi', 'IdentityManagement.json');
+  if (fs.existsSync(abiPath)) {
+    IdentityManagementABI = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
+  }
+} catch (e) {
+  // Use fallback ABI
+}
+
 // Role constants
-const USER_ROLE = ethers.id("USER");
-const GOVERNMENT_ROLE = ethers.id("GOVERNMENT");
-const ADMIN_ROLE = ethers.id("ADMIN");
+const USER_ROLE = id("USER");
+const GOVERNMENT_ROLE = id("GOVERNMENT");
+const ADMIN_ROLE = id("ADMIN");
+const VERIFIER_ROLE = id("VERIFIER");
 
 /**
- * Get blockchain configuration - always use Avalanche Fuji Testnet
+ * Get blockchain configuration - Ethereum Sepolia Testnet
  * @returns {Object} Blockchain configuration
  */
 const getBlockchainConfig = () => {
-  // Force use of AVAX Fuji Testnet regardless of environment variable settings
-  const rpcUrl = process.env.AVALANCHE_FUJI_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc';
-  const contractAddress = process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS;
-  const chainId = 43113;
-  const networkName = 'Avalanche Fuji Testnet';
+  const rpcUrl = process.env.SEPOLIA_RPC_URL || process.env.BLOCKCHAIN_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
+  const contractAddress = process.env.SEPOLIA_CONTRACT_ADDRESS || process.env.CONTRACT_ADDRESS || process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS;
+  const chainId = 11155111;
+  const networkName = 'Ethereum Sepolia Testnet';
 
   return {
-    network: 'avalanche',
+    network: 'sepolia',
     rpcUrl,
     contractAddress,
-    privateKey: process.env.ADMIN_PRIVATE_KEY,
+    privateKey: process.env.ADMIN_PRIVATE_KEY || process.env.ADMIN_WALLET_PRIVATE_KEY,
     networkName,
-    chainId
+    chainId,
+    currency: 'ETH',
+    blockExplorer: 'https://sepolia.etherscan.io'
   };
 };
 
@@ -84,8 +117,8 @@ const initBlockchain = () => {
       throw new Error('ADMIN_PRIVATE_KEY is not defined in environment variables');
     }
     
-    // Create provider
-    const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    // Create provider (supports ethers v6 and v5)
+    const provider = ethers.JsonRpcProvider ? new ethers.JsonRpcProvider(rpcUrl) : new ethers.providers.JsonRpcProvider(rpcUrl);
     
     // Create wallet
     const wallet = new ethers.Wallet(privateKey, provider);
@@ -110,14 +143,16 @@ const initBlockchain = () => {
  */
 exports.getNetworkInfo = () => {
   try {
-    // Always return Avalanche Fuji network info regardless of environment settings
     const config = getBlockchainConfig();
     
     return {
-      network: 'avalanche',
+      network: 'sepolia',
       networkName: config.networkName,
+      chainId: config.chainId,
+      currency: config.currency || 'ETH',
       rpcUrl: config.rpcUrl,
-      contractAddress: config.contractAddress
+      contractAddress: config.contractAddress,
+      blockExplorer: config.blockExplorer || 'https://sepolia.etherscan.io'
     };
   } catch (error) {
     console.error('Get network info error:', error);
@@ -133,7 +168,7 @@ exports.isContractAccessible = async () => {
   try {
     const { contract, networkName } = initBlockchain();
     // Try to call a view function to check if contract is accessible
-    await contract.hasRole(ethers.constants.AddressZero, ADMIN_ROLE);
+    await contract.hasRole(ZERO_ADDRESS, ADMIN_ROLE);
     return {
       accessible: true,
       network: networkName
@@ -193,17 +228,18 @@ exports.registerIdentity = async (privateKey, biometricHash, professionalDataHas
     
     // Create wallet instance using the provided private key
     const wallet = new ethers.Wallet(privateKey, provider);
+    const { contractAddress } = getBlockchainConfig();
     
     // Create contract instance connected to the wallet
     const contract = new ethers.Contract(
-      process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS,
+      contractAddress,
       IdentityManagementABI,
       wallet
     );
     
     // Convert hashes to bytes32
-    const biometricHashBytes = ethers.utils.id(biometricHash);
-    const professionalDataHashBytes = ethers.utils.id(professionalDataHash);
+    const biometricHashBytes = id(biometricHash);
+    const professionalDataHashBytes = id(professionalDataHash);
     
     // Create identity on blockchain using the wallet
     // The identity will be created for the address associated with the private key
@@ -216,7 +252,7 @@ exports.registerIdentity = async (privateKey, biometricHash, professionalDataHas
     const receipt = await tx.wait();
     
     return {
-      transactionHash: receipt.transactionHash,
+      transactionHash: receipt.hash || receipt.transactionHash,
       blockNumber: receipt.blockNumber,
       status: receipt.status === 1 ? 'SUCCESS' : 'FAILED',
       network: networkName
@@ -238,7 +274,7 @@ exports.updateBiometricHash = async (walletAddress, newBiometricHash) => {
     const { contract, networkName } = initBlockchain();
     
     // Convert string hash to bytes32
-    const biometricHashBytes = ethers.utils.id(newBiometricHash);
+    const biometricHashBytes = id(newBiometricHash);
     
     // Call contract method
     const tx = await contract.updateBiometricHash(
@@ -307,7 +343,7 @@ exports.addProfessionalRecord = async (walletAddress, dataHash, startTimestamp, 
     const { contract, networkName } = initBlockchain();
     
     // Convert hash to bytes32
-    const dataHashBytes = ethers.utils.id(dataHash);
+    const dataHashBytes = id(dataHash);
     
     // Add professional record on blockchain
     const tx = await contract.addProfessionalRecord(
@@ -491,7 +527,7 @@ exports.verifyDocumentHash = async (hash) => {
     const { contract, networkName } = initBlockchain();
     
     // Convert hash to bytes32
-    const hashBytes = ethers.utils.id(hash);
+    const hashBytes = id(hash);
     
     // Verify document hash on blockchain
     const result = await contract.verifyDocument(hashBytes);
@@ -509,28 +545,25 @@ exports.verifyDocumentHash = async (hash) => {
 };
 
 /**
- * Switch blockchain network - always returns Avalanche Fuji
- * @param {String} network - Network parameter (ignored, always uses Avalanche Fuji)
+ * Switch blockchain network
+ * @param {String} network - Target network ('sepolia', 'mainnet')
  * @returns {Boolean} True if switch was successful
  */
 exports.switchNetwork = async (network) => {
   try {
-    // Always force Avalanche Fuji regardless of requested network
+    const targetNetwork = network || 'sepolia';
     const envPath = path.resolve(__dirname, '..', '.env');
     
     if (fs.existsSync(envPath)) {
       let envContent = fs.readFileSync(envPath, 'utf8');
       
-      // Always set to avalanche
       envContent = envContent.replace(
         /BLOCKCHAIN_NETWORK=.*/,
-        `BLOCKCHAIN_NETWORK=avalanche`
+        `BLOCKCHAIN_NETWORK=${targetNetwork}`
       );
       
       fs.writeFileSync(envPath, envContent);
-      
-      // Update environment variable in current process
-      process.env.BLOCKCHAIN_NETWORK = 'avalanche';
+      process.env.BLOCKCHAIN_NETWORK = targetNetwork;
       
       return true;
     } else {
@@ -667,11 +700,11 @@ exports.processExpiredBlockchainStatuses = async (db) => {
             }
             
             // Initialize provider
-            const rpcUrl = process.env.AVALANCHE_FUJI_RPC_URL;
+            const { rpcUrl } = getBlockchainConfig();
             if (!rpcUrl) {
-              throw new Error('AVALANCHE_FUJI_RPC_URL not defined in environment variables');
+              throw new Error('RPC URL not defined in blockchain configuration');
             }
-            const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+            const provider = ethers.JsonRpcProvider ? new ethers.JsonRpcProvider(rpcUrl) : new ethers.providers.JsonRpcProvider(rpcUrl);
             
             // Create wallet instance from user's private key
             // We need to retrieve the user's private key from the database
@@ -685,22 +718,23 @@ exports.processExpiredBlockchainStatuses = async (db) => {
               
               // Check user wallet balance
               const balance = await provider.getBalance(userWallet.address);
+              const balanceBigInt = BigInt(balance.toString());
               
-              if (balance.gt(ethers.utils.parseEther('0'))) {
+              if (balanceBigInt > 0n) {
                 // Calculate gas cost (21000 is standard gas limit for transfers)
-                const gasPrice = await provider.getGasPrice();
-                const gasCost = gasPrice.mul(21000);
+                const feeData = await provider.getFeeData ? await provider.getFeeData() : { gasPrice: 1000000000n };
+                const gasPrice = feeData.gasPrice ? BigInt(feeData.gasPrice.toString()) : 1000000000n;
+                const gasCost = gasPrice * 21000n;
                 
                 // Calculate amount to send (balance - gas cost)
-                const amountToSend = balance.sub(gasCost);
+                const amountToSend = balanceBigInt > gasCost ? balanceBigInt - gasCost : 0n;
                 
-                if (amountToSend.gt(0)) {
+                if (amountToSend > 0n) {
                   // Create transaction
                   const tx = {
                     to: adminWalletAddress,
                     value: amountToSend,
-                    gasLimit: 21000,
-                    gasPrice: gasPrice
+                    gasLimit: 21000
                   };
                   
                   // Send transaction
@@ -709,11 +743,11 @@ exports.processExpiredBlockchainStatuses = async (db) => {
                   
                   refundResult = {
                     success: true,
-                    transactionHash: receipt.transactionHash,
+                    transactionHash: receipt.hash || receipt.transactionHash,
                     blockNumber: receipt.blockNumber,
                     fromAddress: userWallet.address,
                     toAddress: adminWalletAddress,
-                    amount: ethers.utils.formatEther(amountToSend)
+                    amount: formatEther(amountToSend)
                   };
                   
                   // Log the refund transaction

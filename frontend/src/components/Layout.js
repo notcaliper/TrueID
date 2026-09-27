@@ -1,125 +1,50 @@
 import React, { useState } from 'react';
-import { Outlet, useNavigate, Link } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { 
-  AppBar, Box, Drawer, Toolbar, Typography, IconButton, 
-  List, ListItem, ListItemIcon, ListItemText, Divider, 
-  Avatar, Menu, MenuItem, Container
+  AppBar, Box, Toolbar, IconButton,
+  Container, Avatar, Typography, Chip
 } from '@mui/material';
-import {
-  Menu as MenuIcon,
-  Dashboard as DashboardIcon,
-  Person as PersonIcon,
-  AccountBalanceWallet as WalletIcon,
-  VerifiedUser as VerifiedUserIcon,
-  Work as WorkIcon,
-  Security as BlockchainIcon,
-  Fingerprint as BiometricIcon,
-  Logout as LogoutIcon,
-  BugReport as TestIcon
-} from '@mui/icons-material';
+import { Menu as MenuIcon, NotificationsOutlined } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
-
-const drawerWidth = 240;
+import Sidebar from './Sidebar';
 
 const Layout = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState(null);
+  const location = useLocation();
+  
+  const getPageTitle = (pathname) => {
+    if (pathname === '/' || pathname.startsWith('/dashboard')) return 'Command Dashboard';
+    if (pathname.startsWith('/profile')) return 'Identity Vault';
+    if (pathname.startsWith('/biometric')) return 'Biometric Verification Studio';
+    if (pathname.startsWith('/verification')) return 'Trust & Compliance Score';
+    if (pathname.startsWith('/blockchain')) return 'Blockchain Ledger State';
+    if (pathname.startsWith('/wallet')) return 'Web3 Asset Wallet';
+    if (pathname.startsWith('/professional') || pathname.startsWith('/records')) return 'Professional Credentials';
+    return 'TrueID Platform';
+  };
   
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
   
-  const handleProfileMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-  
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-  
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-  
-  const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'Profile', icon: <PersonIcon />, path: '/profile' },
-    { text: 'Wallet', icon: <WalletIcon />, path: '/wallet' },
-    { text: 'Verification Status', icon: <VerifiedUserIcon />, path: '/verification-status' },
-    { text: 'Biometric Verification', icon: <BiometricIcon />, path: '/biometric-verification' },
-    { text: 'Professional Records', icon: <WorkIcon />, path: '/professional-records' },
-    { text: 'Blockchain Status', icon: <BlockchainIcon />, path: '/blockchain-status' },
-  ];
-  
-  // Development menu items - only shown in development environment
-  const devMenuItems = [
-    { text: 'System Test', icon: <TestIcon color="error" />, path: '/test' },
-  ];
-  
-  const drawer = (
-    <div>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
-          TrueID
-        </Typography>
-      </Toolbar>
-      <Divider />
-      <List>
-        {menuItems.map((item) => (
-          <ListItem 
-            button 
-            key={item.text} 
-            component={Link} 
-            to={item.path}
-            onClick={() => setMobileOpen(false)}
-          >
-            <ListItemIcon>
-              {item.icon}
-            </ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItem>
-        ))}
-      </List>
-      
-      {/* Development section */}
-      <Divider />
-      <List>
-        <ListItem>
-          <Typography variant="caption" color="error">
-            DEVELOPMENT
-          </Typography>
-        </ListItem>
-        {devMenuItems.map((item) => (
-          <ListItem 
-            button 
-            key={item.text} 
-            component={Link} 
-            to={item.path}
-            onClick={() => setMobileOpen(false)}
-          >
-            <ListItemIcon>
-              {item.icon}
-            </ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItem>
-        ))}
-      </List>
-    </div>
-  );
-  
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0a0e17' }}>
+      {/* Top Application Bar */}
       <AppBar
         position="fixed"
         sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
+          width: { sm: 'calc(100% - 84px)' },
+          ml: { sm: '84px' },
+          background: 'rgba(10, 14, 23, 0.82)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          color: '#f8fafc',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+          boxShadow: 'none',
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ minHeight: 64, px: { xs: 2, sm: 3 } }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
@@ -129,83 +54,97 @@ const Layout = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            TrueID System
-          </Typography>
-          <IconButton
-            size="large"
-            edge="end"
-            aria-label="account of current user"
-            aria-controls="menu-appbar"
-            aria-haspopup="true"
-            onClick={handleProfileMenuOpen}
-            color="inherit"
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography variant="h6" fontWeight={700} sx={{ 
+              color: '#f8fafc',
+              letterSpacing: '-0.02em',
+              fontSize: { xs: '1rem', sm: '1.15rem' },
+            }}>
+              {getPageTitle(location.pathname)}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ flexGrow: 1 }} />
+          
+          {/* Network / System Status Pill */}
+          <Chip
+            size="small"
+            icon={<Box component="span" className="status-dot-emerald" sx={{ ml: 1, mr: -0.5 }} />}
+            label="Ethereum Sepolia"
+            sx={{
+              display: { xs: 'none', md: 'inline-flex' },
+              mr: 2,
+              height: 28,
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              color: '#34d399',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+            }}
+          />
+
+          <IconButton 
+            sx={{ 
+              color: '#94a3b8', 
+              mr: 1.5,
+              borderRadius: '10px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              p: 0.8,
+              '&:hover': { color: '#fff', backgroundColor: 'rgba(255, 255, 255, 0.05)' } 
+            }}
           >
-            <Avatar alt={user?.name || 'User'} src={user?.avatarUrl || undefined} sx={{ bgcolor: 'primary.main' }}>
-              {(!user?.avatarUrl && user?.name) ? user.name.charAt(0) : null}
-            </Avatar>
+            <NotificationsOutlined fontSize="small" />
           </IconButton>
-          <Menu
-            id="menu-appbar"
-            anchorEl={anchorEl}
-            anchorOrigin={{
-              vertical: 'bottom',
-              horizontal: 'right',
+          
+          <Avatar 
+            src={user?.profileImage}
+            alt={user?.firstName}
+            sx={{ 
+              width: 36, 
+              height: 36,
+              bgcolor: '#4f46e5',
+              border: '2px solid rgba(255, 255, 255, 0.12)',
+              fontWeight: 700,
+              fontSize: '0.85rem'
             }}
-            keepMounted
-            transformOrigin={{
-              vertical: 'top',
-              horizontal: 'right',
-            }}
-            open={Boolean(anchorEl)}
-            onClose={handleMenuClose}
           >
-            <MenuItem component={Link} to="/profile" onClick={handleMenuClose}>Profile</MenuItem>
-            <MenuItem onClick={handleLogout}>
-              <ListItemIcon>
-                <LogoutIcon fontSize="small" />
-              </ListItemIcon>
-              Logout
-            </MenuItem>
-          </Menu>
+            {user?.firstName?.[0]}{user?.lastName?.[0]}
+          </Avatar>
         </Toolbar>
       </AppBar>
-      <Box
-        component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="mailbox folders"
-      >
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
-          }}
-          sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
-      </Box>
+
+      {/* Sidebar Navigation */}
+      <Sidebar mobileOpen={mobileOpen} onDrawerToggle={handleDrawerToggle} />
+
+      {/* Main Content Area */}
       <Box
         component="main"
-        sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` } }}
+        sx={{ 
+          flexGrow: 1, 
+          p: { xs: 2, sm: 3, md: 3.5 }, 
+          width: { sm: 'calc(100% - 84px)' },
+          backgroundColor: '#0a0e17',
+          minHeight: '100vh',
+          position: 'relative',
+        }}
       >
-        <Toolbar />
-        <Container maxWidth="lg">
+        {/* Subtle Ambient Radial Highlight */}
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '400px',
+            background: 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.09), transparent 70%)',
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+
+        <Toolbar sx={{ minHeight: 64 }} />
+        <Container maxWidth={false} sx={{ position: 'relative', zIndex: 1, px: { xs: 1, sm: 2, md: 3 } }}>
           <Outlet />
         </Container>
       </Box>

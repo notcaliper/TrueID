@@ -15,6 +15,7 @@ const SCHEMA_FILE = path.join(__dirname, 'config', 'database.sql');
 const MIGRATION_FILES = [
   '001_add_mfa_to_users.sql',
   '002_session_management.sql',
+  '003_sepolia_soulbound_identity.sql',
   // Legacy migrations that should run after schema
   'add_verification_requests.sql',
   'add_verification_status.sql'

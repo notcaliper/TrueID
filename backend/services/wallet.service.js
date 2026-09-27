@@ -9,10 +9,7 @@ const ethers = require('ethers');
  * @returns {ethers.providers.JsonRpcProvider} Provider instance
  */
 const initProvider = () => {
-  const rpcUrl = process.env.AVALANCHE_FUJI_RPC_URL;
-  if (!rpcUrl) {
-    throw new Error('AVALANCHE_FUJI_RPC_URL not defined in environment variables');
-  }
+  const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || process.env.SEPOLIA_RPC_URL || process.env.AVALANCHE_FUJI_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
   return new ethers.providers.JsonRpcProvider(rpcUrl);
 };
 
@@ -22,12 +19,8 @@ const initProvider = () => {
  */
 exports.generateWallet = () => {
   try {
-    // Create a random wallet
+    // Create a random EVM wallet
     const wallet = ethers.Wallet.createRandom();
-    
-    // Connect wallet to provider (optional, not needed just for address generation)
-    const provider = initProvider();
-    const connectedWallet = wallet.connect(provider);
     
     return {
       address: wallet.address,
@@ -35,7 +28,7 @@ exports.generateWallet = () => {
     };
   } catch (error) {
     console.error('Error generating wallet:', error);
-    throw new Error('Failed to generate Avalanche wallet');
+    throw new Error('Failed to generate wallet');
   }
 };
 
