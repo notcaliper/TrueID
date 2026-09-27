@@ -25,13 +25,11 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>TrueID</title>
-    <script async src="https://docs.opencv.org/4.5.5/opencv.js" onload="onOpenCvReady();"></script>
-    <script>
-      function onOpenCvReady() {
-        window.opencvIsReady = true;
-        document.dispatchEvent(new CustomEvent('opencv-ready'));
-      }
-    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Local high-performance MediaPipe Neural FaceMesh -->
+    <script src="%PUBLIC_URL%/mediapipe/face_mesh/face_mesh.js"></script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

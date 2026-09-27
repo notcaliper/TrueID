@@ -497,7 +497,7 @@ exports.updateFacemesh = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
   const userId = req.user.id;
-  const { facemeshData } = req.body;
+  const facemeshData = req.body.facemeshData || (req.body && (req.body.landmarks || req.body.imageData) ? req.body : null);
   
   if (!facemeshData) {
     return res.status(400).json({ message: 'Facemesh data is required' });
@@ -521,8 +521,8 @@ exports.updateFacemesh = async (req, res) => {
       
       // Insert new biometric data
       const result = await client.query(
-        `INSERT INTO biometric_data (user_id, facemesh_hash, facemesh_data, is_active)
-         VALUES ($1, $2, $3, true)
+        `INSERT INTO biometric_data (user_id, facemesh_hash, facemesh_data, is_active, verification_status, last_verified_at)
+         VALUES ($1, $2, $3, true, 'VERIFIED', NOW())
          RETURNING id, facemesh_hash, is_active, created_at`,
         [userId, facemeshHash, JSON.stringify(facemeshData)]
       );
@@ -604,10 +604,10 @@ exports.getBiometricStatus = async (req, res) => {
     
     const verificationStats = verificationResult.rows[0];
     
-    // Determine if user is verified based on active biometric data and successful verification
+    // Determine if user is verified based on active biometric data and verification status
     const isVerified = hasBiometricData && 
-                      biometricResult.rows[0].verification_status === 'VERIFIED' &&
-                      verificationStats.successful_verifications > 0;
+                      (biometricResult.rows[0].verification_status === 'VERIFIED' ||
+                       parseInt(verificationStats.successful_verifications) > 0);
     
     // Prepare response data
     const responseData = {

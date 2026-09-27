@@ -700,7 +700,7 @@ const ProfessionalRecords = () => {
                       <Box sx={{ mt: 3 }}>
                         <Typography variant="subtitle1">Blockchain Transaction</Typography>
                         <Link
-                          href={`https://testnet.snowtrace.io/tx/${selectedRecord.blockchain_tx_hash}`}
+                          href={`https://sepolia.etherscan.io/tx/${selectedRecord.blockchain_tx_hash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           sx={{ display: 'flex', alignItems: 'center', gap: 1 }}

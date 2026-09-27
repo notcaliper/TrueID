@@ -106,6 +106,9 @@ const networkRoutes = require('./routes/network.routes');
 const testRoutes = require('./routes/test.routes');
 const professionRoutes = require('./routes/profession.routes');
 const documentRoutes = require('./routes/document.routes');
+const mfaRoutes = require('./routes/mfa.routes');
+const sessionRoutes = require('./routes/session.routes');
+const gdprRoutes = require('./routes/gdpr.routes');
 
 // Use routes
 app.use('/api/user', authRoutes); // Changed from '/api/auth' to '/api/user' to match frontend expectations
@@ -116,6 +119,9 @@ app.use('/api/network', networkRoutes);
 app.use('/api/test', testRoutes);
 app.use('/api/profession', professionRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/mfa', mfaRoutes);
+app.use('/api/sessions', sessionRoutes);
+app.use('/api/gdpr', gdprRoutes);
 
 // Create uploads directory if it doesn't exist
 const uploadDir = path.join(__dirname, 'uploads/documents');

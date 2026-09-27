@@ -28,19 +28,18 @@ module.exports = {
     cache: "./blockchain/cache",
     artifacts: "./blockchain/artifacts"
   },
-  defaultNetwork: "avalanche_fuji",
+  defaultNetwork: "sepolia",
   networks: {
-    // Avalanche Fuji Testnet configuration
-    avalanche_fuji: {
-      url: process.env.AVALANCHE_FUJI_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc",
+    // Ethereum Sepolia Testnet configuration
+    sepolia: {
+      url: process.env.SEPOLIA_RPC_URL || process.env.BLOCKCHAIN_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
       accounts: [PRIVATE_KEY],
-      chainId: 43113
+      chainId: 11155111
     }
   },
-  // Contract verification is done manually through the Snowtrace interface
-  snowtrace: {
+  etherscan: {
     apiKey: {
-      avalancheFujiTestnet: ""
+      sepolia: process.env.ETHERSCAN_API_KEY || ""
     }
   }
 };

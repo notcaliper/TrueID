@@ -12,7 +12,7 @@ const TestGuide = () => {
       <Divider sx={{ mb: 2 }} />
       
       <Typography variant="body1" paragraph>
-        This guide explains how to test the TrueID authentication system. The system integrates with the Avalanche blockchain
+        This guide explains how to test the TrueID authentication system. The system integrates with the Ethereum Sepolia blockchain
         to create a secure identity for users.
       </Typography>
       
@@ -31,7 +31,7 @@ const TestGuide = () => {
             <ListItemIcon sx={{ minWidth: 30 }}>
               <InfoIcon fontSize="small" color="info" />
             </ListItemIcon>
-            <ListItemText primary="Generates an Avalanche C-Chain wallet" />
+            <ListItemText primary="Generates an Ethereum Sepolia wallet" />
           </ListItem>
           <ListItem>
             <ListItemIcon sx={{ minWidth: 30 }}>
@@ -59,7 +59,7 @@ const TestGuide = () => {
           </ListItemIcon>
           <ListItemText 
             primary="Test Registration" 
-            secondary="Creates a new user with random credentials and an Avalanche wallet" 
+            secondary="Creates a new user with random credentials and an Ethereum Sepolia wallet" 
           />
         </ListItem>
         <ListItem>

@@ -375,7 +375,7 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
                           <p className="info-label">Blockchain Transaction</p>
                           <p className="info-value">
                             <a 
-                              href={`https://testnet.snowtrace.io/tx/${userData.blockchain_tx_hash}`} 
+                              href={`https://sepolia.etherscan.io/tx/${userData.blockchain_tx_hash}`} 
                               target="_blank" 
                               rel="noopener noreferrer"
                             >
@@ -465,7 +465,7 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
                                   <p className="version-label">Blockchain TX:</p>
                                   <p className="version-value">
                                     <a 
-                                      href={`https://testnet.snowtrace.io/tx/${version.blockchain_tx_hash}`} 
+                                      href={`https://sepolia.etherscan.io/tx/${version.blockchain_tx_hash}`} 
                                       target="_blank" 
                                       rel="noopener noreferrer"
                                     >

@@ -34,6 +34,12 @@ exports.userRegistrationRules = [
     .withMessage('Password must be at least 8 characters long'),
 
   body('name')
+    .customSanitizer((val, { req }) => {
+      if (!val && (req.body.firstName || req.body.lastName)) {
+        return `${req.body.firstName || ''} ${req.body.lastName || ''}`.trim();
+      }
+      return val || '';
+    })
     .trim()
     .isLength({ min: 2, max: 100 })
     .withMessage('Name must be between 2 and 100 characters'),

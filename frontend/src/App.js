@@ -1,8 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import theme from './theme'; // Dark Glassmorphism Theme
 
 // Pages
 import Login from './pages/Login';
@@ -16,7 +17,16 @@ import BlockchainStatus from './pages/BlockchainStatus';
 import BiometricVerificationPage from './pages/BiometricVerificationPage';
 import NotFound from './pages/NotFound';
 
-
+// Admin Portal
+import AdminRoute from './admin/components/AdminRoute';
+import AdminLayout from './admin/components/AdminLayout';
+import AdminLogin from './admin/pages/AdminLogin';
+import AdminDashboard from './admin/pages/AdminDashboard';
+import AdminRecordManagement from './admin/pages/AdminRecordManagement';
+import AdminFaceVerification from './admin/pages/AdminFaceVerification';
+import AdminProfessionalRecords from './admin/pages/AdminProfessionalRecords';
+import AdminActivityLogs from './admin/pages/AdminActivityLogs';
+import AdminSettings from './admin/pages/AdminSettings';
 
 // Components
 import Layout from './components/Layout';
@@ -37,28 +47,6 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// Create a theme
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-    background: {
-      default: '#f5f5f5',
-    },
-  },
-  typography: {
-    fontFamily: [
-      'Roboto',
-      'Arial',
-      'sans-serif',
-    ].join(','),
-  },
-});
-
 function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -69,8 +57,9 @@ function App() {
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
             
-            {/* Protected routes */}
+            {/* Citizen Protected routes */}
             <Route path="/" element={
               <ProtectedRoute>
                 <Layout />
@@ -83,6 +72,21 @@ function App() {
               <Route path="professional-records" element={<ProfessionalRecords />} />
               <Route path="blockchain-status" element={<BlockchainStatus />} />
               <Route path="biometric-verification" element={<BiometricVerificationPage />} />
+            </Route>
+
+            {/* Government / Authority Admin Portal */}
+            <Route path="/admin" element={
+              <AdminRoute>
+                <AdminLayout />
+              </AdminRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="records" element={<AdminRecordManagement />} />
+              <Route path="face-verification" element={<AdminFaceVerification />} />
+              <Route path="professional-records" element={<AdminProfessionalRecords />} />
+              <Route path="activity-logs" element={<AdminActivityLogs />} />
+              <Route path="settings" element={<AdminSettings />} />
             </Route>
             
             {/* 404 route */}

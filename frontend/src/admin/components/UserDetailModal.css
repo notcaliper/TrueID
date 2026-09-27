@@ -1,0 +1,190 @@
+/* UserDetailModal.css */
+
+.user-detail-modal {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 800px;
+  margin: auto;
+  padding: 16px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+.modal-content {
+  padding: 16px 0;
+}
+
+.tab-navigation {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.tab-navigation button {
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  transition: color 0.2s;
+}
+
+.tab-navigation button.active {
+  color: #3b82f6;
+  border-bottom: 2px solid #3b82f6;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 8px;
+}
+
+.modal-footer button {
+  padding: 8px 16px;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.modal-footer button:hover {
+  background-color: #2563eb;
+}
+
+.modal-footer button:disabled,
+.modal-footer .button-disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.modal-footer button:disabled:hover,
+.modal-footer .button-disabled:hover {
+  background-color: #9ca3af;
+}
+
+.info-list {
+  display: grid;
+  gap: 8px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+}
+
+.info-label {
+  font-weight: bold;
+  color: #374151;
+}
+
+.info-value {
+  color: #6b7280;
+}
+
+/* Verification status styles */
+.status-verified,
+.status-rejected,
+.status-pending {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.status-verified {
+  background-color: #10b981;
+  color: white;
+}
+
+.status-rejected {
+  background-color: #ef4444;
+  color: white;
+}
+
+.status-pending {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.verification-status-section {
+  background-color: #f9fafb;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+/* Version history styles */
+.version-item {
+  margin-bottom: 20px;
+  padding: 15px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.version-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.version-title {
+  font-weight: 600;
+  color: #374151;
+  font-size: 16px;
+  margin: 0;
+}
+
+.version-date {
+  color: #6b7280;
+  font-size: 14px;
+  margin: 0;
+}
+
+.version-description {
+  margin-bottom: 12px;
+  padding: 8px;
+  background-color: #f3f4f6;
+  border-radius: 4px;
+  font-style: italic;
+  color: #4b5563;
+}
+
+.version-details {
+  display: flex;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.version-label {
+  font-weight: 500;
+  width: 120px;
+  color: #4b5563;
+  margin: 0;
+}
+
+.version-value {
+  color: #1f2937;
+  word-break: break-all;
+  margin: 0;
+}

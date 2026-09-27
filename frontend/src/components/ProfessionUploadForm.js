@@ -5,7 +5,14 @@ import {
   Typography,
   Alert,
   CircularProgress,
+  Chip
 } from '@mui/material';
+import {
+  CloudUpload as CloudUploadIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
+  Pending as PendingIcon
+} from '@mui/icons-material';
 import { userAPI } from '../services/api.service';
 
 /**
@@ -23,7 +30,6 @@ const ProfessionUploadForm = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  // Fetch current verification status on mount
   useEffect(() => {
     (async () => {
       try {
@@ -72,67 +78,109 @@ const ProfessionUploadForm = () => {
     }
   };
 
-  const getAlertSeverity = () => {
-    if (status === 'approved') return 'success';
-    if (status === 'rejected') return 'error';
-    if (status === 'pending') return 'warning';
-    return 'info';
+  const getStatusChip = () => {
+    if (!status) return null;
+    
+    let color = 'default';
+    let icon = null;
+    let label = status.charAt(0).toUpperCase() + status.slice(1);
+    
+    if (status === 'approved') {
+      color = 'success';
+      icon = <CheckCircleIcon fontSize="small" />;
+    } else if (status === 'rejected') {
+      color = 'error';
+      icon = <CancelIcon fontSize="small" />;
+    } else if (status === 'pending') {
+      color = 'warning';
+      icon = <PendingIcon fontSize="small" />;
+    }
+
+    return (
+      <Chip 
+        icon={icon} 
+        label={`Status: ${label}`} 
+        color={color}
+        variant="filled"
+        sx={{ fontWeight: 600, px: 1 }}
+      />
+    );
   };
 
   return (
-    <Box sx={{ mt: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Profession Verification
-      </Typography>
-
-      {status && (
-        <Alert severity={getAlertSeverity()} sx={{ mb: 2 }}>
-          Current status: {status.charAt(0).toUpperCase() + status.slice(1)}
-        </Alert>
-      )}
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#f8fafc' }}>
+          Profession Verification
+        </Typography>
+        {getStatusChip()}
+      </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2, background: 'rgba(239, 68, 68, 0.1)' }}>
           {error}
         </Alert>
       )}
 
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert severity="success" sx={{ mb: 2, borderRadius: 2, background: 'rgba(16, 185, 129, 0.1)' }}>
           {success}
         </Alert>
       )}
 
-      {previewUrl && (
-        <Box sx={{ mb: 2 }}>
+      {previewUrl ? (
+        <Box sx={{ mb: 3, position: 'relative', borderRadius: 3, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
           <img
             src={previewUrl}
             alt="Preview"
-            style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }}
+            style={{ width: '100%', display: 'block', maxHeight: 300, objectFit: 'cover' }}
           />
-        </Box>
-      )}
-
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Button variant="outlined" component="label">
-          {selectedFile ? 'Change Image' : 'Choose Image'}
-          <input hidden type="file" accept="image/*" onChange={handleFileChange} />
-        </Button>
-        {selectedFile && (
-          <>
-            <Button color="error" variant="text" onClick={handleRemove}>
+          <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, p: 2, background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            <Button color="error" variant="contained" size="small" onClick={handleRemove} sx={{ borderRadius: 2 }}>
               Remove
             </Button>
             <Button
               variant="contained"
+              color="primary"
+              size="small"
               onClick={handleSubmit}
               disabled={loading}
+              sx={{ borderRadius: 2 }}
             >
-              {loading ? <CircularProgress size={20} /> : 'Submit'}
+              {loading ? <CircularProgress size={20} color="inherit" /> : 'Submit for Review'}
             </Button>
-          </>
-        )}
-      </Box>
+          </Box>
+        </Box>
+      ) : (
+        <Box 
+          component="label"
+          sx={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center',
+            p: 4,
+            border: '2px dashed rgba(255, 255, 255, 0.2)',
+            borderRadius: 3,
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            background: 'rgba(255, 255, 255, 0.02)',
+            '&:hover': {
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderColor: 'primary.main'
+            }
+          }}
+        >
+          <CloudUploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="body1" sx={{ color: '#cbd5e1', fontWeight: 500 }}>
+            Click to upload professional document
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
+            Supports JPG, PNG, PDF (Max 5MB)
+          </Typography>
+          <input hidden type="file" accept="image/*" onChange={handleFileChange} />
+        </Box>
+      )}
     </Box>
   );
 };

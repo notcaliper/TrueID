@@ -25,7 +25,7 @@ import { userAPI, blockchainAPI } from '../services/api.service';
 import walletService from '../services/wallet.service';
 
 const WalletPage = () => {
-  const { } = useAuth(); // We'll use auth context but don't need the user object directly
+  useAuth(); // We'll use auth context but don't need the user object directly
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [walletData, setWalletData] = useState({
@@ -68,7 +68,7 @@ const WalletPage = () => {
           timestamp: tx.created_at || tx.timestamp,
           type: tx.transaction_type || tx.tx_type || tx.type,
           status: tx.status || 'CONFIRMED',
-          network: tx.network || 'Avalanche Fuji Testnet'
+          network: tx.network || 'Ethereum Sepolia Testnet'
         }));
         
         setWalletData({
@@ -146,7 +146,7 @@ const WalletPage = () => {
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Avalanche C-Chain Wallet
+              Ethereum Sepolia Wallet
             </Typography>
             <Box sx={{ mb: 2 }}>
               <Typography variant="subtitle2" color="text.secondary">
@@ -168,7 +168,7 @@ const WalletPage = () => {
                   size="small"
                   variant="outlined"
                   component={Link}
-                  href={`https://testnet.snowtrace.io/address/${walletData.address}`}
+                  href={`https://sepolia.etherscan.io/address/${walletData.address}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   startIcon={<ExternalLinkIcon />}
@@ -185,10 +185,10 @@ const WalletPage = () => {
               Balance
             </Typography>
             <Typography variant="h5" sx={{ mt: 1 }}>
-              {walletData.balance} AVAX
+              {walletData.balance} ETH
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Avalanche Fuji Testnet
+              Ethereum Sepolia Testnet
             </Typography>
             
             <Divider sx={{ my: 2 }} />
@@ -219,7 +219,7 @@ const WalletPage = () => {
                       Network
                     </Typography>
                     <Typography variant="body2">
-                      {walletData.blockchainStatus.network || 'Avalanche Fuji Testnet'}
+                      {walletData.blockchainStatus.network || 'Ethereum Sepolia Testnet'}
                     </Typography>
                   </Grid>
                 </Grid>
@@ -328,7 +328,7 @@ const WalletPage = () => {
                           <Button
                             size="small"
                             component={Link}
-                            href={`https://testnet.snowtrace.io/tx/${tx.hash}`}
+                            href={`https://sepolia.etherscan.io/tx/${tx.hash}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             endIcon={<ExternalLinkIcon />}
