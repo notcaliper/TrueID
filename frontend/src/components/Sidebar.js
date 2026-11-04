@@ -62,14 +62,12 @@ const menuSections = [
 ];
 
 const sidebarStyles = `
-  @keyframes pulseSubtle {
-    0%, 100% { box-shadow: 0 0 12px rgba(99, 102, 241, 0.3); }
-    50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.6); }
-  }
   .active-nav-item {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(90deg, rgba(99, 102, 241, 0.16) 0%, rgba(99, 102, 241, 0.04) 100%) !important;
+    background: rgba(99, 102, 241, 0.12) !important;
+    border: 1px solid rgba(99, 102, 241, 0.25) !important;
+    border-radius: 10px !important;
   }
   .active-nav-item::before {
     content: '';
@@ -78,6 +76,9 @@ const sidebarStyles = `
     background: #6366f1;
     box-shadow: 0 0 10px #6366f1;
     border-radius: 0 3px 3px 0;
+  }
+  .active-nav-item svg {
+    color: #818cf8 !important;
   }
   .hover-nav-item {
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);

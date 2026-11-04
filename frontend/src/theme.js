@@ -1,386 +1,180 @@
 import { createTheme } from '@mui/material/styles';
 
 /**
- * TrueID Modern Clean Fintech / Web3 SaaS Theme
- * Refined deep slate & navy palette with electric indigo & vibrant emerald accents.
+ * TrueID Blockscan / Etherscan Professional Design System
+ * Supports both crisp White/Light mode (default) and exact Blockscan Dark mode.
  */
 
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    background: {
-      default: '#0a0e17',          // Deep Midnight Slate
-      paper: 'rgba(17, 24, 39, 0.75)', // Translucent Slate 900
-    },
-    primary: {
-      main: '#6366f1',             // Electric Indigo
-      light: '#818cf8',
-      dark: '#4f46e5',
-      contrastText: '#ffffff',
-    },
-    secondary: {
-      main: '#06b6d4',             // Cyber Cyan / Electric Teal
-      light: '#22d3ee',
-      dark: '#0891b2',
-      contrastText: '#ffffff',
-    },
-    success: {
-      main: '#10b981',             // Vibrant Emerald
-      light: '#34d399',
-      dark: '#059669',
-      contrastText: '#ffffff',
-    },
-    warning: {
-      main: '#f59e0b',             // Amber Gold
-      light: '#fbbf24',
-      dark: '#d97706',
-      contrastText: '#0f172a',
-    },
-    error: {
-      main: '#f43f5e',             // Rose Red
-      light: '#fb7185',
-      dark: '#e11d48',
-      contrastText: '#ffffff',
-    },
-    info: {
-      main: '#38bdf8',             // Sky Blue
-      light: '#7dd3fc',
-      dark: '#0284c7',
-      contrastText: '#0f172a',
-    },
-    text: {
-      primary: '#f8fafc',          // Ultra Crisp Slate White
-      secondary: '#94a3b8',        // Cool Neutral Slate
-      disabled: '#475569',         // Muted Slate
-    },
-    divider: 'rgba(255, 255, 255, 0.08)',
-    action: {
-      hover: 'rgba(255, 255, 255, 0.04)',
-      selected: 'rgba(99, 102, 241, 0.12)',
-      disabled: 'rgba(255, 255, 255, 0.25)',
-      disabledBackground: 'rgba(255, 255, 255, 0.06)',
-    },
-  },
+export const getTheme = (mode = 'light') => {
+  const isLight = mode === 'light';
 
-  typography: {
-    fontFamily: '"Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    h1: { fontWeight: 800, letterSpacing: '-0.03em', color: '#f8fafc', lineHeight: 1.2 },
-    h2: { fontWeight: 700, letterSpacing: '-0.025em', color: '#f8fafc', lineHeight: 1.25 },
-    h3: { fontWeight: 700, letterSpacing: '-0.02em', color: '#f8fafc', lineHeight: 1.3 },
-    h4: { fontWeight: 600, letterSpacing: '-0.015em', color: '#f8fafc', lineHeight: 1.35 },
-    h5: { fontWeight: 600, letterSpacing: '-0.01em', color: '#f8fafc' },
-    h6: { fontWeight: 600, letterSpacing: '-0.005em', color: '#f8fafc' },
-    subtitle1: { color: '#94a3b8', fontWeight: 500, letterSpacing: '-0.01em' },
-    subtitle2: { color: '#64748b', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em' },
-    body1: { color: '#cbd5e1', fontSize: '0.95rem', lineHeight: 1.6 },
-    body2: { color: '#94a3b8', fontSize: '0.875rem', lineHeight: 1.5 },
-    button: { fontWeight: 600, textTransform: 'none', letterSpacing: '0.01em' },
-  },
-
-  shape: {
-    borderRadius: 14,
-  },
-
-  components: {
-    MuiCssBaseline: {
-      styleOverrides: {
-        body: {
-          backgroundColor: '#0a0e17',
-          color: '#f8fafc',
-          scrollbarColor: 'rgba(255, 255, 255, 0.15) transparent',
-          '&::-webkit-scrollbar, & *::-webkit-scrollbar': {
-            width: 6,
-            height: 6,
-          },
-          '&::-webkit-scrollbar-track, & *::-webkit-scrollbar-track': {
-            background: 'transparent',
-          },
-          '&::-webkit-scrollbar-thumb, & *::-webkit-scrollbar-thumb': {
-            backgroundColor: 'rgba(255, 255, 255, 0.15)',
-            borderRadius: 4,
-          },
-        },
+  return createTheme({
+    palette: {
+      mode,
+      background: {
+        default: isLight ? '#f8fafc' : '#111214',
+        paper: isLight ? '#ffffff' : '#181a1c',
+        subtle: isLight ? '#f1f5f9' : '#1e2124',
+      },
+      primary: {
+        main: isLight ? '#2563eb' : '#3b82f6',
+        light: isLight ? '#3b82f6' : '#60a5fa',
+        dark: isLight ? '#1d4ed8' : '#1d4ed8',
+        contrastText: '#ffffff',
+      },
+      secondary: {
+        main: '#06b6d4',
+        contrastText: '#ffffff',
+      },
+      success: {
+        main: isLight ? '#16a34a' : '#22c55e',
+        light: isLight ? '#22c55e' : '#4ade80',
+        dark: '#15803d',
+        contrastText: '#ffffff',
+      },
+      warning: {
+        main: isLight ? '#d97706' : '#f59e0b',
+        contrastText: '#ffffff',
+      },
+      error: {
+        main: isLight ? '#dc2626' : '#ef4444',
+        contrastText: '#ffffff',
+      },
+      text: {
+        primary: isLight ? '#0f172a' : '#ffffff',
+        secondary: isLight ? '#64748b' : '#8b949e',
+        disabled: isLight ? '#94a3b8' : '#4b5563',
+      },
+      divider: isLight ? '#e2e8f0' : '#282a2d',
+      action: {
+        hover: isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)',
+        selected: isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(59, 130, 246, 0.15)',
       },
     },
 
-    // Fintech Glass & Slate Card
-    MuiPaper: {
-      defaultProps: {
-        elevation: 0,
-      },
-      styleOverrides: {
-        root: {
-          backgroundImage: 'none',
-          backgroundColor: 'rgba(17, 24, 39, 0.75)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: 16,
-          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.2)',
-          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-        },
-      },
+    typography: {
+      fontFamily: '"Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      h1: { fontWeight: 800, letterSpacing: '-0.025em', color: isLight ? '#0f172a' : '#ffffff' },
+      h2: { fontWeight: 700, letterSpacing: '-0.02em', color: isLight ? '#0f172a' : '#ffffff' },
+      h3: { fontWeight: 700, letterSpacing: '-0.015em', color: isLight ? '#0f172a' : '#ffffff' },
+      h4: { fontWeight: 700, letterSpacing: '-0.01em', color: isLight ? '#0f172a' : '#ffffff' },
+      h5: { fontWeight: 600, color: isLight ? '#0f172a' : '#ffffff' },
+      h6: { fontWeight: 600, color: isLight ? '#0f172a' : '#ffffff' },
+      subtitle1: { color: isLight ? '#475569' : '#8b949e', fontWeight: 500 },
+      subtitle2: { color: isLight ? '#64748b' : '#6b7280', fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em' },
+      body1: { color: isLight ? '#1e293b' : '#d1d5db', fontSize: '0.925rem', lineHeight: 1.6 },
+      body2: { color: isLight ? '#64748b' : '#8b949e', fontSize: '0.85rem', lineHeight: 1.5 },
+      button: { fontWeight: 600, textTransform: 'none', letterSpacing: '0.01em' },
     },
 
-    MuiCard: {
-      defaultProps: {
-        elevation: 0,
-      },
-      styleOverrides: {
-        root: {
-          backgroundImage: 'none',
-          backgroundColor: 'rgba(17, 24, 39, 0.75)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: 16,
-        },
-      },
+    shape: {
+      borderRadius: 10,
     },
 
-    // Clean Fintech Buttons
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 10,
-          padding: '8px 18px',
-          fontSize: '0.9rem',
-          fontWeight: 600,
-          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-        },
-        containedPrimary: {
-          background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-          color: '#ffffff',
-          boxShadow: '0 2px 10px rgba(99, 102, 241, 0.35)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          '&:hover': {
-            background: 'linear-gradient(135deg, #818cf8 0%, #6366f1 100%)',
-            boxShadow: '0 4px 18px rgba(99, 102, 241, 0.5)',
-            transform: 'translateY(-1px)',
-          },
-          '&:active': {
-            transform: 'translateY(0)',
-          },
-        },
-        containedSuccess: {
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-          color: '#ffffff',
-          boxShadow: '0 2px 10px rgba(16, 185, 129, 0.35)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          '&:hover': {
-            background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)',
-            boxShadow: '0 4px 18px rgba(16, 185, 129, 0.45)',
-            transform: 'translateY(-1px)',
-          },
-        },
-        outlined: {
-          borderColor: 'rgba(255, 255, 255, 0.12)',
-          color: '#e2e8f0',
-          backgroundColor: 'rgba(255, 255, 255, 0.02)',
-          '&:hover': {
-            borderColor: 'rgba(255, 255, 255, 0.25)',
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            transform: 'translateY(-1px)',
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            backgroundColor: isLight ? '#f8fafc' : '#111214',
+            color: isLight ? '#0f172a' : '#ffffff',
+            margin: 0,
+            padding: 0,
+            fontFamily: '"Plus Jakarta Sans", "Inter", -apple-system, sans-serif',
+            WebkitFontSmoothing: 'antialiased',
           },
         },
       },
-    },
-
-    // Modern Form Inputs
-    MuiTextField: {
-      styleOverrides: {
-        root: {
-          '& .MuiOutlinedInput-root': {
-            borderRadius: 10,
-            backgroundColor: 'rgba(15, 23, 42, 0.6)',
-            transition: 'all 0.2s ease',
-            '& fieldset': {
-              borderColor: 'rgba(255, 255, 255, 0.1)',
-            },
-            '&:hover fieldset': {
-              borderColor: 'rgba(255, 255, 255, 0.22)',
-            },
-            '&.Mui-focused': {
-              backgroundColor: 'rgba(15, 23, 42, 0.85)',
-              boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.25)',
-            },
-            '&.Mui-focused fieldset': {
-              borderColor: '#6366f1',
-              borderWidth: '1px',
-            },
-          },
-          '& .MuiInputLabel-root': {
-            color: '#94a3b8',
-          },
-          '& .MuiInputLabel-root.Mui-focused': {
-            color: '#818cf8',
+      MuiCard: {
+        styleOverrides: {
+          root: {
+            backgroundColor: isLight ? '#ffffff' : '#181a1c',
+            backgroundImage: 'none',
+            border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+            borderRadius: 12,
+            boxShadow: isLight
+              ? '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)'
+              : '0 4px 12px 0 rgba(0, 0, 0, 0.3)',
+            transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           },
         },
       },
-    },
-
-    // Top Navigation Bar
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          backgroundImage: 'none',
-          backgroundColor: 'rgba(10, 14, 23, 0.8)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          color: '#f8fafc',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
-          boxShadow: 'none',
-        },
-      },
-    },
-
-    // Drawer / Sidebar
-    MuiDrawer: {
-      styleOverrides: {
-        paper: {
-          backgroundImage: 'none',
-          backgroundColor: 'rgba(10, 14, 23, 0.92)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          borderRight: '1px solid rgba(255, 255, 255, 0.07)',
-        },
-      },
-    },
-
-    // List Navigation Items
-    MuiListItemButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 10,
-          margin: '3px 8px',
-          padding: '8px 14px',
-          color: '#94a3b8',
-          transition: 'all 0.18s ease',
-          '&:hover': {
-            backgroundColor: 'rgba(255, 255, 255, 0.04)',
-            color: '#f8fafc',
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            backgroundColor: isLight ? '#ffffff' : '#181a1c',
+            backgroundImage: 'none',
           },
-          '&.Mui-selected': {
-            backgroundColor: 'rgba(99, 102, 241, 0.12)',
+        },
+      },
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+            textTransform: 'none',
+            fontWeight: 600,
+            fontSize: '0.875rem',
+            padding: '8px 16px',
+          },
+          containedPrimary: {
+            backgroundColor: isLight ? '#2563eb' : '#3b82f6',
             color: '#ffffff',
-            borderLeft: '3px solid #6366f1',
+            boxShadow: 'none',
             '&:hover': {
-              backgroundColor: 'rgba(99, 102, 241, 0.18)',
+              backgroundColor: isLight ? '#1d4ed8' : '#2563eb',
+              boxShadow: 'none',
             },
-            '& .MuiListItemIcon-root': {
-              color: '#818cf8',
+          },
+          outlined: {
+            borderColor: isLight ? '#e2e8f0' : '#282a2d',
+            color: isLight ? '#334155' : '#e2e8f0',
+            '&:hover': {
+              borderColor: isLight ? '#cbd5e1' : '#4b5563',
+              backgroundColor: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.05)',
             },
           },
         },
       },
-    },
-
-    MuiListItemIcon: {
-      styleOverrides: {
-        root: {
-          color: '#64748b',
-          minWidth: 38,
-          transition: 'color 0.18s ease',
+      MuiChip: {
+        styleOverrides: {
+          root: {
+            borderRadius: 6,
+            fontWeight: 600,
+            fontSize: '0.75rem',
+          },
         },
       },
-    },
-
-    // Clean Fintech Chips / Badges
-    MuiChip: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-          fontWeight: 600,
-          fontSize: '0.75rem',
-        },
-        filled: {
-          backgroundColor: 'rgba(255, 255, 255, 0.08)',
-          color: '#cbd5e1',
-        },
-        filledPrimary: {
-          backgroundColor: 'rgba(99, 102, 241, 0.15)',
-          color: '#a5b4fc',
-          border: '1px solid rgba(99, 102, 241, 0.3)',
-        },
-        filledSuccess: {
-          backgroundColor: 'rgba(16, 185, 129, 0.15)',
-          color: '#34d399',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
-        },
-        filledWarning: {
-          backgroundColor: 'rgba(245, 158, 11, 0.15)',
-          color: '#fbbf24',
-          border: '1px solid rgba(245, 158, 11, 0.3)',
-        },
-        filledError: {
-          backgroundColor: 'rgba(244, 63, 94, 0.15)',
-          color: '#fda4af',
-          border: '1px solid rgba(244, 63, 94, 0.3)',
+      MuiDialog: {
+        styleOverrides: {
+          paper: {
+            backgroundColor: isLight ? '#ffffff' : '#181a1c',
+            backgroundImage: 'none',
+            borderRadius: 14,
+            border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+            boxShadow: isLight
+              ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
+              : '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
+          },
         },
       },
-    },
-
-    // Fintech Data Tables
-    MuiTableHead: {
-      styleOverrides: {
-        root: {
-          backgroundColor: 'rgba(255, 255, 255, 0.02)',
-          '& .MuiTableCell-root': {
-            color: '#64748b',
-            fontWeight: 700,
-            fontSize: '0.72rem',
+      MuiTableCell: {
+        styleOverrides: {
+          root: {
+            borderColor: isLight ? '#f1f5f9' : '#282a2d',
+            padding: '14px 16px',
+            fontSize: '0.875rem',
+          },
+          head: {
+            fontWeight: 600,
+            backgroundColor: isLight ? '#f8fafc' : '#141618',
+            color: isLight ? '#64748b' : '#8b949e',
+            fontSize: '0.75rem',
             textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            letterSpacing: '0.05em',
           },
         },
       },
     },
+  });
+};
 
-    MuiTableCell: {
-      styleOverrides: {
-        root: {
-          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-          padding: '14px 16px',
-          color: '#cbd5e1',
-          fontSize: '0.875rem',
-        },
-      },
-    },
-
-    MuiAlert: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          border: '1px solid transparent',
-        },
-        standardError: {
-          backgroundColor: 'rgba(244, 63, 94, 0.1)',
-          color: '#fda4af',
-          borderColor: 'rgba(244, 63, 94, 0.25)',
-          '& .MuiAlert-icon': { color: '#f43f5e' },
-        },
-        standardSuccess: {
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          color: '#6ee7b7',
-          borderColor: 'rgba(16, 185, 129, 0.25)',
-          '& .MuiAlert-icon': { color: '#10b981' },
-        },
-        standardWarning: {
-          backgroundColor: 'rgba(245, 158, 11, 0.1)',
-          color: '#fde68a',
-          borderColor: 'rgba(245, 158, 11, 0.25)',
-          '& .MuiAlert-icon': { color: '#f59e0b' },
-        },
-        standardInfo: {
-          backgroundColor: 'rgba(56, 189, 248, 0.1)',
-          color: '#7dd3fc',
-          borderColor: 'rgba(56, 189, 248, 0.25)',
-          '& .MuiAlert-icon': { color: '#38bdf8' },
-        },
-      },
-    },
-  },
-});
-
-export default theme;
+export default getTheme('light');

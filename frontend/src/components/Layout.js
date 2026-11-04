@@ -1,152 +1,298 @@
 import React, { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
-import { 
-  AppBar, Box, Toolbar, IconButton,
-  Container, Avatar, Typography, Chip
+import { Outlet, useLocation, useNavigate, Link } from 'react-router-dom';
+import {
+  Box,
+  AppBar,
+  Toolbar,
+  Typography,
+  IconButton,
+  Button,
+  Chip,
+  Avatar,
+  Tooltip,
+  TextField,
+  InputAdornment,
+  Menu,
+  MenuItem,
+  Container,
+  useTheme
 } from '@mui/material';
-import { Menu as MenuIcon, NotificationsOutlined } from '@mui/icons-material';
+import {
+  SearchRounded,
+  LightModeRounded,
+  DarkModeRounded,
+  NotificationsNoneRounded,
+  ShieldRounded,
+  DashboardRounded,
+  PersonRounded,
+  AccountBalanceWalletRounded,
+  VerifiedUserRounded,
+  FingerprintRounded,
+  WorkspacePremiumRounded,
+  SecurityRounded,
+  AdminPanelSettingsRounded,
+  LogoutRounded,
+  ContentCopyRounded,
+  QrCode2Rounded
+} from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
-import Sidebar from './Sidebar';
+import { useColorMode } from '../context/ThemeContext';
+
+const navTabs = [
+  { label: 'Citizen Dashboard', path: '/', icon: <DashboardRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Identity Profile', path: '/profile', icon: <PersonRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Trust & Verification', path: '/verification-status', icon: <VerifiedUserRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Biometric Vault', path: '/biometric-verification', icon: <FingerprintRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Verifiable Credentials', path: '/professional-records', icon: <WorkspacePremiumRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Web3 Wallet', path: '/wallet', icon: <AccountBalanceWalletRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Blockchain Ledger', path: '/blockchain-status', icon: <SecurityRounded sx={{ fontSize: 16 }} /> },
+];
 
 const Layout = () => {
-  const { user } = useAuth();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const { mode, toggleTheme, isLight } = useColorMode();
+  const theme = useTheme();
   const location = useLocation();
-  
-  const getPageTitle = (pathname) => {
-    if (pathname === '/' || pathname.startsWith('/dashboard')) return 'Command Dashboard';
-    if (pathname.startsWith('/profile')) return 'Identity Vault';
-    if (pathname.startsWith('/biometric')) return 'Biometric Verification Studio';
-    if (pathname.startsWith('/verification')) return 'Trust & Compliance Score';
-    if (pathname.startsWith('/blockchain')) return 'Blockchain Ledger State';
-    if (pathname.startsWith('/wallet')) return 'Web3 Asset Wallet';
-    if (pathname.startsWith('/professional') || pathname.startsWith('/records')) return 'Professional Credentials';
-    return 'TrueID Platform';
+  const navigate = useNavigate();
+
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [searchVal, setSearchVal] = useState('');
+
+  const citizenAddress = user?.wallet_address || '0x4f8e91d2c3b4a567890123456789abcdef012345';
+
+  const isTabActive = (path) => {
+    if (path === '/') return location.pathname === '/' || location.pathname === '/dashboard';
+    return location.pathname.startsWith(path);
   };
-  
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
+
+  const copyAddress = () => {
+    navigator.clipboard.writeText(citizenAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
-  
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0a0e17' }}>
-      {/* Top Application Bar */}
+    <Box sx={{ minHeight: '100vh', bgcolor: theme.palette.background.default, color: theme.palette.text.primary, display: 'flex', flexDirection: 'column' }}>
+      {/* Top Blockscan Header */}
       <AppBar
-        position="fixed"
+        position="sticky"
+        elevation={0}
         sx={{
-          width: { sm: 'calc(100% - 84px)' },
-          ml: { sm: '84px' },
-          background: 'rgba(10, 14, 23, 0.82)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          color: '#f8fafc',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
-          boxShadow: 'none',
+          bgcolor: isLight ? '#ffffff' : '#181a1c',
+          borderBottom: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+          color: theme.palette.text.primary,
+          zIndex: 1100
         }}
       >
-        <Toolbar sx={{ minHeight: 64, px: { xs: 2, sm: 3 } }}>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+        <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 2, md: 4 }, minHeight: 64, gap: 2 }}>
+          {/* Left Brand */}
+          <Box
+            onClick={() => navigate('/')}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', flexShrink: 0 }}
           >
-            <MenuIcon />
-          </IconButton>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Typography variant="h6" fontWeight={700} sx={{ 
-              color: '#f8fafc',
-              letterSpacing: '-0.02em',
-              fontSize: { xs: '1rem', sm: '1.15rem' },
-            }}>
-              {getPageTitle(location.pathname)}
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: '8px',
+                bgcolor: '#2563eb',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff'
+              }}
+            >
+              <ShieldRounded sx={{ fontSize: 20 }} />
+            </Box>
+            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.02em', color: theme.palette.text.primary }}>
+              TrueID
             </Typography>
           </Box>
-          
-          <Box sx={{ flexGrow: 1 }} />
-          
-          {/* Network / System Status Pill */}
-          <Chip
-            size="small"
-            icon={<Box component="span" className="status-dot-emerald" sx={{ ml: 1, mr: -0.5 }} />}
-            label="Ethereum Sepolia"
-            sx={{
-              display: { xs: 'none', md: 'inline-flex' },
-              mr: 2,
-              height: 28,
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              color: '#34d399',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-            }}
-          />
 
-          <IconButton 
-            sx={{ 
-              color: '#94a3b8', 
-              mr: 1.5,
-              borderRadius: '10px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              p: 0.8,
-              '&:hover': { color: '#fff', backgroundColor: 'rgba(255, 255, 255, 0.05)' } 
-            }}
-          >
-            <NotificationsOutlined fontSize="small" />
-          </IconButton>
-          
-          <Avatar 
-            src={user?.profileImage}
-            alt={user?.firstName}
-            sx={{ 
-              width: 36, 
-              height: 36,
-              bgcolor: '#4f46e5',
-              border: '2px solid rgba(255, 255, 255, 0.12)',
-              fontWeight: 700,
-              fontSize: '0.85rem'
-            }}
-          >
-            {user?.firstName?.[0]}{user?.lastName?.[0]}
-          </Avatar>
+          {/* Center Search Bar (Blockscan Style) */}
+          <Box sx={{ maxWidth: 540, width: '100%', display: { xs: 'none', md: 'block' } }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search Citizen DID, Credential, National ID or Proof Hash..."
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchRounded sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: 18 }} />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Box sx={{ px: 0.8, py: 0.2, bgcolor: isLight ? '#f1f5f9' : '#282a2d', border: `1px solid ${isLight ? '#e2e8f0' : '#3f4246'}`, borderRadius: 1, fontSize: '0.68rem', fontWeight: 600, color: isLight ? '#64748b' : '#9ca3af' }}>
+                      /
+                    </Box>
+                  </InputAdornment>
+                ),
+                sx: {
+                  bgcolor: isLight ? '#f8fafc' : '#111214',
+                  borderRadius: '10px',
+                  fontSize: '0.825rem',
+                  color: theme.palette.text.primary,
+                  '& fieldset': { borderColor: isLight ? '#e2e8f0' : '#282a2d' },
+                  '&:hover fieldset': { borderColor: isLight ? '#cbd5e1' : '#3f4246' },
+                  '&.Mui-focused fieldset': { borderColor: '#2563eb' }
+                }
+              }}
+            />
+          </Box>
+
+          {/* Right Controls */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexShrink: 0 }}>
+            {/* Theme Toggle Button (Exact Blockscan moon icon) */}
+            <Tooltip title={isLight ? 'Switch to Dark Mode' : 'Switch to White / Light Mode'}>
+              <IconButton
+                onClick={toggleTheme}
+                size="small"
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '8px',
+                  border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+                  bgcolor: isLight ? '#f8fafc' : '#111214',
+                  color: isLight ? '#475569' : '#f8fafc',
+                  position: 'relative'
+                }}
+              >
+                {isLight ? <DarkModeRounded sx={{ fontSize: 18 }} /> : <LightModeRounded sx={{ fontSize: 18 }} />}
+                {/* Active indicator dot */}
+                <Box sx={{ position: 'absolute', top: 5, right: 5, width: 5, height: 5, borderRadius: '50%', bgcolor: '#2563eb' }} />
+              </IconButton>
+            </Tooltip>
+
+            {/* Notification Bell */}
+            <IconButton
+              size="small"
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: '8px',
+                border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+                bgcolor: isLight ? '#f8fafc' : '#111214',
+                color: isLight ? '#475569' : '#f8fafc'
+              }}
+            >
+              <NotificationsNoneRounded sx={{ fontSize: 18 }} />
+            </IconButton>
+
+            {/* User Profile Avatar Pill */}
+            <Box
+              onClick={(e) => setAnchorEl(e.currentTarget)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                cursor: 'pointer',
+                p: 0.5,
+                pl: 1,
+                borderRadius: '8px',
+                border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+                bgcolor: isLight ? '#f8fafc' : '#111214',
+                '&:hover': { bgcolor: isLight ? '#f1f5f9' : '#1e2124' }
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: theme.palette.text.primary, display: { xs: 'none', sm: 'block' } }}>
+                {user?.name || user?.username || 'NotAkshay'}
+              </Typography>
+              <Avatar
+                sx={{
+                  width: 26,
+                  height: 26,
+                  bgcolor: '#2563eb',
+                  fontSize: '0.72rem',
+                  fontWeight: 700
+                }}
+              >
+                {(user?.name || user?.username || 'U')[0].toUpperCase()}
+              </Avatar>
+            </Box>
+
+            <Menu
+              anchorEl={anchorEl}
+              open={Boolean(anchorEl)}
+              onClose={() => setAnchorEl(null)}
+              PaperProps={{
+                sx: {
+                  mt: 1,
+                  bgcolor: isLight ? '#ffffff' : '#181a1c',
+                  border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                  borderRadius: 2
+                }
+              }}
+            >
+              <MenuItem onClick={() => { setAnchorEl(null); navigate('/profile'); }}>
+                <PersonRounded fontSize="small" sx={{ mr: 1, color: '#64748b' }} /> Identity Vault
+              </MenuItem>
+              <MenuItem onClick={() => { setAnchorEl(null); navigate('/admin'); }}>
+                <AdminPanelSettingsRounded fontSize="small" sx={{ mr: 1, color: '#64748b' }} /> Authority Portal
+              </MenuItem>
+              <MenuItem onClick={handleLogout} sx={{ color: '#ef4444' }}>
+                <LogoutRounded fontSize="small" sx={{ mr: 1 }} /> Sign Out
+              </MenuItem>
+            </Menu>
+          </Box>
         </Toolbar>
-      </AppBar>
 
-      {/* Sidebar Navigation */}
-      <Sidebar mobileOpen={mobileOpen} onDrawerToggle={handleDrawerToggle} />
-
-      {/* Main Content Area */}
-      <Box
-        component="main"
-        sx={{ 
-          flexGrow: 1, 
-          p: { xs: 2, sm: 3, md: 3.5 }, 
-          width: { sm: 'calc(100% - 84px)' },
-          backgroundColor: '#0a0e17',
-          minHeight: '100vh',
-          position: 'relative',
-        }}
-      >
-        {/* Subtle Ambient Radial Highlight */}
+        {/* Blockscan Horizontal Tabs Bar */}
         <Box
           sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '400px',
-            background: 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.09), transparent 70%)',
-            pointerEvents: 'none',
-            zIndex: 0,
+            display: 'flex',
+            px: { xs: 2, md: 4 },
+            gap: 1,
+            overflowX: 'auto',
+            borderTop: `1px solid ${isLight ? '#f1f5f9' : '#222529'}`,
+            bgcolor: isLight ? '#ffffff' : '#181a1c',
+            '&::-webkit-scrollbar': { height: 0 }
           }}
-        />
+        >
+          {navTabs.map((tab) => {
+            const active = isTabActive(tab.path);
+            return (
+              <Button
+                key={tab.path}
+                component={Link}
+                to={tab.path}
+                startIcon={tab.icon}
+                sx={{
+                  color: active ? '#2563eb' : isLight ? '#64748b' : '#8b949e',
+                  borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
+                  borderRadius: 0,
+                  py: 1.2,
+                  px: 1.8,
+                  textTransform: 'none',
+                  fontSize: '0.84rem',
+                  fontWeight: active ? 700 : 500,
+                  whiteSpace: 'nowrap',
+                  bgcolor: 'transparent',
+                  '&:hover': {
+                    bgcolor: isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.02)',
+                    color: active ? '#2563eb' : isLight ? '#0f172a' : '#ffffff'
+                  }
+                }}
+              >
+                {tab.label}
+              </Button>
+            );
+          })}
+        </Box>
+      </AppBar>
 
-        <Toolbar sx={{ minHeight: 64 }} />
-        <Container maxWidth={false} sx={{ position: 'relative', zIndex: 1, px: { xs: 1, sm: 2, md: 3 } }}>
-          <Outlet />
-        </Container>
+      {/* Main Content Viewport */}
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 4 }, maxWidth: 1400, mx: 'auto', width: '100%' }}>
+        <Outlet />
       </Box>
     </Box>
   );

@@ -9,7 +9,7 @@ const AdminLogin = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { login, user } = useAuth();
+  const { login, user, setUser } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already logged in as admin
@@ -31,11 +31,27 @@ const AdminLogin = () => {
     }
 
     try {
-      const result = await login(username, password);
-      if (result.success) {
+      const response = await fetch('http://localhost:5000/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json();
+      if (response.ok && data.token) {
+        const adminUser = {
+          ...data.admin,
+          role: 'ADMIN',
+          isAdmin: true
+        };
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('accessToken', data.token);
+        localStorage.setItem('user', JSON.stringify(adminUser));
+        if (setUser) {
+          setUser(adminUser);
+        }
         navigate('/admin');
       } else {
-        setError(result.error || 'Invalid credentials. Please try again.');
+        setError(data.message || 'Invalid credentials. Please try again.');
       }
     } catch (err) {
       setError('An error occurred. Please try again later.');

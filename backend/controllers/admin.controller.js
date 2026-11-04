@@ -405,8 +405,8 @@ exports.verifyUser = async (req, res) => {
   try {
     // Check if user exists and get all necessary user data including private key
     const userResult = await db.query(
-      'SELECT id, name, government_id, verification_status, avax_address, avax_address, avax_private_key FROM users WHERE id = $1',
-                'CONFIRMED',
+      'SELECT id, name, government_id, verification_status, avax_address, avax_private_key FROM users WHERE id = $1',
+      [id]
     );
     
     if (userResult.rows.length === 0) {

@@ -1,26 +1,60 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ApiService from '../services/adminApi.service';
-import { FaSearch, FaDownload, FaCalendarAlt, FaFilter, 
-         FaCheckCircle, FaTimesCircle, FaEdit, FaClock, 
-         FaChevronLeft, FaChevronRight, FaHistory } from 'react-icons/fa';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Button,
+  IconButton,
+  TextField,
+  MenuItem,
+  Chip,
+  CircularProgress,
+  Alert,
+  Tooltip,
+  InputAdornment,
+  TablePagination,
+  Grid
+} from '@mui/material';
+import {
+  HistoryRounded,
+  FileDownloadRounded,
+  SearchRounded,
+  FilterListRounded,
+  OpenInNewRounded,
+  CheckCircleRounded,
+  CancelRounded,
+  EditRounded,
+  HourglassEmptyRounded,
+  AdminPanelSettingsRounded,
+  CalendarTodayRounded
+} from '@mui/icons-material';
 
 const AdminActivityLogs = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0); // MUI 0-indexed
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(15);
+  const [actionFilter, setActionFilter] = useState('all');
   const [dateRange, setDateRange] = useState({
     startDate: '',
     endDate: ''
   });
-  const [actionFilter, setActionFilter] = useState('all');
-  const logsPerPage = 15;
+  const [exporting, setExporting] = useState(false);
 
-  // Memoize fetchActivityLogs to avoid recreation on each render
   const fetchActivityLogs = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const filters = {
         action: actionFilter !== 'all' ? actionFilter : undefined,
@@ -28,633 +62,378 @@ const AdminActivityLogs = () => {
         endDate: dateRange.endDate || undefined,
         search: searchQuery || undefined
       };
-      
-      const data = await ApiService.getActivityLogs(currentPage, logsPerPage, filters);
-      setLogs(data.logs);
-      setTotalPages(Math.ceil(data.total / logsPerPage));
-      setLoading(false);
+
+      const data = await ApiService.getActivityLogs(currentPage + 1, rowsPerPage, filters);
+      setLogs(data.logs || []);
+      setTotalLogs(data.total || (data.logs ? data.logs.length : 0));
     } catch (err) {
       console.error('Error fetching activity logs:', err);
-      setError('Failed to load activity logs. Please try again.');
+      setError('Failed to load system activity logs.');
+    } finally {
       setLoading(false);
     }
-  }, [currentPage, logsPerPage, searchQuery, actionFilter, dateRange]);
+  }, [currentPage, rowsPerPage, searchQuery, actionFilter, dateRange]);
 
   useEffect(() => {
     fetchActivityLogs();
   }, [fetchActivityLogs]);
 
-
-
   const handleSearch = (e) => {
     e.preventDefault();
-    setCurrentPage(1); // Reset to first page on new search
-    fetchActivityLogs();
-  };
-
-  const handleDateRangeChange = (e) => {
-    const { name, value } = e.target;
-    setDateRange(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleFilterApply = () => {
-    setCurrentPage(1); // Reset to first page on filter change
+    setCurrentPage(0);
     fetchActivityLogs();
   };
 
   const handleExportLogs = async () => {
     try {
-      setLoading(true);
+      setExporting(true);
       const filters = {
         action: actionFilter !== 'all' ? actionFilter : undefined,
         startDate: dateRange.startDate || undefined,
         endDate: dateRange.endDate || undefined,
         search: searchQuery || undefined
       };
-      
+
       const blob = await ApiService.exportActivityLogs(filters);
-      
-      // Create a URL for the blob
-      const url = window.URL.createObjectURL(blob);
-      
-      // Create a temporary link element
+      const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `activity_logs_${new Date().toISOString().split('T')[0]}.csv`);
-      
-      // Append to the document
+      link.setAttribute('download', `trueid-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
-      
-      // Trigger the download
       link.click();
-      
-      // Clean up
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      setLoading(false);
+      link.remove();
     } catch (err) {
       console.error('Error exporting logs:', err);
-      setError('Failed to export logs. Please try again.');
-      setLoading(false);
+      setError('Failed to export activity logs.');
+    } finally {
+      setExporting(false);
     }
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return 'N/A';
+    try {
+      const d = new Date(dateString);
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return dateString;
+    }
   };
 
-  // Truncate hash for display
-  const truncateHash = (hash) => {
-    if (!hash) return '';
-    return `${hash.substring(0, 10)}...${hash.substring(hash.length - 8)}`;
-  };
-
-  const getActionIcon = (action) => {
-    if (action.includes('Verified')) return <FaCheckCircle className="action-icon verified" style={{ color: '#10b981' }} />;
-    if (action.includes('Rejected')) return <FaTimesCircle className="action-icon rejected" style={{ color: '#ef4444' }} />;
-    if (action.includes('Updated')) return <FaEdit className="action-icon updated" style={{ color: '#3b82f6' }} />;
-    return <FaClock className="action-icon pending" style={{ color: '#f59e0b' }} />;
+  const getActionColor = (action) => {
+    if (!action) return { color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.2)' };
+    const act = action.toUpperCase();
+    if (act.includes('VERIF') || act.includes('SUCCESS')) {
+      return { color: '#34d399', bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.25)' };
+    }
+    if (act.includes('REJECT') || act.includes('FAIL') || act.includes('ERROR')) {
+      return { color: '#f87171', bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.25)' };
+    }
+    if (act.includes('UPDATE') || act.includes('BIOMETRIC')) {
+      return { color: '#818cf8', bg: 'rgba(99, 102, 241, 0.12)', border: 'rgba(99, 102, 241, 0.25)' };
+    }
+    return { color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.25)' };
   };
 
   return (
-    <div className="activity-logs" style={{
-      padding: '24px',
-      backgroundColor: '#1a1a1a',
-      minHeight: '100vh',
-      color: '#e0e0e0',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    }}>
-      <div className="page-header" style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '24px',
-        padding: '0 0 16px 0',
-        borderBottom: '1px solid #333'
-      }}>
-        <h1 className="page-title" style={{
-          fontSize: '28px',
-          fontWeight: '600',
-          margin: '0',
-          display: 'flex',
-          alignItems: 'center',
-          color: '#fff',
-          letterSpacing: '-0.5px'
-        }}>
-          <FaHistory style={{
-            marginRight: '12px',
-            color: '#6366f1'
-          }} />
-          Activity Logs
-        </h1>
-        <button
-          onClick={handleExportLogs}
-          className="export-button"
-          disabled={loading}
-          style={{
-            backgroundColor: '#2d2d2d',
-            color: '#fff',
-            border: '1px solid #404040',
-            borderRadius: '8px',
-            padding: '10px 16px',
-            fontSize: '14px',
-            fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? '0.7' : '1',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            ':hover': {
-              backgroundColor: '#404040'
-            }
-          }}
-        >
-          <FaDownload style={{ marginRight: '8px' }} />
-          Export Logs
-        </button>
-      </div>
-      
+    <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+      {/* Header Banner */}
+      <Card
+        sx={{
+          mb: 4,
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(13, 18, 29, 0.95) 100%)',
+          border: '1px solid rgba(99, 102, 241, 0.25)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          p: { xs: 2.5, md: 3.5 }
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Chip
+                icon={<HistoryRounded sx={{ fontSize: '14px !important', color: '#818cf8 !important' }} />}
+                label="IMMUTABLE AUDIT TRAIL"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(99, 102, 241, 0.15)',
+                  color: '#818cf8',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  fontWeight: 700,
+                  fontSize: '0.68rem',
+                  letterSpacing: '0.08em'
+                }}
+              />
+              <Chip
+                label={`${totalLogs} EVENTS LOGGED`}
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  color: '#cbd5e1',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  fontWeight: 700,
+                  fontSize: '0.68rem'
+                }}
+              />
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', mb: 0.5 }}>
+              Authority Activity Logs
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 640 }}>
+              Chronological cryptographic log of identity audits, biometric enrollments, and operator actions.
+            </Typography>
+          </Box>
+
+          <Button
+            variant="outlined"
+            startIcon={exporting ? <CircularProgress size={16} sx={{ color: '#818cf8' }} /> : <FileDownloadRounded />}
+            onClick={handleExportLogs}
+            disabled={exporting}
+            sx={{
+              borderColor: 'rgba(99, 102, 241, 0.3)',
+              color: '#a5b4fc',
+              fontWeight: 600,
+              px: 2.5,
+              py: 1,
+              borderRadius: 2,
+              textTransform: 'none',
+              bgcolor: 'rgba(99, 102, 241, 0.05)',
+              '&:hover': {
+                bgcolor: 'rgba(99, 102, 241, 0.12)',
+                borderColor: '#6366f1'
+              }
+            }}
+          >
+            {exporting ? 'Generating CSV...' : 'Export Audit Logs (CSV)'}
+          </Button>
+        </Box>
+      </Card>
+
       {error && (
-        <div className="error-message" style={{
-          backgroundColor: '#2c1519',
-          color: '#f87171',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          border: '1px solid #451a1a',
-          fontSize: '14px',
-          display: 'flex',
-          alignItems: 'center'
-        }}>
-          <FaTimesCircle style={{ marginRight: '8px' }} />
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
           {error}
-        </div>
+        </Alert>
       )}
-      
-      {/* Filters */}
-      <div className="filters-section" style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-        marginBottom: '24px',
-        backgroundColor: '#2d2d2d',
-        borderRadius: '12px',
-        padding: '24px',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-      }}>
-        <div className="filters-container" style={{
-          display: 'flex',
-          flexDirection: 'column',
-          width: '100%'
-        }}>
-          <div className="filters-header" style={{
-            display: 'flex',
-            alignItems: 'center',
-            marginBottom: '16px',
-            paddingBottom: '12px',
-            borderBottom: '1px solid #404040'
-          }}>
-            <FaFilter style={{
-              color: '#6366f1',
-              marginRight: '10px',
-              fontSize: '16px'
-            }} />
-            <h3 className="filters-title" style={{
-              margin: '0',
-              fontSize: '18px',
-              fontWeight: '600',
-              color: '#fff',
-              letterSpacing: '-0.3px'
-            }}>Filter Activity Logs</h3>
-          </div>
-          
-          <div className="filters-body" style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '20px'
-          }}>
-            <div className="filter-group" style={{
-              flex: '1',
-              minWidth: '200px'
-            }}>
-              <label htmlFor="actionFilter" className="filter-label" style={{
-                display: 'flex',
-                alignItems: 'center',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#a3a3a3'
-              }}>
-                <FaCheckCircle style={{
-                  marginRight: '8px',
-                  color: '#6366f1',
-                  fontSize: '14px'
-                }} />
-                Action Type
-              </label>
-              <select
-                id="actionFilter"
-                value={actionFilter}
-                onChange={(e) => setActionFilter(e.target.value)}
-                className="filter-select"
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #404040',
-                  backgroundColor: '#1a1a1a',
-                  fontSize: '14px',
-                  color: '#e0e0e0',
-                  appearance: 'none',
-                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%23e0e0e0\' d=\'M6 8.825L1.175 4 2.05 3.125 6 7.075 9.95 3.125 10.825 4 6 8.825z\' /%3E%3C/svg%3E")',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 12px center',
-                  paddingRight: '32px',
-                  transition: 'border-color 0.2s ease',
-                  outline: 'none'
-                }}
-              >
-                <option value="all">All Actions</option>
-                <option value="verified">Verified</option>
-                <option value="rejected">Rejected</option>
-                <option value="updated">Updated</option>
-              </select>
-            </div>
-            
-            <div className="filter-group" style={{
-              flex: '1',
-              minWidth: '200px'
-            }}>
-              <label htmlFor="startDate" className="filter-label" style={{
-                display: 'flex',
-                alignItems: 'center',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#a3a3a3'
-              }}>
-                <FaCalendarAlt style={{
-                  marginRight: '8px',
-                  color: '#6366f1',
-                  fontSize: '14px'
-                }} />
-                Start Date
-              </label>
-              <input
-                type="date"
-                id="startDate"
-                name="startDate"
-                value={dateRange.startDate}
-                onChange={handleDateRangeChange}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #404040',
-                  backgroundColor: '#1a1a1a',
-                  color: '#e0e0e0',
-                  fontSize: '14px',
-                  outline: 'none'
-                }}
-              />
-            </div>
-            
-            <div className="filter-group" style={{
-              flex: '1',
-              minWidth: '200px'
-            }}>
-              <label htmlFor="endDate" className="filter-label" style={{
-                display: 'flex',
-                alignItems: 'center',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#a3a3a3'
-              }}>
-                <FaCalendarAlt style={{
-                  marginRight: '8px',
-                  color: '#6366f1',
-                  fontSize: '14px'
-                }} />
-                End Date
-              </label>
-              <input
-                type="date"
-                id="endDate"
-                name="endDate"
-                value={dateRange.endDate}
-                onChange={handleDateRangeChange}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #404040',
-                  backgroundColor: '#1a1a1a',
-                  color: '#e0e0e0',
-                  fontSize: '14px',
-                  outline: 'none'
-                }}
-              />
-            </div>
-            
-            <div className="filter-actions" style={{
-              display: 'flex',
-              alignItems: 'flex-end',
-              flex: '1',
-              minWidth: '200px'
-            }}>
-              <button
-                onClick={handleFilterApply}
-                className="filter-button"
-                style={{
-                  backgroundColor: '#6366f1',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px 16px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  width: '100%',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 4px rgba(99,102,241,0.2)'
-                }}
-              >
-                <FaFilter style={{ marginRight: '8px' }} />
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        <div className="search-container" style={{
-          marginTop: '16px',
-          borderTop: '1px solid #404040',
-          paddingTop: '16px'
-        }}>
-          <form onSubmit={handleSearch} className="search-form" style={{
-            display: 'flex',
-            gap: '12px'
-          }}>
-            <div className="search-input-container" style={{
-              position: 'relative',
-              flex: '1'
-            }}>
-              <input
-                type="text"
-                placeholder="Search by user name, ID, or admin..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="search-input"
-                style={{
-                  width: '100%',
-                  padding: '12px 16px 12px 40px',
-                  borderRadius: '8px',
-                  border: '1px solid #404040',
-                  fontSize: '14px',
-                  color: '#e0e0e0',
-                  backgroundColor: '#1a1a1a',
-                  transition: 'border-color 0.2s ease',
-                  outline: 'none'
-                }}
-              />
-              <FaSearch style={{
-                position: 'absolute',
-                left: '14px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#6b7280'
-              }} />
-            </div>
-            <button
-              type="submit"
-              className="search-button"
-              style={{
-                backgroundColor: '#6366f1',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '10px 20px',
-                fontSize: '14px',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap',
-                boxShadow: '0 2px 4px rgba(99,102,241,0.2)'
-              }}
-            >
-              <FaSearch style={{ marginRight: '8px' }} />
-              Search
-            </button>
-          </form>
-        </div>
-      </div>
-      
-      {/* Activity Logs Table */}
-      <div className="table-container" style={{
-        backgroundColor: '#2d2d2d',
-        borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-        overflow: 'hidden',
-        marginBottom: '24px'
-      }}>
-        <table className="data-table" style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          fontSize: '14px'
-        }}>
-          <thead>
-            <tr style={{
-              backgroundColor: '#262626',
-              borderBottom: '2px solid #404040'
-            }}>
-              <th style={{
-                padding: '16px',
-                textAlign: 'left',
-                fontWeight: '600',
-                color: '#e0e0e0'
-              }}>Action</th>
-              <th style={{
-                padding: '16px',
-                textAlign: 'left',
-                fontWeight: '600',
-                color: '#e0e0e0'
-              }}>User</th>
-              <th style={{
-                padding: '16px',
-                textAlign: 'left',
-                fontWeight: '600',
-                color: '#e0e0e0'
-              }}>Admin</th>
-              <th style={{
-                padding: '16px',
-                textAlign: 'left',
-                fontWeight: '600',
-                color: '#e0e0e0'
-              }}>Timestamp</th>
-              <th style={{
-                padding: '16px',
-                textAlign: 'left',
-                fontWeight: '600',
-                color: '#e0e0e0'
-              }}>TX Hash</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="5" style={{
-                  padding: '40px',
-                  textAlign: 'center'
-                }}>
-                  <div className="loading-spinner" style={{
-                    display: 'inline-block',
-                    width: '40px',
-                    height: '40px',
-                    border: '4px solid rgba(99,102,241,0.1)',
-                    borderLeftColor: '#6366f1',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }}></div>
-                </td>
-              </tr>
-            ) : logs.length === 0 ? (
-              <tr>
-                <td colSpan="5" style={{
-                  padding: '40px',
-                  textAlign: 'center',
-                  color: '#a3a3a3'
-                }}>
-                  No activity logs found.
-                </td>
-              </tr>
-            ) : (
-              logs.map((log) => (
-                <tr key={log.id} style={{
-                  borderBottom: '1px solid #404040',
-                  transition: 'background-color 0.2s ease',
-                  ':hover': {
-                    backgroundColor: '#333333'
-                  }
-                }}>
-                  <td style={{ padding: '16px', color: '#e0e0e0' }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}>
-                      {getActionIcon(log.action)}
-                      <span>{log.action}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '16px', color: '#e0e0e0' }}>
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px'
-                    }}>
-                      <span style={{ fontWeight: '500' }}>{log.userName}</span>
-                      <span style={{ color: '#a3a3a3', fontSize: '12px' }}>{log.userId}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '16px', color: '#e0e0e0' }}>{log.adminName}</td>
-                  <td style={{ padding: '16px', color: '#e0e0e0' }}>{formatDate(log.timestamp)}</td>
-                  <td style={{
-                    padding: '16px',
-                    fontFamily: 'monospace',
-                    fontSize: '13px',
-                    color: '#6366f1'
-                  }}>{truncateHash(log.txHash)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="pagination" style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '16px',
-          backgroundColor: '#2d2d2d',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-        }}>
-          <div className="pagination-info" style={{
-            fontSize: '14px',
-            color: '#a3a3a3'
-          }}>
-            Showing page {currentPage} of {totalPages}
-          </div>
-          <div className="pagination-controls" style={{
-            display: 'flex',
-            gap: '12px'
-          }}>
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: '1px solid #404040',
-                backgroundColor: currentPage === 1 ? '#262626' : '#2d2d2d',
-                color: currentPage === 1 ? '#6b7280' : '#6366f1',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <FaChevronLeft style={{ marginRight: '8px' }} />
-              Previous
-            </button>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: '1px solid #404040',
-                backgroundColor: currentPage === totalPages ? '#262626' : '#2d2d2d',
-                color: currentPage === totalPages ? '#6b7280' : '#6366f1',
-                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Next
-              <FaChevronRight style={{ marginLeft: '8px' }} />
-            </button>
-          </div>
-        </div>
-      )}
-      
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+
+      {/* Filter and Search Card */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 3,
+          bgcolor: 'rgba(13, 18, 29, 0.75)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(14px)',
+          p: 2.5
+        }}
+      >
+        <Box component="form" onSubmit={handleSearch} sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: 'center' }}>
+          <TextField
+            select
+            value={actionFilter}
+            onChange={(e) => {
+              setActionFilter(e.target.value);
+              setCurrentPage(0);
+            }}
+            size="small"
+            sx={{
+              minWidth: { xs: '100%', sm: 180 },
+              bgcolor: 'rgba(15, 23, 42, 0.7)',
+              borderRadius: 2,
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' }
+            }}
+          >
+            <MenuItem value="all">All Action Types</MenuItem>
+            <MenuItem value="LOGIN_SUCCESS">Login Events</MenuItem>
+            <MenuItem value="ADMIN_LOGIN_SUCCESS">Admin Access</MenuItem>
+            <MenuItem value="IDENTITY_VERIFIED">Identities Verified</MenuItem>
+            <MenuItem value="BIOMETRIC_DATA_UPDATED">Biometric Enrolments</MenuItem>
+          </TextField>
+
+          <TextField
+            placeholder="Search by username, government ID, or operator..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            size="small"
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRounded sx={{ color: '#64748b' }} />
+                </InputAdornment>
+              ),
+              sx: {
+                bgcolor: 'rgba(15, 23, 42, 0.7)',
+                borderRadius: 2,
+                color: '#f8fafc',
+                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
+                '&:hover fieldset': { borderColor: 'rgba(99, 102, 241, 0.4)' },
+                '&.Mui-focused fieldset': { borderColor: '#6366f1' }
+              }
+            }}
+          />
+
+          <Button
+            type="submit"
+            variant="contained"
+            sx={{
+              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+              color: '#ffffff',
+              fontWeight: 600,
+              px: 3,
+              borderRadius: 2,
+              textTransform: 'none',
+              flexShrink: 0
+            }}
+          >
+            Filter Logs
+          </Button>
+        </Box>
+      </Card>
+
+      {/* Logs Table */}
+      <Card
+        sx={{
+          borderRadius: 3,
+          bgcolor: 'rgba(13, 18, 29, 0.75)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(14px)',
+          overflow: 'hidden'
+        }}
+      >
+        <TableContainer>
+          <Table>
+            <TableHead sx={{ bgcolor: 'rgba(15, 23, 42, 0.8)' }}>
+              <TableRow>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  Action / Event
+                </TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  Target Citizen
+                </TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  Authorized By
+                </TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  Timestamp
+                </TableCell>
+                <TableCell align="right" sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  Details / Tx
+                </TableCell>
+              </TableRow>
+            </TableHead>
+
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} sx={{ textAlign: 'center', py: 6, borderBottom: 'none' }}>
+                    <CircularProgress size={32} sx={{ color: '#6366f1', mb: 1.5 }} />
+                    <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                      Retrieving audit records...
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : logs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} sx={{ textAlign: 'center', py: 6, borderBottom: 'none' }}>
+                    <Typography variant="body1" sx={{ color: '#cbd5e1', fontWeight: 600 }}>
+                      No matching audit logs found.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                logs.map((log, idx) => {
+                  const meta = getActionColor(log.action);
+                  return (
+                    <TableRow
+                      key={log.id || idx}
+                      hover
+                      sx={{
+                        transition: 'background-color 0.15s',
+                        '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.04) !important' },
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+                      }}
+                    >
+                      <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                        <Chip
+                          label={log.action}
+                          size="small"
+                          sx={{
+                            bgcolor: meta.bg,
+                            color: meta.color,
+                            border: `1px solid ${meta.border}`,
+                            fontWeight: 700,
+                            fontSize: '0.68rem',
+                            letterSpacing: '0.04em'
+                          }}
+                        />
+                      </TableCell>
+
+                      <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#f8fafc' }}>
+                          {log.user_name || log.userName || 'N/A'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b', fontFamily: 'monospace' }}>
+                          {log.government_id || log.userId ? `ID: ${log.government_id || log.userId}` : ''}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <AdminPanelSettingsRounded sx={{ color: '#818cf8', fontSize: 16 }} />
+                          <Typography variant="body2" sx={{ color: '#cbd5e1' }}>
+                            {log.admin_username || log.adminName || 'System'}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+
+                      <TableCell sx={{ color: '#94a3b8', fontSize: '0.8rem', borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                        {formatDate(log.created_at || log.timestamp)}
+                      </TableCell>
+
+                      <TableCell align="right" sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                        {log.details?.transactionHash || log.txHash ? (
+                          <Tooltip title="View Transaction on Etherscan">
+                            <IconButton
+                              size="small"
+                              onClick={() => window.open(`https://sepolia.etherscan.io/tx/${log.details?.transactionHash || log.txHash}`, '_blank')}
+                              sx={{ color: '#6366f1' }}
+                            >
+                              <OpenInNewRounded sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        ) : (
+                          <Typography variant="caption" sx={{ color: '#64748b' }}>
+                            Local Node
+                          </Typography>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <TablePagination
+          component="div"
+          count={totalLogs}
+          page={currentPage}
+          onPageChange={(e, newPage) => setCurrentPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setCurrentPage(0);
+          }}
+          rowsPerPageOptions={[10, 15, 25, 50]}
+          sx={{
+            color: '#94a3b8',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            '& .MuiSelect-icon': { color: '#94a3b8' }
+          }}
+        />
+      </Card>
+    </Box>
   );
 };
 

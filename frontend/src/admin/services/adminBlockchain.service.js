@@ -24,7 +24,7 @@ class BlockchainService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
-        body: JSON.stringify({ action: 'VERIFY' })
+        body: JSON.stringify({ verificationStatus: 'VERIFIED' })
       });
       
       const data = await response.json();

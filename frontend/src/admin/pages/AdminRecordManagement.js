@@ -1,94 +1,85 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ApiService from '../services/adminApi.service';
 import UserDetailModal from '../components/UserDetailModal';
-import { FaSearch, FaEye, FaUserCheck, FaUserTimes, FaUserClock, FaChevronLeft, FaChevronRight, FaDatabase, FaExclamationCircle, FaEdit } from 'react-icons/fa';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Button,
+  IconButton,
+  TextField,
+  MenuItem,
+  Chip,
+  CircularProgress,
+  Alert,
+  Tooltip,
+  InputAdornment,
+  TablePagination
+} from '@mui/material';
+import {
+  SearchRounded,
+  RefreshRounded,
+  VisibilityRounded,
+  EditRounded,
+  FolderSharedRounded,
+  VerifiedUserRounded,
+  HourglassEmptyRounded,
+  CancelRounded,
+  FingerprintRounded,
+  SecurityRounded,
+  FilterListRounded
+} from '@mui/icons-material';
 
 const AdminRecordManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState('name'); // 'name', 'id', or 'facehash'
+  const [searchType, setSearchType] = useState('name');
   const [selectedUser, setSelectedUser] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0); // MUI 0-indexed
   const [totalUsers, setTotalUsers] = useState(0);
-  const [refreshInterval, setRefreshInterval] = useState(60000); // 60 seconds refresh by default
-  const [lastRefreshed, setLastRefreshed] = useState(new Date());
-  const [autoRefresh, setAutoRefresh] = useState(false); // Disabled by default
-  const refreshTimerRef = useRef(null);
-  const usersPerPage = 10;
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Memoize fetchUsers to avoid recreation on each render
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
+  const fetchUsers = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    else setRefreshing(true);
+    setError(null);
+
     try {
-      const data = await ApiService.getUsers(currentPage, usersPerPage, searchQuery, searchType);
-      setUsers(data.users);
-      setTotalPages(Math.ceil(data.total / usersPerPage));
-      setTotalUsers(data.total);
-      setLastRefreshed(new Date());
-      setLoading(false);
+      const data = await ApiService.getUsers(currentPage + 1, rowsPerPage, searchQuery, searchType);
+      setUsers(data.users || []);
+      setTotalUsers(data.total || 0);
     } catch (err) {
       console.error('Error fetching users:', err);
-      setError('Failed to load users. Please try again.');
+      setError('Failed to load user records from directory.');
+    } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [currentPage, usersPerPage, searchQuery, searchType]);
+  }, [currentPage, rowsPerPage, searchQuery, searchType]);
 
-  // Initial data load
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
-  
-  // Set up polling for real-time updates
-  useEffect(() => {
-    if (autoRefresh) {
-      refreshTimerRef.current = setInterval(() => {
-        fetchUsers();
-      }, refreshInterval);
-    }
-    
-    return () => {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-      }
-    };
-  }, [fetchUsers, refreshInterval, autoRefresh]);
 
-  // Manual refresh function
-  const handleManualRefresh = () => {
-    fetchUsers();
-  };
-
-  // Toggle auto-refresh
-  const toggleAutoRefresh = () => {
-    setAutoRefresh(!autoRefresh);
-  };
-
-  // Change refresh interval
-  const handleRefreshIntervalChange = (e) => {
-    const value = parseInt(e.target.value, 10);
-    setRefreshInterval(value);
-  };
-
-  const handleSearch = (e) => {
+  const handleSearchSubmit = (e) => {
     e.preventDefault();
-    setCurrentPage(1); // Reset to first page on new search
+    setCurrentPage(0);
     fetchUsers();
   };
 
-  const handleViewUser = (user) => {
-    // Ensure the user object has the correct ID property
-    // The API returns 'id' but the modal expects 'id'
-    const userWithProperID = {
-      ...user,
-      // Make sure id is defined and properly set
-      id: user.id
-    };
-    
-    setSelectedUser(userWithProperID);
+  const handleViewUser = (u, isEditMode = false) => {
+    setSelectedUser({ ...u, isEdit: isEditMode });
     setIsModalOpen(true);
   };
 
@@ -98,655 +89,393 @@ const AdminRecordManagement = () => {
   };
 
   const handleUserUpdated = (updatedUser) => {
-    // Update the user in the list
-    setUsers(users.map(user => 
-      user.id === updatedUser.id ? updatedUser : user
-    ));
-    setIsModalOpen(false);
-    setSelectedUser(null);
+    setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+    handleCloseModal();
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return 'N/A';
+    try {
+      const d = new Date(dateString);
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return dateString;
+    }
   };
 
-  const getStatusDisplay = (status) => {
-    if (!status) return 'Unknown';
-    
-    // API returns status in uppercase (e.g., 'PENDING', 'VERIFIED', 'REJECTED')
-    // Convert to title case for display (e.g., 'Pending', 'Verified', 'Rejected')
-    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+  const getStatusChip = (status) => {
+    const s = (status || 'PENDING').toUpperCase();
+    if (s === 'VERIFIED') {
+      return (
+        <Chip
+          icon={<VerifiedUserRounded sx={{ fontSize: '14px !important', color: '#10b981 !important' }} />}
+          label="VERIFIED"
+          size="small"
+          sx={{
+            bgcolor: 'rgba(16, 185, 129, 0.12)',
+            color: '#34d399',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            fontWeight: 700,
+            fontSize: '0.68rem',
+            letterSpacing: '0.04em'
+          }}
+        />
+      );
+    }
+    if (s === 'REJECTED') {
+      return (
+        <Chip
+          icon={<CancelRounded sx={{ fontSize: '14px !important', color: '#ef4444 !important' }} />}
+          label="REJECTED"
+          size="small"
+          sx={{
+            bgcolor: 'rgba(239, 68, 68, 0.12)',
+            color: '#f87171',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            fontWeight: 700,
+            fontSize: '0.68rem',
+            letterSpacing: '0.04em'
+          }}
+        />
+      );
+    }
+    return (
+      <Chip
+        icon={<HourglassEmptyRounded sx={{ fontSize: '14px !important', color: '#f59e0b !important' }} />}
+        label="PENDING"
+        size="small"
+        sx={{
+          bgcolor: 'rgba(245, 158, 11, 0.12)',
+          color: '#fbbf24',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          fontWeight: 700,
+          fontSize: '0.68rem',
+          letterSpacing: '0.04em'
+        }}
+      />
+    );
   };
-
-  // Animation styles are defined in the CSS injected below
-
-  // Add animation styles to head
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      
-      @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-5px); }
-        75% { transform: translateX(5px); }
-      }
-      
-      @media (max-width: 1024px) {
-        .record-management {
-          padding: 16px;
-        }
-        
-        .page-header {
-          margin-bottom: 24px;
-        }
-      }
-      
-      @media (max-width: 768px) {
-        .record-management form {
-          flex-direction: column;
-        }
-        
-        .record-management .form-group {
-          width: 100%;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => document.head.removeChild(style);
-  }, []);
 
   return (
-    <div className="record-management" style={{
-      padding: '32px',
-      backgroundColor: 'white',
-      minHeight: '100vh',
-      color: '#1f2937',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    }}>
-      <div className="page-header" style={{
-        marginBottom: '32px'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          marginBottom: '24px'
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            backgroundColor: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '1px solid #3b82f6',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-          }}>
-            <FaDatabase style={{ color: '#3b82f6', fontSize: '20px' }} />
-          </div>
-          <div>
-            <h1 style={{
-              fontSize: '28px',
-              fontWeight: '600',
-              margin: '0 0 4px 0',
-              color: '#1f2937',
-              letterSpacing: '-0.5px'
-            }}>User Records</h1>
-            <p style={{
-              color: '#6b7280',
-              fontSize: '14px',
-              margin: '0'
-            }}>Manage and monitor user identities in the system</p>
-          </div>
-        </div>
-        
-        <form onSubmit={handleSearch} style={{
-          backgroundColor: 'white',
-          padding: '24px',
-          borderRadius: '16px',
-          border: '1px solid #3b82f6',
-          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{
-            display: 'flex',
-            gap: '16px',
-            marginBottom: '16px'
-          }}>
-            <div style={{
-              flex: '0 0 200px'
-            }}>
-              <select 
-                value={searchType} 
-                onChange={(e) => setSearchType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  backgroundColor: 'white',
-                  border: '1px solid #3b82f6',
-                  borderRadius: '12px',
-                  color: '#1f2937',
-                  fontSize: '14px',
-                  outline: 'none',
-                  cursor: 'pointer',
-                  appearance: 'none',
-                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%236b7280\'%3E%3Cpath d=\'M7 10l5 5 5-5z\'/%3E%3C/svg%3E")',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 12px center',
-                  backgroundSize: '20px',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <option value="name">Search by Name</option>
-                <option value="id">Search by ID</option>
-                <option value="facehash">Search by Facemesh Hash</option>
-              </select>
-            </div>
-            
-            <div style={{
-              flex: '1',
-              position: 'relative'
-            }}>
-              <input
-                type="text"
-                placeholder={`Search by ${searchType}...`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px 12px 40px',
-                  backgroundColor: 'white',
-                  border: '1px solid #3b82f6',
-                  borderRadius: '12px',
-                  color: '#1f2937',
-                  fontSize: '14px',
-                  outline: 'none',
-                  transition: 'all 0.2s ease'
+    <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+      {/* Top Banner */}
+      <Card
+        sx={{
+          mb: 4,
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(13, 18, 29, 0.95) 100%)',
+          border: '1px solid rgba(99, 102, 241, 0.25)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          p: { xs: 2.5, md: 3.5 }
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Chip
+                icon={<FolderSharedRounded sx={{ fontSize: '14px !important', color: '#818cf8 !important' }} />}
+                label="CITIZEN ENROLLMENT DIRECTORY"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(99, 102, 241, 0.15)',
+                  color: '#818cf8',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  fontWeight: 700,
+                  fontSize: '0.68rem',
+                  letterSpacing: '0.08em'
                 }}
               />
-              <FaSearch style={{
-                position: 'absolute',
-                left: '14px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#6b7280'
-              }} />
-            </div>
-            
-            <button
-              type="submit"
-              style={{
-                backgroundColor: '#3b82f6',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '12px 24px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <FaSearch />
-              Search Records
-            </button>
-          </div>
-          
-          {!loading && (
-            <div style={{
-              color: '#a3a3a3',
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <span style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: '#34d399'
-              }}></span>
-              Showing {users.length} of {totalUsers} total users
-            </div>
-          )}
-        </form>
-      </div>
+              <Chip
+                label={`${totalUsers} RECORDS INDEXED`}
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  color: '#cbd5e1',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  fontWeight: 700,
+                  fontSize: '0.68rem'
+                }}
+              />
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', mb: 0.5 }}>
+              Citizen Identity Records
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 640 }}>
+              Search, inspect dossiers, audit invariant biometric vectors, and issue cryptographic attestations.
+            </Typography>
+          </Box>
+
+          <Button
+            variant="outlined"
+            startIcon={refreshing ? <CircularProgress size={16} sx={{ color: '#818cf8' }} /> : <RefreshRounded />}
+            onClick={() => fetchUsers(false)}
+            disabled={loading || refreshing}
+            sx={{
+              borderColor: 'rgba(99, 102, 241, 0.3)',
+              color: '#a5b4fc',
+              fontWeight: 600,
+              px: 2.5,
+              py: 1,
+              borderRadius: 2,
+              textTransform: 'none',
+              bgcolor: 'rgba(99, 102, 241, 0.05)',
+              '&:hover': {
+                bgcolor: 'rgba(99, 102, 241, 0.12)',
+                borderColor: '#6366f1'
+              }
+            }}
+          >
+            {refreshing ? 'Updating...' : 'Sync Directory'}
+          </Button>
+        </Box>
+      </Card>
 
       {error && (
-        <div style={{
-          backgroundColor: 'white',
-          color: '#ef4444',
-          padding: '16px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          fontSize: '14px',
-          border: '1px solid #ef4444',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          animation: 'shake 0.5s',
-          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-        }}>
-          <FaExclamationCircle />
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
           {error}
-        </div>
+        </Alert>
       )}
 
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '16px',
-        overflow: 'hidden',
-        border: '1px solid #3b82f6',
-        marginBottom: '24px',
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-      }}>
-        <div style={{
-          overflowX: 'auto'
-        }}>
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: '14px'
-          }}>
-            <thead>
-              <tr style={{
-                backgroundColor: '#3b82f6'
-              }}>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'left',
-                  fontWeight: '600',
-                  color: 'white',
-                  borderBottom: '2px solid white',
-                  whiteSpace: 'nowrap'
-                }}>Serial No.</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'left',
-                  fontWeight: '600',
-                  color: 'white',
-                  borderBottom: '2px solid white',
-                  whiteSpace: 'nowrap'
-                }}>Name</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'left',
-                  fontWeight: '600',
-                  color: 'white',
-                  borderBottom: '2px solid white',
-                  whiteSpace: 'nowrap'
-                }}>Unique ID</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'left',
-                  fontWeight: '600',
-                  color: 'white',
-                  borderBottom: '2px solid white',
-                  whiteSpace: 'nowrap'
-                }}>Status</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'left',
-                  fontWeight: '600',
-                  color: 'white',
-                  borderBottom: '2px solid white',
-                  whiteSpace: 'nowrap'
-                }}>Last Updated</th>
-                <th style={{
-                  padding: '16px',
-                  textAlign: 'left',
-                  fontWeight: '600',
-                  color: 'white',
-                  borderBottom: '2px solid white',
-                  whiteSpace: 'nowrap'
-                }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="6" style={{
-                    padding: '48px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{
-                      display: 'inline-flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '16px'
-                    }}>
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        border: '3px solid rgba(99,102,241,0.1)',
-                        borderTopColor: '#6366f1',
-                        borderRadius: '50%',
-                        animation: 'spin 1s linear infinite'
-                      }}></div>
-                      <span style={{ color: '#a3a3a3' }}>Loading records...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan="6" style={{
-                    padding: '48px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{
-                      display: 'inline-flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '16px',
-                      color: '#a3a3a3'
-                    }}>
-                      <FaDatabase style={{ fontSize: '32px', opacity: '0.5' }} />
-                      <span>No records found</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                users.map((user, index) => (
-                  <tr key={user?.id || index} style={{
-                    borderBottom: '1px solid #e5e7eb',
-                    backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb',
-                    transition: 'background-color 0.2s ease'
-                  }}>
-                    <td style={{
-                      padding: '16px',
-                      color: '#1f2937',
-                      whiteSpace: 'nowrap'
-                    }}>{(currentPage - 1) * usersPerPage + index + 1}</td>
-                    <td style={{
-                      padding: '16px',
-                      color: '#1f2937',
-                      whiteSpace: 'nowrap'
-                    }}>{user?.name || 'N/A'}</td>
-                    <td style={{
-                      padding: '16px',
-                      color: '#1f2937',
-                      fontFamily: 'monospace',
-                      whiteSpace: 'nowrap'
-                    }}>{user?.government_id || 'N/A'}</td>
-                    <td style={{
-                      padding: '16px',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        borderRadius: '20px',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        backgroundColor: 'white',
-                        color: user?.verification_status === 'VERIFIED' ? '#10b981' :
-                               user?.verification_status === 'REJECTED' ? '#ef4444' :
-                               '#f59e0b',
-                        border: `1px solid ${user?.verification_status === 'VERIFIED' ? '#10b981' :
-                                           user?.verification_status === 'REJECTED' ? '#ef4444' :
-                                           '#f59e0b'}`,
-                        transition: 'all 0.2s ease'
-                      }}>
-                        {user?.verification_status === 'VERIFIED' && <FaUserCheck />}
-                        {user?.verification_status === 'REJECTED' && <FaUserTimes />}
-                        {(!user?.verification_status || user.verification_status === 'PENDING') && <FaUserClock />}
-                        <span>{getStatusDisplay(user?.verification_status || 'PENDING')}</span>
-                      </div>
-                    </td>
-                    <td style={{
-                      padding: '16px',
-                      color: '#6b7280',
-                      whiteSpace: 'nowrap'
-                    }}>{user?.updated_at ? formatDate(user.updated_at) : 'N/A'}</td>
-                    <td style={{
-                      padding: '16px',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        gap: '8px'
-                      }}>
-                        <button
-                          onClick={() => handleViewUser(user)}
-                          style={{
-                            backgroundColor: 'white',
-                            color: '#3b82f6',
-                            border: '1px solid #3b82f6',
-                            borderRadius: '8px',
-                            padding: '8px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          title="View Details"
-                        >
-                          <FaEye />
-                        </button>
-                        <button
-                          onClick={() => handleViewUser({...user, isEdit: true})}
-                          style={{
-                            backgroundColor: 'white',
-                            color: '#3b82f6',
-                            border: '1px solid #3b82f6',
-                            borderRadius: '8px',
-                            padding: '8px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          title="Edit User"
-                        >
-                          <FaEdit />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Filter and Search Bar */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 3,
+          bgcolor: 'rgba(13, 18, 29, 0.75)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(14px)',
+          p: 2.5
+        }}
+      >
+        <Box component="form" onSubmit={handleSearchSubmit} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+          <TextField
+            select
+            value={searchType}
+            onChange={(e) => setSearchType(e.target.value)}
+            size="small"
+            sx={{
+              minWidth: { xs: '100%', sm: 180 },
+              bgcolor: 'rgba(15, 23, 42, 0.7)',
+              borderRadius: 2,
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' }
+            }}
+          >
+            <MenuItem value="name">Search by Name</MenuItem>
+            <MenuItem value="id">Search by Gov ID</MenuItem>
+            <MenuItem value="facehash">Search by Face Hash</MenuItem>
+          </TextField>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: '16px',
-          padding: '12px',
-          backgroundColor: '#262626',
-          borderRadius: '12px',
-          border: '1px solid #404040'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px'
-          }}>
-            <div style={{
-              color: '#6b7280',
-              fontSize: '14px'
-            }}>
-              Page {currentPage} of {totalPages}
-            </div>
-            
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <button
-                onClick={handleManualRefresh}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '36px',
-                  height: '36px',
-                  backgroundColor: 'white',
-                  border: '1px solid #3b82f6',
-                  borderRadius: '12px',
-                  color: '#3b82f6',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-                title="Refresh data"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style={{
-                  animation: loading ? 'spin 1s linear infinite' : 'none'
-                }}>
-                  <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                  <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                </svg>
-              </button>
-              
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <input
-                  type="checkbox"
-                  id="autoRefresh"
-                  checked={autoRefresh}
-                  onChange={toggleAutoRefresh}
-                  style={{
-                    accentColor: '#3b82f6'
-                  }}
-                />
-                <label htmlFor="autoRefresh" style={{ fontSize: '14px', color: '#6b7280' }}>
-                  Auto-refresh
-                </label>
-              </div>
-              
-              {autoRefresh && (
-                <select
-                  value={refreshInterval}
-                  onChange={handleRefreshIntervalChange}
-                  style={{
-                    padding: '4px 8px',
-                    backgroundColor: 'white',
-                    border: '1px solid #3b82f6',
-                    borderRadius: '8px',
-                    color: '#1f2937',
-                    fontSize: '14px'
-                  }}
-                >
-                  <option value="5000">5s</option>
-                  <option value="10000">10s</option>
-                  <option value="30000">30s</option>
-                  <option value="60000">1m</option>
-                </select>
-              )}
-              
-              <div style={{ fontSize: '12px', color: '#a3a3a3' }}>
-                Last updated: {lastRefreshed.toLocaleTimeString()}
-              </div>
-            </div>
-          </div>
-        
-          <div style={{
-            display: 'flex',
-            gap: '8px'
-          }}>
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 16px',
-                backgroundColor: 'white',
-                border: '1px solid #3b82f6',
-                borderRadius: '12px',
-                color: currentPage === 1 ? '#9ca3af' : '#3b82f6',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
-                opacity: currentPage === 1 ? 0.6 : 1
-              }}
-            >
-              <FaChevronLeft />
-              <span>Previous</span>
-            </button>
-            
-            <div style={{
-              display: 'flex',
-              gap: '4px'
-            }}>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    style={{
-                      minWidth: '40px',
-                      padding: '10px',
-                      backgroundColor: currentPage === pageNum ? '#3b82f6' : 'white',
-                      border: '1px solid #3b82f6',
-                      borderRadius: '12px',
-                      color: currentPage === pageNum ? '#fff' : '#3b82f6',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
+          <TextField
+            placeholder={`Enter search query...`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            size="small"
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRounded sx={{ color: '#64748b' }} />
+                </InputAdornment>
+              ),
+              sx: {
+                bgcolor: 'rgba(15, 23, 42, 0.7)',
+                borderRadius: 2,
+                color: '#f8fafc',
+                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
+                '&:hover fieldset': { borderColor: 'rgba(99, 102, 241, 0.4)' },
+                '&.Mui-focused fieldset': { borderColor: '#6366f1' }
+              }
+            }}
+          />
+
+          <Button
+            type="submit"
+            variant="contained"
+            sx={{
+              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+              color: '#ffffff',
+              fontWeight: 600,
+              px: 3,
+              borderRadius: 2,
+              textTransform: 'none',
+              flexShrink: 0
+            }}
+          >
+            Search
+          </Button>
+        </Box>
+      </Card>
+
+      {/* Records Table */}
+      <Card
+        sx={{
+          borderRadius: 3,
+          bgcolor: 'rgba(13, 18, 29, 0.75)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(14px)',
+          overflow: 'hidden'
+        }}
+      >
+        <TableContainer>
+          <Table>
+            <TableHead sx={{ bgcolor: 'rgba(15, 23, 42, 0.8)' }}>
+              <TableRow>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  #
+                </TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  Citizen Name
+                </TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  Government Serial ID
+                </TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  Attestation State
+                </TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  Last Modified
+                </TableCell>
+                <TableCell align="right" sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  Actions
+                </TableCell>
+              </TableRow>
+            </TableHead>
+
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} sx={{ textAlign: 'center', py: 6, borderBottom: 'none' }}>
+                    <CircularProgress size={32} sx={{ color: '#6366f1', mb: 1.5 }} />
+                    <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                      Querying encrypted user registry...
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} sx={{ textAlign: 'center', py: 6, borderBottom: 'none' }}>
+                    <Typography variant="body1" sx={{ color: '#cbd5e1', fontWeight: 600 }}>
+                      No citizen records found.
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                      Try adjusting your search criteria or filter.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                users.map((u, idx) => (
+                  <TableRow
+                    key={u.id || idx}
+                    hover
+                    sx={{
+                      transition: 'background-color 0.15s',
+                      '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.04) !important' },
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
                     }}
                   >
-                    {pageNum}
-                  </button>
-                );
-              })}
-            </div>
-            
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 16px',
-                backgroundColor: 'white',
-                border: '1px solid #3b82f6',
-                borderRadius: '12px',
-                color: currentPage === totalPages ? '#9ca3af' : '#3b82f6',
-                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
-                opacity: currentPage === totalPages ? 0.6 : 1
-              }}
-            >
-              <span>Next</span>
-              <FaChevronRight />
-            </button>
-          </div>
-        </div>
-      )}
+                    <TableCell sx={{ color: '#64748b', fontSize: '0.85rem', borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      {currentPage * rowsPerPage + idx + 1}
+                    </TableCell>
 
-      {/* User Detail Modal */}
+                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#f8fafc' }}>
+                          {u.name || 'Anonymous Citizen'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                          {u.email || 'No email attached'}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+
+                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 600, fontSize: '0.82rem' }}>
+                        {u.government_id || 'NOT_ASSIGNED'}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      {getStatusChip(u.verification_status)}
+                    </TableCell>
+
+                    <TableCell sx={{ color: '#94a3b8', fontSize: '0.8rem', borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      {formatDate(u.updated_at || u.created_at)}
+                    </TableCell>
+
+                    <TableCell align="right" sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                        <Button
+                          size="small"
+                          startIcon={<VisibilityRounded />}
+                          onClick={() => handleViewUser(u, false)}
+                          sx={{
+                            color: '#a5b4fc',
+                            bgcolor: 'rgba(99, 102, 241, 0.1)',
+                            border: '1px solid rgba(99, 102, 241, 0.25)',
+                            borderRadius: 1.5,
+                            textTransform: 'none',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            px: 1.5,
+                            '&:hover': {
+                              bgcolor: 'rgba(99, 102, 241, 0.2)',
+                              color: '#ffffff'
+                            }
+                          }}
+                        >
+                          Dossier
+                        </Button>
+
+                        <Button
+                          size="small"
+                          startIcon={<EditRounded />}
+                          onClick={() => handleViewUser(u, true)}
+                          sx={{
+                            color: '#cbd5e1',
+                            bgcolor: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: 1.5,
+                            textTransform: 'none',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            px: 1.5,
+                            '&:hover': {
+                              bgcolor: 'rgba(255, 255, 255, 0.1)',
+                              color: '#ffffff'
+                            }
+                          }}
+                        >
+                          Audit
+                        </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <TablePagination
+          component="div"
+          count={totalUsers}
+          page={currentPage}
+          onPageChange={(e, newPage) => setCurrentPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setCurrentPage(0);
+          }}
+          rowsPerPageOptions={[5, 10, 25]}
+          sx={{
+            color: '#94a3b8',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            '& .MuiSelect-icon': { color: '#94a3b8' }
+          }}
+        />
+      </Card>
+
+      {/* Dossier Modal */}
       {isModalOpen && selectedUser && (
         <UserDetailModal
           user={selectedUser}
@@ -754,7 +483,7 @@ const AdminRecordManagement = () => {
           onUserUpdated={handleUserUpdated}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

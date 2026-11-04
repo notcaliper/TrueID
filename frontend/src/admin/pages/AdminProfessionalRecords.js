@@ -51,7 +51,8 @@ import {
   Info as InfoIcon,
   Fingerprint as FingerprintIcon,
   Link as LinkIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  WorkspacePremiumRounded
 } from '@mui/icons-material';
 import { LoadingButton } from '@mui/lab';
 import ApiService from '../services/adminApi.service';
@@ -482,101 +483,214 @@ const AdminProfessionalRecords = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Professional Records Management
-      </Typography>
+    <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+      {/* Top Banner */}
+      <Card
+        sx={{
+          mb: 4,
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(13, 18, 29, 0.95) 100%)',
+          border: '1px solid rgba(99, 102, 241, 0.25)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          p: { xs: 2.5, md: 3.5 }
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Chip
+                icon={<WorkspacePremiumRounded sx={{ fontSize: '14px !important', color: '#818cf8 !important' }} />}
+                label="ACADEMIC & PROFESSIONAL VERIFICATION"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(99, 102, 241, 0.15)',
+                  color: '#818cf8',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  fontWeight: 700,
+                  fontSize: '0.68rem',
+                  letterSpacing: '0.08em'
+                }}
+              />
+              <Chip
+                label={`${totalRecords} CREDENTIALS`}
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  color: '#cbd5e1',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  fontWeight: 700,
+                  fontSize: '0.68rem'
+                }}
+              />
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', mb: 0.5 }}>
+              Professional Records Registry
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 640 }}>
+              Audit institutional diplomas, corporate employment proofs, and cryptographic certificate hashes.
+            </Typography>
+          </Box>
+
+          <Button
+            startIcon={<RefreshIcon />}
+            onClick={() => debouncedFetch(searchQuery, page, rowsPerPage)}
+            variant="outlined"
+            sx={{
+              borderColor: 'rgba(99, 102, 241, 0.3)',
+              color: '#a5b4fc',
+              fontWeight: 600,
+              px: 2.5,
+              py: 1,
+              borderRadius: 2,
+              textTransform: 'none',
+              bgcolor: 'rgba(99, 102, 241, 0.05)',
+              '&:hover': {
+                bgcolor: 'rgba(99, 102, 241, 0.12)',
+                borderColor: '#6366f1'
+              }
+            }}
+          >
+            Sync Registry
+          </Button>
+        </Box>
+      </Card>
       
       {/* Search and Controls */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 3,
+          bgcolor: 'rgba(13, 18, 29, 0.75)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(14px)',
+          p: 2.5
+        }}
+      >
         <TextField
-          label="Search"
+          placeholder="Search by title, organization, or citizen name..."
           variant="outlined"
           size="small"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          fullWidth
           InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1 }} />
+            startAdornment: (
+              <SearchIcon sx={{ color: '#64748b', mr: 1 }} />
+            ),
+            sx: {
+              bgcolor: 'rgba(15, 23, 42, 0.7)',
+              borderRadius: 2,
+              color: '#f8fafc',
+              '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
+            }
           }}
-          sx={{ width: 300 }}
         />
-        
-        <Button
-          startIcon={<RefreshIcon />}
-          onClick={() => debouncedFetch(searchQuery, page, rowsPerPage)}
-          variant="outlined"
-        >
-          Refresh
-        </Button>
-      </Box>
+      </Card>
       
       {/* Records Table */}
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>User</TableCell>
-              <TableCell>Title</TableCell>
-              <TableCell>Organization</TableCell>
-              <TableCell>Date Range</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Hash Status</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
+      <Card
+        sx={{
+          borderRadius: 3,
+          bgcolor: 'rgba(13, 18, 29, 0.75)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(14px)',
+          overflow: 'hidden'
+        }}
+      >
+        <TableContainer>
+          <Table>
+            <TableHead sx={{ bgcolor: 'rgba(15, 23, 42, 0.8)' }}>
               <TableRow>
-                <TableCell colSpan={7} align="center">
-                  <CircularProgress />
-                </TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Citizen</TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Title</TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Organization</TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Date Range</TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Status</TableCell>
+                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Hash Status</TableCell>
+                <TableCell align="right" sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Actions</TableCell>
               </TableRow>
-            ) : records.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} align="center">
-                  No records found
-                </TableCell>
-              </TableRow>
-            ) : (
-              records.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell>
-                    <Typography variant="subtitle2">{record.user?.name}</Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      {record.user?.government_id}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{record.title}</TableCell>
-                  <TableCell>{record.organization || record.institution}</TableCell>
-                  <TableCell>
-                    {formatDate(record.start_date || record.startDate)} -{' '}
-                    {record.end_date || record.endDate ? formatDate(record.end_date || record.endDate) : 'Present'}
-                  </TableCell>
-                  <TableCell>
-                    <StatusChip status={record.verification_status || record.verificationStatus} />
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title={record.data_hash || 'No hash available'}>
-                      <Chip
-                        icon={<FingerprintIcon />}
-                        label={record.data_hash ? 'Hashed' : 'Not Hashed'}
-                        color={record.data_hash ? 'success' : 'default'}
-                      />
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell>
-                    <IconButton 
-                      onClick={() => handleViewRecord(record)} 
-                      color="primary"
-                    >
-                      <VisibilityIcon />
-                    </IconButton>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 6, borderBottom: 'none' }}>
+                    <CircularProgress size={32} sx={{ color: '#6366f1' }} />
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : records.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center" sx={{ py: 6, borderBottom: 'none' }}>
+                    <Typography variant="body1" sx={{ color: '#cbd5e1', fontWeight: 600 }}>
+                      No verified records registered yet.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                records.map((record) => (
+                  <TableRow
+                    key={record.id}
+                    hover
+                    sx={{
+                      '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.04) !important' },
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+                    }}
+                  >
+                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#f8fafc' }}>{record.user?.name || 'N/A'}</Typography>
+                      <Typography variant="caption" sx={{ color: '#64748b', fontFamily: 'monospace' }}>
+                        {record.user?.government_id}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ color: '#f8fafc', fontWeight: 600, borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>{record.title}</TableCell>
+                    <TableCell sx={{ color: '#38bdf8', borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>{record.organization || record.institution}</TableCell>
+                    <TableCell sx={{ color: '#94a3b8', fontSize: '0.8rem', borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      {formatDate(record.start_date || record.startDate)} —{' '}
+                      {record.end_date || record.endDate ? formatDate(record.end_date || record.endDate) : 'Present'}
+                    </TableCell>
+                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <StatusChip status={record.verification_status || record.verificationStatus} />
+                    </TableCell>
+                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <Tooltip title={record.data_hash || 'No hash available'}>
+                        <Chip
+                          icon={<FingerprintIcon sx={{ fontSize: '14px !important' }} />}
+                          label={record.data_hash ? 'Hashed' : 'Not Hashed'}
+                          size="small"
+                          sx={{
+                            bgcolor: record.data_hash ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                            color: record.data_hash ? '#34d399' : '#94a3b8',
+                            border: `1px solid ${record.data_hash ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                            fontWeight: 700,
+                            fontSize: '0.68rem'
+                          }}
+                        />
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell align="right" sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <Button
+                        size="small"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => handleViewRecord(record)}
+                        sx={{
+                          color: '#a5b4fc',
+                          bgcolor: 'rgba(99, 102, 241, 0.1)',
+                          border: '1px solid rgba(99, 102, 241, 0.25)',
+                          borderRadius: 1.5,
+                          textTransform: 'none',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          px: 1.5
+                        }}
+                      >
+                        Inspect
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
         <TablePagination
           component="div"
           count={totalRecords}
@@ -587,8 +701,13 @@ const AdminProfessionalRecords = () => {
             setRowsPerPage(parseInt(e.target.value, 10));
             setPage(0);
           }}
+          sx={{
+            color: '#94a3b8',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            '& .MuiSelect-icon': { color: '#94a3b8' }
+          }}
         />
-      </TableContainer>
+      </Card>
       
       {/* Record Detail Modal */}
       <Dialog
@@ -596,6 +715,15 @@ const AdminProfessionalRecords = () => {
         onClose={handleCloseModal}
         maxWidth="md"
         fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#0d121d',
+            backgroundImage: 'none',
+            borderRadius: 3,
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 24px 48px rgba(0, 0, 0, 0.7)'
+          }
+        }}
       >
         {selectedRecord && (
           <>

@@ -1,17 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ApiService from '../services/adminApi.service';
-import { FaUsers, FaUserCheck, FaUserClock, FaUserTimes, 
-         FaCheckCircle, FaTimesCircle, FaEdit, FaHistory, 
-         FaCog, FaLink, FaChevronRight, FaFingerprint, 
-         FaChartLine, FaShieldAlt, FaIdCard, FaArrowUp, 
-         FaArrowDown, FaSync, FaExclamationTriangle, FaUserShield } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
-import './AdminDashboard.css';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Button,
+  Grid,
+  Chip,
+  CircularProgress,
+  Alert,
+  Divider,
+  Avatar,
+  IconButton,
+  Tooltip
+} from '@mui/material';
+import {
+  PeopleAltRounded,
+  VerifiedUserRounded,
+  HourglassEmptyRounded,
+  CancelRounded,
+  RefreshRounded,
+  ArrowForwardRounded,
+  SecurityRounded,
+  FolderSharedRounded,
+  FingerprintRounded,
+  WorkspacePremiumRounded,
+  HistoryRounded,
+  SettingsRounded,
+  OpenInNewRounded,
+  TrendingUpRounded,
+  CheckCircleRounded
+} from '@mui/icons-material';
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const currentUser = user || { username: 'admin', role: 'SUPER_ADMIN' };
+
   const [stats, setStats] = useState({
     totalUsers: 0,
     verifiedUsers: 0,
@@ -26,52 +54,23 @@ const AdminDashboard = () => {
       rejectedChange: 0
     }
   });
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchDashboardData();
-    // Set up auto-refresh every 5 minutes
-    const refreshInterval = setInterval(() => {
-      handleRefresh(true);
-    }, 300000);
-    
-    return () => clearInterval(refreshInterval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Initial empty state for dashboard data - used as reference for data structure
-  // eslint-disable-next-line no-unused-vars
-  const initialDashboardState = {
-    userStats: {
-      total: 0,
-      verified: 0,
-      pending: 0,
-      rejected: 0
-    },
-    recordStats: {
-      biometricRecords: 0,
-      professionalRecords: 0,
-      blockchainTransactions: 0
-    },
-    recentActivity: [],
-    registrationTrend: [],
-    lastUpdated: new Date()
-  };
-
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = useCallback(async (isSilent = false) => {
+    if (!isSilent) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     setError(null);
+
     try {
-      // Get dashboard statistics from API
       const response = await ApiService.getDashboardStats();
       const data = response.data || response;
-      
-      console.log('Dashboard data received:', data);
-      
-      // Transform API data to match our state structure
-      // Handle both possible response formats
+
       const transformedData = {
         totalUsers: data.userStats?.total || 0,
         verifiedUsers: data.userStats?.verified || 0,
@@ -79,7 +78,7 @@ const AdminDashboard = () => {
         rejectedUsers: data.userStats?.rejected || 0,
         lastUpdated: new Date(),
         trends: {
-          totalChange: 0, // We'll calculate this when we have previous data
+          totalChange: 0,
           verifiedChange: 0,
           pendingChange: 0,
           rejectedChange: 0
@@ -94,396 +93,530 @@ const AdminDashboard = () => {
           txHash: activity.details?.transactionHash || activity.txHash
         }))
       };
-      
+
       setStats(transformedData);
-      setLoading(false);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      setError('Failed to load dashboard data. Please try again.');
+      setError('Failed to load live dashboard statistics.');
+    } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  }, [currentUser?.username]);
+
+  useEffect(() => {
+    fetchDashboardData();
+    const interval = setInterval(() => {
+      fetchDashboardData(true);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [fetchDashboardData]);
+
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    try {
+      const d = new Date(date);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch {
+      return 'N/A';
     }
   };
 
-  const handleRefresh = async (silent = false) => {
-    if (silent) {
-      // Silent refresh doesn't show loading indicator
-      setRefreshing(true);
-      try {
-        // Get fresh data from API
-        const response = await ApiService.getDashboardStats();
-        const data = response.data || response;
-        
-        // Transform API data to match our state structure
-        const transformedData = {
-          totalUsers: data.userStats?.total || 0,
-          verifiedUsers: data.userStats?.verified || 0,
-          pendingUsers: data.userStats?.pending || 0,
-          rejectedUsers: data.userStats?.rejected || 0,
-          lastUpdated: new Date(),
-          trends: {
-            totalChange: (data.userStats?.total || 0) - stats.totalUsers,
-            verifiedChange: (data.userStats?.verified || 0) - stats.verifiedUsers,
-            pendingChange: (data.userStats?.pending || 0) - stats.pendingUsers,
-            rejectedChange: (data.userStats?.rejected || 0) - stats.rejectedUsers
-          },
-          recentActivities: (data.recentActivity || []).map(activity => ({
-            id: activity.id || Math.random().toString(36).substr(2, 9),
-            action: activity.action,
-            timestamp: new Date(activity.created_at || activity.timestamp || Date.now()),
-            userName: activity.user_name || activity.userName || 'Unknown User',
-            userId: activity.government_id || activity.userId || '-',
-            adminName: activity.admin_username || activity.adminName || currentUser?.username || 'System',
-            txHash: activity.details?.transactionHash || activity.txHash
-          }))
-        };
-        
-        setStats(transformedData);
-      } catch (err) {
-        // Silent refresh doesn't show errors
-        console.error('Error during silent refresh:', err);
-      } finally {
-        setRefreshing(false);
-      }
-    } else {
-      // Regular refresh shows loading state
-      setRefreshing(true);
-      setLoading(true);
-      try {
-        // Get fresh data from API
-        const response = await ApiService.getDashboardStats();
-        const data = response.data || response;
-        
-        // Transform API data to match our state structure
-        const transformedData = {
-          totalUsers: data.userStats?.total || 0,
-          verifiedUsers: data.userStats?.verified || 0,
-          pendingUsers: data.userStats?.pending || 0,
-          rejectedUsers: data.userStats?.rejected || 0,
-          lastUpdated: new Date(),
-          trends: {
-            totalChange: (data.userStats?.total || 0) - stats.totalUsers,
-            verifiedChange: (data.userStats?.verified || 0) - stats.verifiedUsers,
-            pendingChange: (data.userStats?.pending || 0) - stats.pendingUsers,
-            rejectedChange: (data.userStats?.rejected || 0) - stats.rejectedUsers
-          },
-          recentActivities: (data.recentActivity || []).map(activity => ({
-            id: activity.id || Math.random().toString(36).substr(2, 9),
-            action: activity.action,
-            timestamp: new Date(activity.created_at || activity.timestamp || Date.now()),
-            userName: activity.user_name || activity.userName || 'Unknown User',
-            userId: activity.government_id || activity.userId || '-',
-            adminName: activity.admin_username || activity.adminName || currentUser?.username || 'System',
-            txHash: activity.details?.transactionHash || activity.txHash
-          }))
-        };
-        
-        setStats(transformedData);
-        setError(null);
-      } catch (err) {
-        console.error('Error refreshing dashboard data:', err);
-        setError('Failed to refresh dashboard data. Please try again.');
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
+  const getActionColor = (action) => {
+    if (!action) return { color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.2)' };
+    const act = action.toUpperCase();
+    if (act.includes('VERIF') || act.includes('SUCCESS')) {
+      return { color: '#34d399', bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.25)' };
     }
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Truncate hash for display
-  const truncateHash = (hash) => {
-    if (!hash) return '';
-    return `${hash.substring(0, 10)}...${hash.substring(hash.length - 8)}`;
-  };
-
-  const getActionIcon = (action) => {
-    if (action.includes('Verified')) return <FaCheckCircle className="action-icon verified" />;
-    if (action.includes('Rejected')) return <FaTimesCircle className="action-icon rejected" />;
-    if (action.includes('Updated')) return <FaEdit className="action-icon updated" />;
-    if (action.includes('Biometric')) return <FaFingerprint className="action-icon biometric" />;
-    return <FaUserClock className="action-icon pending" />;
+    if (act.includes('REJECT') || act.includes('FAIL')) {
+      return { color: '#f87171', bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.25)' };
+    }
+    if (act.includes('UPDATE') || act.includes('BIOMETRIC')) {
+      return { color: '#818cf8', bg: 'rgba(99, 102, 241, 0.12)', border: 'rgba(99, 102, 241, 0.25)' };
+    }
+    return { color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.25)' };
   };
 
   return (
-    <div className="dashboard-container">
-      {/* Dashboard Header */}
-      <div className="dashboard-header">
-        <h1 className="dashboard-title">
-          <FaChartLine className="title-icon" />
-          Government Identity Dashboard
-        </h1>
-        <div className="dashboard-actions">
-          <button 
-            className={`refresh-button ${refreshing ? 'refreshing' : ''}`}
-            onClick={() => handleRefresh(false)} 
-            disabled={loading || refreshing}
-          >
-            <FaSync className="refresh-icon" />
-            {refreshing ? 'Refreshing...' : 'Refresh Data'}
-          </button>
-          {stats.lastUpdated && (
-            <div className="last-updated">
-              Last updated: {formatDate(stats.lastUpdated)}
-            </div>
-          )}
-        </div>
-      </div>
+    <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+      {/* Top Banner */}
+      <Card
+        sx={{
+          mb: 4,
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(13, 18, 29, 0.95) 100%)',
+          border: '1px solid rgba(99, 102, 241, 0.25)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          p: { xs: 2.5, md: 3.5 }
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Chip
+                icon={<SecurityRounded sx={{ fontSize: '14px !important', color: '#818cf8 !important' }} />}
+                label="GOVERNMENT NODE #01"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(99, 102, 241, 0.15)',
+                  color: '#818cf8',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  fontWeight: 700,
+                  fontSize: '0.68rem',
+                  letterSpacing: '0.08em'
+                }}
+              />
+              <Chip
+                label="CONSENSUS ACTIVE"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(16, 185, 129, 0.15)',
+                  color: '#34d399',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  fontWeight: 700,
+                  fontSize: '0.68rem',
+                  letterSpacing: '0.08em'
+                }}
+              />
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', mb: 0.5 }}>
+              Authority Operations Command
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 640 }}>
+              Live biometric enrollment surveillance, soulbound attestation metrics, and tamper-proof audit trails.
+            </Typography>
+          </Box>
 
-      {/* Loading State */}
-      {loading && !error && (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-        </div>
-      )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {stats.lastUpdated && (
+              <Typography variant="caption" sx={{ color: '#64748b' }}>
+                Synced: {formatDate(stats.lastUpdated)}
+              </Typography>
+            )}
+            <Button
+              variant="outlined"
+              startIcon={refreshing ? <CircularProgress size={16} sx={{ color: '#818cf8' }} /> : <RefreshRounded />}
+              onClick={() => fetchDashboardData(false)}
+              disabled={loading || refreshing}
+              sx={{
+                borderColor: 'rgba(99, 102, 241, 0.3)',
+                color: '#a5b4fc',
+                fontWeight: 600,
+                px: 2.5,
+                py: 1,
+                borderRadius: 2,
+                textTransform: 'none',
+                bgcolor: 'rgba(99, 102, 241, 0.05)',
+                '&:hover': {
+                  bgcolor: 'rgba(99, 102, 241, 0.12)',
+                  borderColor: '#6366f1'
+                }
+              }}
+            >
+              {refreshing ? 'Updating...' : 'Refresh Metrics'}
+            </Button>
+          </Box>
+        </Box>
+      </Card>
 
-      {/* Error Message */}
       {error && (
-        <div className="error-message">
-          <FaExclamationTriangle /> {error}
-        </div>
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+          {error}
+        </Alert>
       )}
 
-      {/* Dashboard Content */}
-      <div className="dashboard-content">
-        {/* Stats Overview */}
-        <div className="section stats-section">
-          <div className="section-header">
-            <h2 className="section-title">
-              <FaChartLine className="section-icon" /> Statistics Overview
-            </h2>
-            <p className="section-subtitle">Current system statistics and trends</p>
-          </div>
-          
-          <div className="stats-grid">
-            <div className="stat-card total">
-              <div className="stat-header">
-                <h3 className="stat-title">Total Users</h3>
-                <FaUsers className="stat-icon total" />
-              </div>
-              <p className="stat-value">{stats.totalUsers}</p>
-              <div className={`stat-trend ${stats.trends.totalChange > 0 ? 'trend-up' : stats.trends.totalChange < 0 ? 'trend-down' : 'trend-neutral'}`}>
-                {stats.trends.totalChange > 0 ? (
-                  <>
-                    <FaArrowUp className="trend-icon" /> +{stats.trends.totalChange} from last period
-                  </>
-                ) : stats.trends.totalChange < 0 ? (
-                  <>
-                    <FaArrowDown className="trend-icon" /> {stats.trends.totalChange} from last period
-                  </>
-                ) : (
-                  <>No change from last period</>
-                )}
-              </div>
-            </div>
-            
-            <div className="stat-card verified">
-              <div className="stat-header">
-                <h3 className="stat-title">Verified Users</h3>
-                <FaUserCheck className="stat-icon verified" />
-              </div>
-              <p className="stat-value">{stats.verifiedUsers}</p>
-              <div className={`stat-trend ${stats.trends.verifiedChange > 0 ? 'trend-up' : stats.trends.verifiedChange < 0 ? 'trend-down' : 'trend-neutral'}`}>
-                {stats.trends.verifiedChange > 0 ? (
-                  <>
-                    <FaArrowUp className="trend-icon" /> +{stats.trends.verifiedChange} from last period
-                  </>
-                ) : stats.trends.verifiedChange < 0 ? (
-                  <>
-                    <FaArrowDown className="trend-icon" /> {stats.trends.verifiedChange} from last period
-                  </>
-                ) : (
-                  <>No change from last period</>
-                )}
-              </div>
-            </div>
-            
-            <div className="stat-card pending">
-              <div className="stat-header">
-                <h3 className="stat-title">Pending Verification</h3>
-                <FaUserClock className="stat-icon pending" />
-              </div>
-              <p className="stat-value">{stats.pendingUsers}</p>
-              <div className={`stat-trend ${stats.trends.pendingChange > 0 ? 'trend-up' : stats.trends.pendingChange < 0 ? 'trend-down' : 'trend-neutral'}`}>
-                {stats.trends.pendingChange > 0 ? (
-                  <>
-                    <FaArrowUp className="trend-icon" /> +{stats.trends.pendingChange} from last period
-                  </>
-                ) : stats.trends.pendingChange < 0 ? (
-                  <>
-                    <FaArrowDown className="trend-icon" /> {stats.trends.pendingChange} from last period
-                  </>
-                ) : (
-                  <>No change from last period</>
-                )}
-              </div>
-            </div>
-            
-            <div className="stat-card rejected">
-              <div className="stat-header">
-                <h3 className="stat-title">Rejected Users</h3>
-                <FaUserTimes className="stat-icon rejected" />
-              </div>
-              <p className="stat-value">{stats.rejectedUsers}</p>
-              <div className={`stat-trend ${stats.trends.rejectedChange > 0 ? 'trend-up' : stats.trends.rejectedChange < 0 ? 'trend-down' : 'trend-neutral'}`}>
-                {stats.trends.rejectedChange > 0 ? (
-                  <>
-                    <FaArrowUp className="trend-icon" /> +{stats.trends.rejectedChange} from last period
-                  </>
-                ) : stats.trends.rejectedChange < 0 ? (
-                  <>
-                    <FaArrowDown className="trend-icon" /> {stats.trends.rejectedChange} from last period
-                  </>
-                ) : (
-                  <>No change from last period</>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Recent Activity */}
-        <div className="section activity-section">
-          <div className="section-header">
-            <h2 className="section-title">
-              <FaHistory className="section-icon" /> Recent Activity
-            </h2>
-            <p className="section-subtitle">Latest verification and system activities</p>
-          </div>
-          
-          <div className="section-content">
-            <div className="activity-list">
-              {stats.recentActivities && stats.recentActivities.length > 0 ? (
-                stats.recentActivities.map(activity => (
-                  <div key={activity.id} className="activity-card">
-                    <div className="activity-header">
-                      <div className="activity-action">
-                        {getActionIcon(activity.action)} {activity.action}
-                      </div>
-                      <div className="activity-timestamp">
-                        {formatDate(activity.timestamp)}
-                      </div>
-                    </div>
-                    
-                    <div className="activity-content">
-                      <div className="activity-user">
-                        <div className="user-name">
-                          {activity.userName}
-                        </div>
-                        <div className="user-id">
-                          <FaFingerprint className="id-icon" />
-                          {activity.userId}
-                        </div>
-                      </div>
-                      
-                      <div className="activity-admin">
-                        <span className="admin-label">Verified by:</span>
-                        <span className="admin-name">
-                          <FaUserShield className="admin-icon" />
-                          {activity.adminName}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {activity.txHash && (
-                      <div className="activity-footer">
-                        <div className="tx-hash">
-                          <FaLink className="tx-icon" />
-                          <span className="tx-label">Blockchain TX:</span>
-                          <Link to={`/activity-logs?txHash=${activity.txHash}`} className="tx-value">
-                            {truncateHash(activity.txHash)}
-                          </Link>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
+      {/* 4 Stat KPI Cards */}
+      <Grid container spacing={2.5} sx={{ mb: 4 }}>
+        {/* Total Users */}
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card
+            sx={{
+              borderRadius: 3,
+              bgcolor: 'rgba(13, 18, 29, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              backdropFilter: 'blur(14px)',
+              p: 2.5,
+              transition: 'all 0.2s',
+              '&:hover': { borderColor: 'rgba(99, 102, 241, 0.4)', transform: 'translateY(-2px)' }
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="caption" sx={{ color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                Total Enrolled
+              </Typography>
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.12)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <PeopleAltRounded sx={{ fontSize: 20 }} />
+              </Box>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', mb: 0.5 }}>
+              {stats.totalUsers}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              Identities registered in directory
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* Verified Users */}
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card
+            sx={{
+              borderRadius: 3,
+              bgcolor: 'rgba(13, 18, 29, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              backdropFilter: 'blur(14px)',
+              p: 2.5,
+              transition: 'all 0.2s',
+              '&:hover': { borderColor: 'rgba(16, 185, 129, 0.4)', transform: 'translateY(-2px)' }
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="caption" sx={{ color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                Verified DIDs
+              </Typography>
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: 'rgba(16, 185, 129, 0.12)', color: '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <VerifiedUserRounded sx={{ fontSize: 20 }} />
+              </Box>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#10b981', mb: 0.5 }}>
+              {stats.verifiedUsers}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              Full consensus & biometric approval
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* Pending Verification */}
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card
+            sx={{
+              borderRadius: 3,
+              bgcolor: 'rgba(13, 18, 29, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              backdropFilter: 'blur(14px)',
+              p: 2.5,
+              transition: 'all 0.2s',
+              '&:hover': { borderColor: 'rgba(245, 158, 11, 0.4)', transform: 'translateY(-2px)' }
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="caption" sx={{ color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                Pending Review
+              </Typography>
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <HourglassEmptyRounded sx={{ fontSize: 20 }} />
+              </Box>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f59e0b', mb: 0.5 }}>
+              {stats.pendingUsers}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              Awaiting FaceMesh / document audit
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* Rejected Claims */}
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card
+            sx={{
+              borderRadius: 3,
+              bgcolor: 'rgba(13, 18, 29, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              backdropFilter: 'blur(14px)',
+              p: 2.5,
+              transition: 'all 0.2s',
+              '&:hover': { borderColor: 'rgba(239, 68, 68, 0.4)', transform: 'translateY(-2px)' }
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="caption" sx={{ color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                Rejected Claims
+              </Typography>
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: 'rgba(239, 68, 68, 0.12)', color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CancelRounded sx={{ fontSize: 20 }} />
+              </Box>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#ef4444', mb: 0.5 }}>
+              {stats.rejectedUsers}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              Fraud flagged or invalid proof
+            </Typography>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Main Sections: Recent Activities & Quick Navigation */}
+      <Grid container spacing={3}>
+        {/* Left Column: Recent Authority Activities */}
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Card
+            sx={{
+              borderRadius: 3,
+              bgcolor: 'rgba(13, 18, 29, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              backdropFilter: 'blur(14px)'
+            }}
+          >
+            <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.12)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <HistoryRounded sx={{ fontSize: 22 }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', fontSize: '1.05rem' }}>
+                      Authority Audit Stream
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                      Chronological log of identity actions & biometric attestation events
+                    </Typography>
+                  </Box>
+                </Box>
+                <Button
+                  size="small"
+                  endIcon={<ArrowForwardRounded />}
+                  onClick={() => navigate('/admin/activity-logs')}
+                  sx={{ color: '#a5b4fc', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem' }}
+                >
+                  Full Log
+                </Button>
+              </Box>
+
+              {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                  <CircularProgress size={32} sx={{ color: '#6366f1' }} />
+                </Box>
+              ) : stats.recentActivities.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 6, color: '#64748b' }}>
+                  <Typography variant="body2">No recent audit actions recorded.</Typography>
+                </Box>
               ) : (
-                <div className="empty-state">
-                  <FaHistory className="empty-icon" />
-                  <p className="empty-text">No recent activities found</p>
-                </div>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {stats.recentActivities.slice(0, 6).map((activity) => {
+                    const meta = getActionColor(activity.action);
+                    return (
+                      <Box
+                        key={activity.id}
+                        sx={{
+                          p: 2,
+                          borderRadius: 2,
+                          bgcolor: 'rgba(15, 23, 42, 0.5)',
+                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          display: 'flex',
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          justifyContent: 'space-between',
+                          alignItems: { xs: 'flex-start', sm: 'center' },
+                          gap: 1.5,
+                          transition: 'all 0.15s ease',
+                          '&:hover': {
+                            bgcolor: 'rgba(15, 23, 42, 0.8)',
+                            borderColor: 'rgba(255, 255, 255, 0.1)'
+                          }
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Chip
+                            label={activity.action}
+                            size="small"
+                            sx={{
+                              bgcolor: meta.bg,
+                              color: meta.color,
+                              border: `1px solid ${meta.border}`,
+                              fontWeight: 700,
+                              fontSize: '0.68rem',
+                              letterSpacing: '0.04em'
+                            }}
+                          />
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#f8fafc' }}>
+                              {activity.userName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#64748b', fontFamily: 'monospace' }}>
+                              ID: {activity.userId}
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                            <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block' }}>
+                              by {activity.adminName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#64748b' }}>
+                              {formatDate(activity.timestamp)}
+                            </Typography>
+                          </Box>
+
+                          {activity.txHash && (
+                            <Tooltip title="View Transaction on Etherscan">
+                              <IconButton
+                                size="small"
+                                onClick={() => window.open(`https://sepolia.etherscan.io/tx/${activity.txHash}`, '_blank')}
+                                sx={{ color: '#6366f1' }}
+                              >
+                                <OpenInNewRounded sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
               )}
-            </div>
-          </div>
-        </div>
-      
-        {/* Quick Actions */}
-        <div className="section quick-actions-section">
-        <div className="section-header">
-          <h2 className="section-title">
-            <FaShieldAlt className="section-icon" />
-            Quick Actions
-          </h2>
-          <p className="section-subtitle">Common tasks for government officials</p>
-        </div>
-        
-        <div className="quick-actions-grid">
-          <Link to="/admin/records" className="quick-action-card">
-            <div className="quick-action-icon-container records">
-              <FaIdCard className="quick-action-icon" />
-            </div>
-            <div className="quick-action-content">
-              <h3 className="quick-action-title">Manage Records</h3>
-              <p className="quick-action-description">View and update user identity records</p>
-              <ul className="quick-action-features">
-                <li>Search and filter users</li>
-                <li>Verify identities</li>
-                <li>Update biometric data</li>
-              </ul>
-            </div>
-            <div className="quick-action-arrow">
-              <FaChevronRight />
-            </div>
-          </Link>
-          
-          <Link to="/admin/activity-logs" className="quick-action-card">
-            <div className="quick-action-icon-container logs">
-              <FaHistory className="quick-action-icon" />
-            </div>
-            <div className="quick-action-content">
-              <h3 className="quick-action-title">Activity Logs</h3>
-              <p className="quick-action-description">View system audit trail and verification history</p>
-              <ul className="quick-action-features">
-                <li>Track verification activities</li>
-                <li>Monitor blockchain transactions</li>
-                <li>Export audit reports</li>
-              </ul>
-            </div>
-            <div className="quick-action-arrow">
-              <FaChevronRight />
-            </div>
-          </Link>
-          
-          <Link to="/admin/settings" className="quick-action-card">
-            <div className="quick-action-icon-container settings">
-              <FaCog className="quick-action-icon" />
-            </div>
-            <div className="quick-action-content">
-              <h3 className="quick-action-title">Admin Settings</h3>
-              <p className="quick-action-description">Manage account preferences and security settings</p>
-              <ul className="quick-action-features">
-                <li>Update admin profile</li>
-                <li>Configure security options</li>
-                <li>Manage notification preferences</li>
-              </ul>
-            </div>
-            <div className="quick-action-arrow">
-              <FaChevronRight />
-            </div>
-          </Link>
-        </div>
-        </div>
-      </div>
-    </div>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Right Column: Authority Console Shortcuts */}
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            {/* Quick Action Card 1: Records */}
+            <Card
+              onClick={() => navigate('/admin/records')}
+              sx={{
+                borderRadius: 3,
+                bgcolor: 'rgba(13, 18, 29, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(14px)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  borderColor: 'rgba(99, 102, 241, 0.4)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
+                }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.25)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <FolderSharedRounded sx={{ fontSize: 24 }} />
+                  </Box>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
+                      Identity Directory
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                      Inspect, verify, or reject user claims
+                    </Typography>
+                  </Box>
+                  <ArrowForwardRounded sx={{ color: '#64748b', fontSize: 18 }} />
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Quick Action Card 2: FaceMesh Biometrics */}
+            <Card
+              onClick={() => navigate('/admin/face-verification')}
+              sx={{
+                borderRadius: 3,
+                bgcolor: 'rgba(13, 18, 29, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(14px)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  borderColor: 'rgba(16, 185, 129, 0.4)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
+                }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)', color: '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <FingerprintRounded sx={{ fontSize: 24 }} />
+                  </Box>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
+                      FaceMesh Biometrics
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                      Live camera face matching scanner
+                    </Typography>
+                  </Box>
+                  <ArrowForwardRounded sx={{ color: '#64748b', fontSize: 18 }} />
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Quick Action Card 3: Professional Credentials */}
+            <Card
+              onClick={() => navigate('/admin/professional-records')}
+              sx={{
+                borderRadius: 3,
+                bgcolor: 'rgba(13, 18, 29, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(14px)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  borderColor: 'rgba(245, 158, 11, 0.4)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
+                }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <WorkspacePremiumRounded sx={{ fontSize: 24 }} />
+                  </Box>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
+                      Professional Records
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                      Audit employment & university degrees
+                    </Typography>
+                  </Box>
+                  <ArrowForwardRounded sx={{ color: '#64748b', fontSize: 18 }} />
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Quick Action Card 4: Security Settings */}
+            <Card
+              onClick={() => navigate('/admin/settings')}
+              sx={{
+                borderRadius: 3,
+                bgcolor: 'rgba(13, 18, 29, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(14px)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  borderColor: 'rgba(99, 102, 241, 0.4)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
+                }
+              }}
+            >
+              <CardContent sx={{ p: 2.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.25)', color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <SettingsRounded sx={{ fontSize: 24 }} />
+                  </Box>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
+                      Node Configuration
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                      Security keys & notification webhooks
+                    </Typography>
+                  </Box>
+                  <ArrowForwardRounded sx={{ color: '#64748b', fontSize: 18 }} />
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };
 

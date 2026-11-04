@@ -1,9 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
+import { ColorModeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import theme from './theme'; // Dark Glassmorphism Theme
 
 // Pages
 import Login from './pages/Login';
@@ -49,8 +47,7 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <ColorModeProvider>
       <AuthProvider>
         <Router>
           <Routes>
@@ -94,7 +91,7 @@ function App() {
           </Routes>
         </Router>
       </AuthProvider>
-    </ThemeProvider>
+    </ColorModeProvider>
   );
 }
 

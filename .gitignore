@@ -119,3 +119,11 @@ admin-portal/.env*
 
 # Editor configs
 .cursor/
+
+# MCP & Playwright artifacts
+.playwright-mcp/
+mcp_config.json
+.mcp.json
+.mcp/
+*.mcp.json
+

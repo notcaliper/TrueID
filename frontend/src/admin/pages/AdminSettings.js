@@ -1,15 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../services/adminApi.service';
-import { FaUser, FaBell, FaShieldAlt, FaExclamationTriangle, FaCheckCircle, FaSave } from 'react-icons/fa';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Button,
+  Grid,
+  Chip,
+  TextField,
+  Switch,
+  FormControlLabel,
+  Alert,
+  CircularProgress,
+  Divider
+} from '@mui/material';
+import {
+  SettingsRounded,
+  SecurityRounded,
+  NotificationsRounded,
+  AdminPanelSettingsRounded,
+  SaveRounded,
+  CheckCircleRounded,
+  KeyRounded,
+  LanRounded
+} from '@mui/icons-material';
 
 const AdminSettings = () => {
   const { user } = useAuth();
-  const currentUser = user || { name: 'Authority Admin', email: 'admin@trueid.org' };
+  const currentUser = user || { name: 'Authority Admin', email: 'admin@trueid.org', role: 'SUPER_ADMIN' };
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -24,29 +48,29 @@ const AdminSettings = () => {
 
   useEffect(() => {
     if (currentUser) {
-      setFormData(prevState => ({
-        ...prevState,
-        name: currentUser.name || '',
-        email: currentUser.email || ''
+      setFormData(prev => ({
+        ...prev,
+        name: currentUser.name || 'Authority Admin',
+        email: currentUser.email || 'admin@trueid.org'
       }));
     }
-    
     fetchAdminProfile();
   }, [currentUser]);
 
   const fetchAdminProfile = async () => {
     try {
       const profile = await ApiService.getAdminProfile();
-      setFormData(prevState => ({
-        ...prevState,
-        ...profile,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      }));
+      if (profile) {
+        setFormData(prev => ({
+          ...prev,
+          ...profile,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        }));
+      }
     } catch (err) {
-      console.error('Error fetching admin profile:', err);
-      setError('Failed to load profile data. Please try again.');
+      console.warn('Profile fetch warning (using defaults):', err);
     }
   };
 
@@ -63,30 +87,26 @@ const AdminSettings = () => {
     setLoading(true);
     setError(null);
     setSuccess(false);
-    
-    // Validate passwords if trying to change
+
     if (formData.newPassword) {
       if (!formData.currentPassword) {
         setError('Current password is required to set a new password');
         setLoading(false);
         return;
       }
-      
       if (formData.newPassword !== formData.confirmPassword) {
         setError('New passwords do not match');
         setLoading(false);
         return;
       }
-      
       if (formData.newPassword.length < 8) {
         setError('Password must be at least 8 characters long');
         setLoading(false);
         return;
       }
     }
-    
+
     try {
-      // Update profile information
       const profileData = {
         name: formData.name,
         email: formData.email,
@@ -95,521 +115,373 @@ const AdminSettings = () => {
         notifyUpdate: formData.notifyUpdate,
         notifyNewUser: formData.notifyNewUser
       };
-      
+
       await ApiService.updateAdminProfile(profileData);
-      
-      // Change password if provided
+
       if (formData.newPassword) {
         await ApiService.changePassword(formData.currentPassword, formData.newPassword);
       }
-      
+
       setSuccess(true);
-      
-      // Reset password fields
       setFormData(prev => ({
         ...prev,
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       }));
-      
-      // Hide success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(false);
-      }, 3000);
+      setTimeout(() => setSuccess(false), 4000);
     } catch (err) {
       console.error('Error updating settings:', err);
-      setError('Failed to update settings. Please try again.');
+      setError('Failed to update settings. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="settings-page" style={{
-      padding: '24px',
-      backgroundColor: '#1a1a1a',
-      minHeight: '100vh',
-      color: '#e0e0e0',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-    }}>
-      <h1 style={{
-        fontSize: '28px',
-        fontWeight: '600',
-        margin: '0 0 24px 0',
-        color: '#fff',
-        letterSpacing: '-0.5px'
-      }}>Settings</h1>
-      
+    <Box sx={{ maxWidth: 1100, mx: 'auto' }}>
+      {/* Header Banner */}
+      <Card
+        sx={{
+          mb: 4,
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(13, 18, 29, 0.95) 100%)',
+          border: '1px solid rgba(99, 102, 241, 0.25)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          p: { xs: 2.5, md: 3.5 }
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Chip
+                icon={<SettingsRounded sx={{ fontSize: '14px !important', color: '#818cf8 !important' }} />}
+                label="GOVERNMENT NODE SETTINGS"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(99, 102, 241, 0.15)',
+                  color: '#818cf8',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  fontWeight: 700,
+                  fontSize: '0.68rem',
+                  letterSpacing: '0.08em'
+                }}
+              />
+              <Chip
+                icon={<LanRounded sx={{ fontSize: '14px !important', color: '#34d399 !important' }} />}
+                label="SEPOLIA TESTNET"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(16, 185, 129, 0.15)',
+                  color: '#34d399',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  fontWeight: 700,
+                  fontSize: '0.68rem'
+                }}
+              />
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', mb: 0.5 }}>
+              Authority Configuration
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 640 }}>
+              Node operator cryptographic access keys, notification webhooks, and administrative credentials.
+            </Typography>
+          </Box>
+        </Box>
+      </Card>
+
       {error && (
-        <div style={{
-          backgroundColor: '#2c1519',
-          color: '#f87171',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: '14px',
-          border: '1px solid #451a1a'
-        }}>
-          <FaExclamationTriangle />
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
           {error}
-        </div>
+        </Alert>
       )}
-      
+
       {success && (
-        <div style={{
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          color: '#34d399',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          marginBottom: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: '14px',
-          border: '1px solid rgba(16, 185, 129, 0.2)'
-        }}>
-          <FaCheckCircle />
-          Settings updated successfully!
-        </div>
+        <Alert severity="success" sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+          Configuration updated and signed successfully.
+        </Alert>
       )}
-      
-      <div style={{
-        backgroundColor: '#2d2d2d',
-        borderRadius: '12px',
-        border: '1px solid #404040',
-        overflow: 'hidden'
-      }}>
-        <div style={{
-          padding: '24px',
-          borderBottom: '1px solid #404040'
-        }}>
-          <h2 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            margin: '0',
-            color: '#fff'
-          }}>Account Settings</h2>
-        </div>
-        
-        <form onSubmit={handleSubmit} style={{
-          padding: '24px'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '32px'
-          }}>
-            {/* Profile Section */}
-            <div>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '24px'
-              }}>
-                <FaUser style={{ color: '#6366f1', fontSize: '20px' }} />
-                <h3 style={{
-                  margin: '0',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#fff'
-                }}>Profile Information</h3>
-              </div>
-              
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '20px'
-              }}>
-                <div>
-                  <label htmlFor="name" style={{
-                    display: 'block',
-                    marginBottom: '8px',
-                    color: '#a3a3a3',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}>Full Name</label>
-                  <input
-                    type="text"
-                    id="name"
+
+      <Box component="form" onSubmit={handleSubmit}>
+        <Grid container spacing={3}>
+          {/* Operator Profile Card */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                bgcolor: 'rgba(13, 18, 29, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(14px)',
+                p: 3,
+                height: '100%'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.12)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AdminPanelSettingsRounded sx={{ fontSize: 22 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>
+                    Operator Identity
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    Officer profile in sovereign registry
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
+                    Authority Name
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      backgroundColor: '#1a1a1a',
-                      border: '1px solid #404040',
-                      borderRadius: '8px',
-                      color: '#e0e0e0',
-                      fontSize: '14px',
-                      outline: 'none'
+                    InputProps={{
+                      sx: {
+                        bgcolor: 'rgba(15, 23, 42, 0.7)',
+                        borderRadius: 2,
+                        color: '#f8fafc',
+                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
+                      }
                     }}
                   />
-                </div>
-                
-                <div>
-                  <label htmlFor="email" style={{
-                    display: 'block',
-                    marginBottom: '8px',
-                    color: '#a3a3a3',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}>Email Address</label>
-                  <input
-                    type="email"
-                    id="email"
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
+                    Institutional Email
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
                     name="email"
+                    type="email"
                     value={formData.email}
                     onChange={handleChange}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      backgroundColor: '#1a1a1a',
-                      border: '1px solid #404040',
-                      borderRadius: '8px',
-                      color: '#e0e0e0',
-                      fontSize: '14px',
-                      outline: 'none'
+                    InputProps={{
+                      sx: {
+                        bgcolor: 'rgba(15, 23, 42, 0.7)',
+                        borderRadius: 2,
+                        color: '#f8fafc',
+                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
+                      }
                     }}
                   />
-                </div>
-              </div>
-              
-              <div style={{
-                marginTop: '32px'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  marginBottom: '24px'
-                }}>
-                  <FaBell style={{ color: '#6366f1', fontSize: '20px' }} />
-                  <h3 style={{
-                    margin: '0',
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: '#fff'
-                  }}>Notification Preferences</h3>
-                </div>
-                
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px'
-                }}>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="checkbox"
-                      id="notifyVerification"
+                </Box>
+
+                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                  <Typography variant="caption" sx={{ color: '#818cf8', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    Authority Node Role
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#f8fafc', mt: 0.5 }}>
+                    GOVERNMENT_AUTHORITY_ROOT (SUPER_ADMIN)
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    Authorized to issue Soulbound tokens on Sepolia testnet
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+          </Grid>
+
+          {/* Security & Password Card */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                bgcolor: 'rgba(13, 18, 29, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(14px)',
+                p: 3,
+                height: '100%'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <KeyRounded sx={{ fontSize: 22 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>
+                    Security & Credentials
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    Update administrative master password
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
+                    Current Password
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    name="currentPassword"
+                    type="password"
+                    placeholder="••••••••••••"
+                    value={formData.currentPassword}
+                    onChange={handleChange}
+                    InputProps={{
+                      sx: {
+                        bgcolor: 'rgba(15, 23, 42, 0.7)',
+                        borderRadius: 2,
+                        color: '#f8fafc',
+                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
+                      }
+                    }}
+                  />
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
+                    New Master Password
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    name="newPassword"
+                    type="password"
+                    placeholder="Min 8 characters"
+                    value={formData.newPassword}
+                    onChange={handleChange}
+                    InputProps={{
+                      sx: {
+                        bgcolor: 'rgba(15, 23, 42, 0.7)',
+                        borderRadius: 2,
+                        color: '#f8fafc',
+                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
+                      }
+                    }}
+                  />
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
+                    Confirm New Password
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    name="confirmPassword"
+                    type="password"
+                    placeholder="Re-enter new password"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    InputProps={{
+                      sx: {
+                        bgcolor: 'rgba(15, 23, 42, 0.7)',
+                        borderRadius: 2,
+                        color: '#f8fafc',
+                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
+                      }
+                    }}
+                  />
+                </Box>
+              </Box>
+            </Card>
+          </Grid>
+
+          {/* Webhook & Notification Card */}
+          <Grid size={12}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                bgcolor: 'rgba(13, 18, 29, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(14px)',
+                p: 3
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <NotificationsRounded sx={{ fontSize: 22 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>
+                    System Event Notifications
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    Real-time alerts for identity state modifications
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#f8fafc' }}>
+                        Verification Approvals
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748b' }}>
+                        Alert when identity tokens are minted
+                      </Typography>
+                    </Box>
+                    <Switch
                       name="notifyVerification"
                       checked={formData.notifyVerification}
                       onChange={handleChange}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        accentColor: '#6366f1'
-                      }}
+                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#6366f1' } }}
                     />
-                    <span style={{ color: '#e0e0e0', fontSize: '14px' }}>
-                      Notify when a user is verified
-                    </span>
-                  </label>
-                  
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="checkbox"
-                      id="notifyRejection"
+                  </Box>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#f8fafc' }}>
+                        Fraud & Rejection Flags
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748b' }}>
+                        High priority alert on suspicious submissions
+                      </Typography>
+                    </Box>
+                    <Switch
                       name="notifyRejection"
                       checked={formData.notifyRejection}
                       onChange={handleChange}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        accentColor: '#6366f1'
-                      }}
+                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#6366f1' } }}
                     />
-                    <span style={{ color: '#e0e0e0', fontSize: '14px' }}>
-                      Notify when a user is rejected
-                    </span>
-                  </label>
-                  
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="checkbox"
-                      id="notifyUpdate"
-                      name="notifyUpdate"
-                      checked={formData.notifyUpdate}
-                      onChange={handleChange}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        accentColor: '#6366f1'
-                      }}
-                    />
-                    <span style={{ color: '#e0e0e0', fontSize: '14px' }}>
-                      Notify when facemesh data is updated
-                    </span>
-                  </label>
-                  
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="checkbox"
-                      id="notifyNewUser"
-                      name="notifyNewUser"
-                      checked={formData.notifyNewUser}
-                      onChange={handleChange}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        accentColor: '#6366f1'
-                      }}
-                    />
-                    <span style={{ color: '#e0e0e0', fontSize: '14px' }}>
-                      Notify when a new user is registered
-                    </span>
-                  </label>
-                </div>
-              </div>
-            </div>
-            
-            {/* Security Section */}
-            <div>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '24px'
-              }}>
-                <FaShieldAlt style={{ color: '#6366f1', fontSize: '20px' }} />
-                <h3 style={{
-                  margin: '0',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#fff'
-                }}>Security</h3>
-              </div>
-              
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '20px'
-              }}>
-                <div>
-                  <label htmlFor="currentPassword" style={{
-                    display: 'block',
-                    marginBottom: '8px',
-                    color: '#a3a3a3',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}>Current Password</label>
-                  <input
-                    type="password"
-                    id="currentPassword"
-                    name="currentPassword"
-                    value={formData.currentPassword}
-                    onChange={handleChange}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      backgroundColor: '#1a1a1a',
-                      border: '1px solid #404040',
-                      borderRadius: '8px',
-                      color: '#e0e0e0',
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="newPassword" style={{
-                    display: 'block',
-                    marginBottom: '8px',
-                    color: '#a3a3a3',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}>New Password</label>
-                  <input
-                    type="password"
-                    id="newPassword"
-                    name="newPassword"
-                    value={formData.newPassword}
-                    onChange={handleChange}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      backgroundColor: '#1a1a1a',
-                      border: '1px solid #404040',
-                      borderRadius: '8px',
-                      color: '#e0e0e0',
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="confirmPassword" style={{
-                    display: 'block',
-                    marginBottom: '8px',
-                    color: '#a3a3a3',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}>Confirm New Password</label>
-                  <input
-                    type="password"
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      backgroundColor: '#1a1a1a',
-                      border: '1px solid #404040',
-                      borderRadius: '8px',
-                      color: '#e0e0e0',
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-              
-              <div style={{
-                marginTop: '24px',
-                padding: '16px',
-                backgroundColor: '#262626',
-                borderRadius: '8px',
-                border: '1px solid #404040'
-              }}>
-                <p style={{
-                  margin: '0 0 12px 0',
-                  color: '#a3a3a3',
-                  fontSize: '14px'
-                }}>Password must be at least 8 characters long and include:</p>
-                <ul style={{
-                  margin: '0',
-                  paddingLeft: '20px',
-                  color: '#a3a3a3',
-                  fontSize: '14px'
-                }}>
-                  <li>At least one uppercase letter</li>
-                  <li>At least one lowercase letter</li>
-                  <li>At least one number</li>
-                  <li>At least one special character</li>
-                </ul>
-              </div>
-              
-              <div style={{
-                marginTop: '24px',
-                padding: '16px',
-                backgroundColor: '#262626',
-                borderRadius: '8px',
-                border: '1px solid #404040'
-              }}>
-                <p style={{
-                  margin: '0 0 12px 0',
-                  color: '#a3a3a3',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}>Account Security Tips:</p>
-                <ul style={{
-                  margin: '0',
-                  paddingLeft: '20px',
-                  color: '#a3a3a3',
-                  fontSize: '14px'
-                }}>
-                  <li>Change your password regularly</li>
-                  <li>Don't share your login credentials</li>
-                  <li>Always log out when using shared computers</li>
-                  <li>Report suspicious activities to the system administrator</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          
-          <div style={{
-            marginTop: '32px',
-            padding: '24px',
-            borderTop: '1px solid #404040',
-            display: 'flex',
-            justifyContent: 'flex-end'
-          }}>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                backgroundColor: '#6366f1',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '12px 24px',
-                fontSize: '14px',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? '0.7' : '1'
-              }}
-            >
-              {loading ? (
-                <>
-                  <div style={{
-                    width: '16px',
-                    height: '16px',
-                    border: '2px solid rgba(255,255,255,0.3)',
-                    borderTopColor: '#fff',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }}></div>
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <>
-                  <FaSave />
-                  <span>Save Changes</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Card>
+          </Grid>
 
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+          {/* Submit Button */}
+          <Grid size={12}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+              <Button
+                type="submit"
+                variant="contained"
+                startIcon={loading ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : <SaveRounded />}
+                disabled={loading}
+                sx={{
+                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  px: 4,
+                  py: 1.2,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.95rem',
+                  boxShadow: '0 4px 18px rgba(99, 102, 241, 0.4)'
+                }}
+              >
+                {loading ? 'Saving Settings...' : 'Save Configuration'}
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Box>
+    </Box>
   );
 };
 

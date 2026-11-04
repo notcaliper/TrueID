@@ -31,6 +31,8 @@ import {
   MenuRounded
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
+import { useColorMode } from '../../context/ThemeContext';
+import { LightModeRounded, DarkModeRounded } from '@mui/icons-material';
 
 const navItems = [
   { label: 'Overview', path: '/admin', icon: <DashboardRounded fontSize="small" /> },
@@ -43,6 +45,7 @@ const navItems = [
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
+  const { mode, toggleTheme, isLight } = useColorMode();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -60,15 +63,15 @@ const AdminLayout = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#06090e', color: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ minHeight: '100vh', backgroundColor: isLight ? '#f8fafc' : '#111214', color: isLight ? '#0f172a' : '#f8fafc', display: 'flex', flexDirection: 'column' }}>
       {/* Top Authority Header */}
       <AppBar 
         position="sticky" 
         elevation={0}
         sx={{
-          backgroundColor: 'rgba(10, 14, 23, 0.85)',
-          backdropFilter: 'blur(16px)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          backgroundColor: isLight ? '#ffffff' : '#181a1c',
+          borderBottom: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+          color: isLight ? '#0f172a' : '#ffffff',
           zIndex: (theme) => theme.zIndex.drawer + 1
         }}
       >
@@ -130,14 +133,31 @@ const AdminLayout = () => {
 
           {/* Right: Actions */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Tooltip title={isLight ? 'Switch to Dark Mode' : 'Switch to White / Light Mode'}>
+              <IconButton
+                onClick={toggleTheme}
+                size="small"
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '8px',
+                  border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.15)'}`,
+                  backgroundColor: isLight ? '#f1f5f9' : 'transparent',
+                  color: isLight ? '#0f172a' : '#f8fafc'
+                }}
+              >
+                {isLight ? <DarkModeRounded sx={{ fontSize: 18 }} /> : <LightModeRounded sx={{ fontSize: 18 }} />}
+              </IconButton>
+            </Tooltip>
+
             <Button
               startIcon={<ArrowBackRounded />}
               onClick={() => navigate('/')}
               variant="outlined"
               size="small"
               sx={{
-                borderColor: 'rgba(255, 255, 255, 0.15)',
-                color: '#cbd5e1',
+                borderColor: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.15)',
+                color: isLight ? '#334155' : '#cbd5e1',
                 textTransform: 'none',
                 fontWeight: 600,
                 fontSize: '0.8rem',
@@ -145,9 +165,9 @@ const AdminLayout = () => {
                 py: 0.6,
                 px: 1.5,
                 '&:hover': {
-                  borderColor: '#818cf8',
-                  backgroundColor: 'rgba(99, 102, 241, 0.08)',
-                  color: '#fff'
+                  borderColor: '#2563eb',
+                  backgroundColor: isLight ? '#f8fafc' : 'rgba(99, 102, 241, 0.08)',
+                  color: isLight ? '#2563eb' : '#fff'
                 }
               }}
             >
