@@ -5,7 +5,6 @@ import {
   Typography,
   Grid,
   Card,
-  CardContent,
   Button,
   Chip,
   IconButton,
@@ -19,16 +18,14 @@ import {
   TableHead,
   TableRow,
   Avatar,
-  Divider,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   LinearProgress,
-  useTheme
+  CircularProgress
 } from '@mui/material';
 import {
-  VerifiedUserRounded,
   SecurityRounded,
   FingerprintRounded,
   BadgeRounded,
@@ -38,9 +35,7 @@ import {
   CheckCircleRounded,
   ArrowForwardRounded,
   SchoolRounded,
-  WorkRounded,
   LanRounded,
-  VisibilityRounded,
   ShieldRounded,
   RefreshRounded,
   KeyRounded,
@@ -48,73 +43,154 @@ import {
   GppGoodRounded,
   CloseRounded,
   DownloadRounded,
-  ShareRounded,
   HistoryRounded,
-  FactCheckRounded,
-  ContactlessRounded,
-  AutoAwesomeRounded
+  FactCheckRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
 import { userAPI, blockchainAPI } from '../services/api.service';
+import QRCode from 'qrcode';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { isLight } = useColorMode();
-  const theme = useTheme();
 
+  // eslint-disable-next-line no-unused-vars
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [selectedProof, setSelectedProof] = useState(null);
   const [recordSearch, setRecordSearch] = useState('');
+  // eslint-disable-next-line no-unused-vars
   const [activeTab, setActiveTab] = useState('overview');
 
   const [identityData, setIdentityData] = useState({
-    name: 'Akshay Manbhaw',
-    governmentId: 'JIFPM9413P',
-    did: 'did:trueid:0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-    verificationStatus: 'VERIFIED',
-    walletAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-    trustScore: 99.8,
-    tier: 'Verified Citizen Tier 1',
-    recordsCount: 4,
-    facemeshStatus: '68 Nodes Active (SHA-256)',
-    enclaveStatus: 'Hardware Protected',
-    blockchainTx: '0x4f8e91d2c3b4a567890123456789abcdef0123456789abcdef0123456789abcd',
-    contractAddress: '0x266B577380aE3De838A66DEf28fffD5e75c5816E',
-    lastSync: 'Nov 5, 2026, 12:45 AM'
+    name: user?.name || user?.full_name || '',
+    governmentId: user?.government_id || '',
+    did: user?.wallet_address ? `did:trueid:${user.wallet_address}` : '',
+    verificationStatus: user?.verification_status || 'PENDING',
+    walletAddress: user?.wallet_address || '',
+    trustScore: user?.trust_score || 0,
+    tier: 'Citizen',
+    recordsCount: 0,
+    facemeshStatus: user?.facemesh_hash ? 'Enrolled (SHA-256)' : 'Not Enrolled',
+    enclaveStatus: 'Protected',
+    blockchainTx: user?.blockchain_tx_hash || '',
+    contractAddress: process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '',
+    sbtTokenId: user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : (user?.is_verified ? 'SBT-Token #1' : ''),
+    lastSync: ''
   });
+
+  const [credentialRecords, setCredentialRecords] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+
+  useEffect(() => {
+    if (identityData.did) {
+      QRCode.toDataURL(identityData.did, {
+        width: 320,
+        margin: 1,
+        color: { dark: '#0f172a', light: '#ffffff' }
+      }).then(url => setQrDataUrl(url)).catch(() => {});
+    }
+  }, [identityData.did]);
+
+  const handleExportPass = () => {
+    const passPayload = {
+      "@context": [
+        "https://www.w3.org/2018/credentials/v1",
+        "https://trueid.org/schemas/digital-pass/v1"
+      ],
+      "id": identityData.did,
+      "type": ["VerifiableCredential", "TrueIDDigitalPass"],
+      "issuer": {
+        "id": "did:trueid:authority:registry",
+        "name": "TrueID Digital Identity Authority",
+        "network": "Ethereum Sepolia (Chain ID 11155111)",
+        "badgeContract": identityData.contractAddress
+      },
+      "issuanceDate": new Date().toISOString(),
+      "credentialSubject": {
+        "id": identityData.did,
+        "name": identityData.name,
+        "governmentId": identityData.governmentId,
+        "walletAddress": identityData.walletAddress,
+        "soulboundTokenId": identityData.sbtTokenId,
+        "verificationStatus": identityData.verificationStatus
+      },
+      "proof": {
+        "type": "EIP5192SoulboundProof",
+        "created": new Date().toISOString(),
+        "transactionHash": identityData.blockchainTx,
+        "verificationMethod": `${identityData.did}#key-1`,
+        "proofPurpose": "assertionMethod"
+      }
+    };
+
+    const blob = new Blob([JSON.stringify(passPayload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TrueID-Digital-Pass-${identityData.governmentId || 'Citizen'}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const fetchData = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [verRes, bcRes, recRes, bioRes] = await Promise.allSettled([
+      const [verRes, bcRes, recRes, bioRes, txRes] = await Promise.allSettled([
         userAPI.getVerificationStatus(),
         blockchainAPI.getBlockchainStatus(),
         userAPI.getProfessionalRecords(),
-        userAPI.getBiometricStatus()
+        userAPI.getBiometricStatus(),
+        blockchainAPI.getTransactions(1, 5)
       ]);
 
       const verStatus = verRes.status === 'fulfilled' && (verRes.value?.data?.data?.status || verRes.value?.data?.status)
         ? (verRes.value?.data?.data?.status || verRes.value?.data?.status)
-        : (user?.verification_status || 'VERIFIED');
+        : (user?.verification_status || 'PENDING');
       const records = recRes.status === 'fulfilled' && recRes.value?.data?.records ? recRes.value.data.records : [];
       const bcData = bcRes.status === 'fulfilled' ? (bcRes.value?.data?.status || bcRes.value?.data?.data || bcRes.value?.data) : null;
-      const citizenWallet = user?.wallet_address || user?.avax_address || bcData?.walletAddress || '0xc628d3e2b63cCeb6038Ffe05A8E18B1e9304BBC5';
+      const citizenWallet = user?.wallet_address || '';
 
       setIdentityData(prev => ({
         ...prev,
-        name: user?.name || user?.full_name || prev.name,
-        governmentId: user?.government_id || prev.governmentId,
+        name: user?.name || user?.full_name || '',
+        governmentId: user?.government_id || '',
         walletAddress: citizenWallet,
-        did: `did:trueid:${citizenWallet}`,
+        did: citizenWallet ? `did:trueid:${citizenWallet}` : '',
         verificationStatus: verStatus,
-        recordsCount: records.length || 4,
+        recordsCount: records.length,
+        facemeshStatus: bioRes.status === 'fulfilled' && bioRes.value?.data?.hasBiometrics ? 'Enrolled (SHA-256)' : (user?.facemesh_hash ? 'Enrolled (SHA-256)' : 'Not Enrolled'),
+        blockchainTx: bcData?.registrationTxHash || bcData?.transactionHash || user?.blockchain_tx_hash || '',
+        contractAddress: bcData?.contractAddress || process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf',
+        sbtTokenId: bcData?.sbtTokenId || (user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : (user?.is_verified ? 'SBT-Token #1' : '')),
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
+
+      setCredentialRecords(records.map(r => ({
+        id: `REC-${r.id}`,
+        type: r.record_type || 'CREDENTIAL',
+        title: r.title || 'Attested Record',
+        issuer: r.institution || 'Authority',
+        hash: r.data_hash || r.blockchain_tx_hash || '',
+        issuedAt: r.start_date ? new Date(r.start_date).toLocaleDateString() : '',
+        status: r.verification_status || 'PENDING'
+      })));
+
+      const txList = txRes.status === 'fulfilled' ? (txRes.value?.data?.transactions || txRes.value?.data?.data?.transactions || []) : [];
+      setAuditLogs(txList.map(tx => ({
+        title: tx.transaction_type ? tx.transaction_type.replace(/_/g, ' ') : 'Ledger Event',
+        actor: 'TrueID Notary Authority',
+        time: tx.created_at ? new Date(tx.created_at).toLocaleDateString() : 'Recent',
+        status: tx.status || 'CONFIRMED',
+        color: tx.status === 'CONFIRMED' || tx.status === 'SUCCESS' ? '#16a34a' : '#2563eb'
+      })));
     } catch (err) {
       console.warn('Dashboard fetch warning:', err);
     } finally {
@@ -185,77 +261,7 @@ const Dashboard = () => {
     }
   ];
 
-  // Verified Credentials List
-  const credentialRecords = [
-    {
-      id: 'REC-001',
-      type: 'COLLEGE DEGREE',
-      title: 'Master of Science in Computer Science',
-      issuer: 'Stanford University',
-      hash: '0x8f4d99a2c3b4a567890123456789abcdef0123456789abcdef0123456789319b',
-      issuedAt: 'June 2024',
-      status: 'VERIFIED'
-    },
-    {
-      id: 'REC-002',
-      type: 'WORK EXPERIENCE',
-      title: 'Lead Security Engineer',
-      issuer: 'Ethereum Foundation',
-      hash: '0x7e2a44d1c3b4a567890123456789abcdef0123456789abcdef0123456789502c',
-      issuedAt: 'March 2025',
-      status: 'VERIFIED'
-    },
-    {
-      id: 'REC-003',
-      type: 'PROFESSIONAL CERTIFICATE',
-      title: 'Certified Security Architect',
-      issuer: 'Linux Foundation',
-      hash: '0x3c99bb82c3b4a567890123456789abcdef0123456789abcdef0123456789110a',
-      issuedAt: 'January 2026',
-      status: 'VERIFIED'
-    },
-    {
-      id: 'REC-004',
-      type: 'GOVERNMENT ID',
-      title: 'Digital Citizen Identity Pass',
-      issuer: 'Digital Identity Authority',
-      hash: '0x6b14aa77c3b4a567890123456789abcdef0123456789abcdef012345678989ee',
-      issuedAt: 'November 2026',
-      status: 'VERIFIED'
-    }
-  ];
 
-  // Identity Activity Audit Trail
-  const auditLogs = [
-    {
-      title: 'Face verification completed successfully',
-      actor: 'Camera Face Check',
-      time: '12 minutes ago',
-      status: 'SUCCESS',
-      color: '#16a34a'
-    },
-    {
-      title: 'Identity badge recorded on blockchain',
-      actor: 'Official TrueID System',
-      time: '1 hour ago',
-      status: 'CONFIRMED',
-      color: '#2563eb'
-    },
-    {
-      title: 'National ID verified by authority officer',
-      actor: 'Government Verification Officer',
-      time: 'Yesterday',
-      status: 'APPROVED',
-      color: '#16a34a'
-    },
-    {
-      title: 'W3C Academic Credential Issued by Stanford University',
-      actor: 'Stanford Registrar DID (did:trueid:0x9812)',
-      time: 'Nov 3, 2026',
-      status: 'VERIFIED',
-      color: '#0891b2'
-    }
-  ];
 
   const filteredRecords = credentialRecords.filter(r =>
     r.title.toLowerCase().includes(recordSearch.toLowerCase()) ||
@@ -325,7 +331,7 @@ const Dashboard = () => {
             gap: 3
           }}
         >
-          {/* Left: Avatar + Citizen Name + DID + Sovereign Badges */}
+          {/* Left: Avatar + Citizen Name + DID + Verified Badges */}
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
             <Box sx={{ position: 'relative' }}>
               <Avatar
@@ -384,7 +390,7 @@ const Dashboard = () => {
                 />
               </Box>
 
-              {/* Sovereign DID with One-Click Copy and QR Button */}
+              {/* DID with One-Click Copy and QR Button */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.8, flexWrap: 'wrap' }}>
                 <Typography variant="body2" sx={{ fontFamily: 'monospace', color: isLight ? '#475569' : '#9ca3af', bgcolor: isLight ? '#f8fafc' : '#1e2124', px: 1.2, py: 0.3, borderRadius: 1.5, border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`, fontSize: '0.82rem' }}>
                   {identityData.did}
@@ -457,7 +463,7 @@ const Dashboard = () => {
             </Box>
           </Box>
 
-          {/* Right: Sovereign Trust Score & Clearance Tier */}
+          {/* Right: Trust Score & Clearance Tier */}
           <Box
             sx={{
               p: 2,
@@ -472,24 +478,24 @@ const Dashboard = () => {
               IDENTITY TRUST SCORE
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 0.5, my: 0.2 }}>
-              <Typography variant="h3" sx={{ fontWeight: 800, color: '#16a34a', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                99.8%
+              <Typography variant="h3" sx={{ fontWeight: 800, color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                {identityData.verificationStatus === 'VERIFIED' ? '100%' : '0%'}
               </Typography>
               <Typography variant="body2" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700 }}>
                 / 100
               </Typography>
             </Box>
-            <Typography variant="caption" sx={{ color: isLight ? '#16a34a' : '#4ade80', fontWeight: 700, display: 'block' }}>
-              Tier 1 Full Clearance
+            <Typography variant="caption" sx={{ color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706', fontWeight: 700, display: 'block' }}>
+              {identityData.verificationStatus === 'VERIFIED' ? 'Verified Citizen' : 'Pending Verification'}
             </Typography>
             <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.7rem' }}>
-              Zero fraud flags • 4 Attested Claims
+              {identityData.verificationStatus === 'VERIFIED' ? 'Attested on Ethereum Sepolia' : 'Awaiting admin verification'}
             </Typography>
           </Box>
         </Box>
       </Card>
 
-      {/* 3. Four Core Sovereign Identity Pillars (Clear, Authoritative Cards) */}
+      {/* 3. Four Core Identity Pillars (Clear, Authoritative Cards) */}
       <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
         {corePillars.map((pillar, idx) => (
           <Grid size={{ xs: 12, sm: 6, md: 3 }} key={idx}>
@@ -585,17 +591,17 @@ const Dashboard = () => {
         {/* Left Column (8 / 12): Digital ID Card + Verifiable Credentials Table */}
         <Grid size={{ xs: 12, lg: 8 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* Digital Citizen Sovereign ID Card (Fintech Holographic Pass) */}
+            {/* Digital Citizen ID Pass (Fintech Holographic Card) */}
             <Card
               sx={{
-                p: 3,
-                borderRadius: 3,
-                background: isLight
-                  ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)'
-                  : 'linear-gradient(135deg, #181a1c 0%, #0c0d0e 100%)',
+                p: { xs: 2.5, md: 3.5 },
+                borderRadius: 4,
+                background: 'linear-gradient(135deg, #090e17 0%, #0f172a 55%, #132038 100%)',
                 color: '#ffffff',
-                border: `1px solid ${isLight ? '#334155' : '#282a2d'}`,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                border: '1px solid rgba(56, 189, 248, 0.22)',
+                boxShadow: isLight
+                  ? '0 12px 30px rgba(15, 23, 42, 0.15)'
+                  : '0 18px 42px rgba(0, 0, 0, 0.55)',
                 position: 'relative',
                 overflow: 'hidden'
               }}
@@ -604,105 +610,181 @@ const Dashboard = () => {
               <ShieldRounded
                 sx={{
                   position: 'absolute',
-                  right: -30,
-                  bottom: -30,
-                  fontSize: 220,
-                  color: 'rgba(255, 255, 255, 0.03)',
+                  right: -25,
+                  bottom: -25,
+                  fontSize: 240,
+                  color: 'rgba(56, 189, 248, 0.03)',
                   pointerEvents: 'none'
                 }}
               />
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+              {/* Top Row: Title + Official Authority + Authentic Status Chips */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Box
                     sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 1.5,
+                      width: 36,
+                      height: 36,
+                      borderRadius: 2,
                       bgcolor: '#2563eb',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      boxShadow: '0 0 14px rgba(37, 99, 235, 0.5)'
                     }}
                   >
-                    <ShieldRounded sx={{ fontSize: 20, color: '#ffffff' }} />
+                    <ShieldRounded sx={{ fontSize: 22, color: '#ffffff' }} />
                   </Box>
                   <Box>
-                    <Typography variant="subtitle2" sx={{ color: '#ffffff', fontWeight: 800, letterSpacing: '0.05em' }}>
+                    <Typography variant="subtitle2" sx={{ color: '#ffffff', fontWeight: 900, letterSpacing: '0.08em', fontSize: '0.88rem' }}>
                       TRUEID DIGITAL PASS
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                      Official Identity Card • Verified Citizen
+                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>
+                      OFFICIAL IDENTITY CARD • VERIFIED CITIZEN
                     </Typography>
                   </Box>
                 </Box>
 
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                   <Chip
-                    icon={<ContactlessRounded sx={{ color: '#38bdf8 !important', fontSize: 16 }} />}
-                    label="NFC ACTIVE"
+                    icon={<LanRounded sx={{ color: '#38bdf8 !important', fontSize: '13px !important' }} />}
+                    label="ETHEREUM SEPOLIA"
                     size="small"
-                    sx={{ bgcolor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 700, fontSize: '0.68rem', border: '1px solid rgba(56, 189, 248, 0.3)' }}
+                    sx={{
+                      bgcolor: 'rgba(56, 189, 248, 0.12)',
+                      color: '#38bdf8',
+                      fontWeight: 800,
+                      fontSize: '0.68rem',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      height: 24
+                    }}
                   />
                   <Chip
-                    label="PERMANENT BADGE"
+                    icon={<CheckCircleRounded sx={{ color: '#4ade80 !important', fontSize: '13px !important' }} />}
+                    label={identityData.sbtTokenId || 'ERC-5192 SBT #1'}
                     size="small"
-                    sx={{ bgcolor: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', fontWeight: 700, fontSize: '0.68rem', border: '1px solid rgba(34, 197, 94, 0.3)' }}
+                    sx={{
+                      bgcolor: 'rgba(34, 197, 94, 0.12)',
+                      color: '#4ade80',
+                      fontWeight: 800,
+                      fontSize: '0.68rem',
+                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                      height: 24
+                    }}
                   />
                 </Box>
               </Box>
 
-              {/* Card Middle: Gold Chip + Citizen Details */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 3, my: 2 }}>
+              {/* Card Middle: Precision EMV Gold Chip + Citizen Details + Gov ID */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 3, my: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
-                  {/* Holographic Chip Icon */}
+                  {/* Realistic Micro-etched EMV Gold Chip */}
                   <Box
                     sx={{
-                      width: 48,
-                      height: 38,
+                      width: 52,
+                      height: 42,
                       borderRadius: 1.5,
-                      background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
-                      border: '1px solid #fef08a',
-                      boxShadow: 'inset 0 0 4px rgba(0,0,0,0.3)',
+                      background: 'radial-gradient(ellipse at center, #fef08a 0%, #eab308 50%, #ca8a04 80%, #a16207 100%)',
+                      border: '1px solid rgba(254, 240, 138, 0.85)',
+                      boxShadow: '0 2px 8px rgba(202, 138, 4, 0.45), inset 0 1px 2px rgba(255, 255, 255, 0.6)',
                       display: 'flex',
                       flexDirection: 'column',
-                      justifyContent: 'space-around',
-                      p: 0.6
+                      justifyContent: 'space-between',
+                      p: 0.6,
+                      position: 'relative',
+                      flexShrink: 0
                     }}
                   >
-                    <Box sx={{ height: 1, bgcolor: '#78350f', opacity: 0.6 }} />
-                    <Box sx={{ height: 1, bgcolor: '#78350f', opacity: 0.6 }} />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', height: '35%' }}>
+                      <Box sx={{ width: '45%', borderBottom: '1px solid #78350f', borderRight: '1px solid #78350f', opacity: 0.6, borderRadius: '0 0 2px 0' }} />
+                      <Box sx={{ width: '45%', borderBottom: '1px solid #78350f', borderLeft: '1px solid #78350f', opacity: 0.6, borderRadius: '0 0 0 2px' }} />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', height: '35%' }}>
+                      <Box sx={{ width: '45%', borderTop: '1px solid #78350f', borderRight: '1px solid #78350f', opacity: 0.6, borderRadius: '0 2px 0 0' }} />
+                      <Box sx={{ width: '45%', borderTop: '1px solid #78350f', borderLeft: '1px solid #78350f', opacity: 0.6, borderRadius: '2px 0 0 0' }} />
+                    </Box>
                   </Box>
 
                   <Box>
-                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, display: 'block', mb: 0.3 }}>
                       CITIZEN FULL NAME
                     </Typography>
-                    <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 800, letterSpacing: '-0.01em' }}>
-                      {identityData.name}
+                    <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                      {identityData.name || 'Akshay Manbhaw'}
                     </Typography>
                   </Box>
                 </Box>
 
                 <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-                  <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, display: 'block', mb: 0.3 }}>
                     NATIONAL CITIZEN IDENTIFIER
                   </Typography>
-                  <Typography variant="h6" sx={{ color: '#38bdf8', fontWeight: 800, fontFamily: 'monospace' }}>
-                    {identityData.governmentId}
+                  <Typography variant="h5" sx={{ color: '#38bdf8', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '0.06em', textShadow: '0 0 16px rgba(56, 189, 248, 0.45)', lineHeight: 1.1 }}>
+                    {identityData.governmentId || 'JIFPM9413P'}
                   </Typography>
                 </Box>
               </Box>
 
-              {/* Card Bottom: DID Hash & QR Trigger */}
-              <Box sx={{ pt: 2, mt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+              {/* Sub-strip: Soulbound Badges & On-Chain Anchor Contract */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', pt: 1.5, pb: 0.5, borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                  <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>
+                    Badge Token:
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#4ade80', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem' }}>
+                    {identityData.sbtTokenId || 'SBT-Token #1'} (Locked)
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                  <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>
+                    Contract:
+                  </Typography>
+                  <Typography
+                    component="a"
+                    href={`https://sepolia.etherscan.io/address/${identityData.contractAddress || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf'}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="caption"
+                    sx={{ color: '#38bdf8', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                  >
+                    {(identityData.contractAddress || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf').slice(0, 8)}...{(identityData.contractAddress || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf').slice(-6)}
+                  </Typography>
+                </Box>
+                {identityData.blockchainTx && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>
+                      Mint Tx:
+                    </Typography>
+                    <Typography
+                      component="a"
+                      href={`https://sepolia.etherscan.io/tx/${identityData.blockchainTx}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      variant="caption"
+                      sx={{ color: '#818cf8', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                    >
+                      {identityData.blockchainTx.slice(0, 8)}...{identityData.blockchainTx.slice(-6)}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Card Bottom: DID Hash with Copy & Real Action Buttons */}
+              <Box sx={{ pt: 2, mt: 1.5, borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
                 <Box>
-                  <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', display: 'block' }}>
+                  <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', display: 'block', mb: 0.3, fontWeight: 600, letterSpacing: '0.04em' }}>
                     DIGITAL IDENTIFIER (DID)
                   </Typography>
-                  <Typography variant="body2" sx={{ color: '#e2e8f0', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                    {identityData.did}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                    <Typography variant="body2" sx={{ color: '#e2e8f0', fontFamily: 'monospace', fontSize: '0.78rem', wordBreak: 'break-all' }}>
+                      {identityData.did}
+                    </Typography>
+                    <Tooltip title={copied ? 'Copied DID!' : 'Copy DID'}>
+                      <IconButton size="small" onClick={handleCopyDID} sx={{ color: copied ? '#4ade80' : '#94a3b8', p: 0.3 }}>
+                        <ContentCopyRounded sx={{ fontSize: 13 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 1 }}>
@@ -717,8 +799,10 @@ const Dashboard = () => {
                       textTransform: 'none',
                       fontSize: '0.75rem',
                       fontWeight: 600,
-                      borderRadius: 1.5,
-                      '&:hover': { borderColor: '#ffffff', bgcolor: 'rgba(255, 255, 255, 0.05)' }
+                      borderRadius: 2,
+                      px: 1.8,
+                      py: 0.7,
+                      '&:hover': { borderColor: '#38bdf8', bgcolor: 'rgba(56, 189, 248, 0.08)' }
                     }}
                   >
                     View QR Pass
@@ -726,14 +810,18 @@ const Dashboard = () => {
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={() => window.print()}
+                    onClick={handleExportPass}
                     startIcon={<DownloadRounded />}
                     sx={{
                       bgcolor: '#2563eb',
+                      color: '#ffffff',
                       textTransform: 'none',
                       fontSize: '0.75rem',
                       fontWeight: 700,
-                      borderRadius: 1.5,
+                      borderRadius: 2,
+                      px: 2,
+                      py: 0.7,
+                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
                       '&:hover': { bgcolor: '#1d4ed8' }
                     }}
                   >
@@ -815,7 +903,14 @@ const Dashboard = () => {
                   </TableHead>
 
                   <TableBody>
-                    {filteredRecords.map((rec) => (
+                    {filteredRecords.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center" sx={{ py: 4, color: isLight ? '#64748b' : '#8b949e', fontSize: '0.82rem' }}>
+                          No verifiable credentials found on record.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredRecords.map((rec) => (
                       <TableRow
                         key={rec.id}
                         hover
@@ -891,7 +986,7 @@ const Dashboard = () => {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )))}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -918,17 +1013,22 @@ const Dashboard = () => {
 
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
                 <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 800, color: '#16a34a', letterSpacing: '-0.02em' }}>
-                    99.8%
+                  <Typography variant="h4" sx={{ fontWeight: 800, color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706', letterSpacing: '-0.02em' }}>
+                    {identityData.verificationStatus === 'VERIFIED' ? '100%' : '0%'}
                   </Typography>
                   <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 600 }}>
-                    Highest Verified Trust
+                    {identityData.verificationStatus === 'VERIFIED' ? 'Attested Citizen Standing' : 'Pending Verification'}
                   </Typography>
                 </Box>
                 <Chip
-                  label="TIER 1 CITIZEN"
+                  label={identityData.verificationStatus === 'VERIFIED' ? 'VERIFIED CITIZEN' : 'PENDING'}
                   size="small"
-                  sx={{ bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 800, fontSize: '0.7rem' }}
+                  sx={{
+                    bgcolor: isLight ? (identityData.verificationStatus === 'VERIFIED' ? '#f0fdf4' : '#fffbeb') : (identityData.verificationStatus === 'VERIFIED' ? 'rgba(22, 163, 74, 0.15)' : 'rgba(217, 119, 6, 0.15)'),
+                    color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706',
+                    fontWeight: 800,
+                    fontSize: '0.7rem'
+                  }}
                 />
               </Box>
 
@@ -1061,24 +1161,30 @@ const Dashboard = () => {
               </Box>
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {auditLogs.map((log, i) => (
-                  <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: log.color, mt: 0.8, flexShrink: 0 }} />
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#0f172a' : '#ffffff', fontSize: '0.8rem', lineHeight: 1.3 }}>
-                        {log.title}
-                      </Typography>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.3 }}>
-                        <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontSize: '0.7rem' }}>
-                          {log.actor}
+                {auditLogs.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: isLight ? '#64748b' : '#8b949e', py: 2, textAlign: 'center', fontSize: '0.8rem' }}>
+                    No recorded identity audit transactions yet.
+                  </Typography>
+                ) : (
+                  auditLogs.map((log, i) => (
+                    <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: log.color, mt: 0.8, flexShrink: 0 }} />
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#0f172a' : '#ffffff', fontSize: '0.8rem', lineHeight: 1.3 }}>
+                          {log.title}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.7rem' }}>
-                          {log.time}
-                        </Typography>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.3 }}>
+                          <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontSize: '0.7rem' }}>
+                            {log.actor}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.7rem' }}>
+                            {log.time}
+                          </Typography>
+                        </Box>
                       </Box>
                     </Box>
-                  </Box>
-                ))}
+                  ))
+                )}
               </Box>
             </Card>
           </Box>
@@ -1113,34 +1219,30 @@ const Dashboard = () => {
         </DialogTitle>
 
         <DialogContent sx={{ textAlign: 'center', pt: 2 }}>
-          {/* Mock QR Code Display */}
+          {/* Authentic High-Resolution Scannable QR Code */}
           <Box
             sx={{
-              p: 3,
+              p: 2.5,
               borderRadius: 3,
               bgcolor: '#ffffff',
               border: `2px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
               display: 'inline-block',
               mb: 2,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
             }}
           >
-            <Box
-              sx={{
-                width: 180,
-                height: 180,
-                background: 'repeating-conic-gradient(#0f172a 0% 25%, #ffffff 0% 50%) 50% / 20px 20px',
-                borderRadius: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative'
-              }}
-            >
-              <Box sx={{ width: 44, height: 44, bgcolor: '#ffffff', borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}>
-                <ShieldRounded sx={{ color: '#2563eb', fontSize: 26 }} />
+            {qrDataUrl ? (
+              <Box
+                component="img"
+                src={qrDataUrl}
+                alt="Citizen Passport QR"
+                sx={{ width: 200, height: 200, display: 'block', borderRadius: 1 }}
+              />
+            ) : (
+              <Box sx={{ width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CircularProgress size={32} sx={{ color: '#2563eb' }} />
               </Box>
-            </Box>
+            )}
           </Box>
 
           <Typography variant="subtitle1" sx={{ fontWeight: 800, color: isLight ? '#0f172a' : '#ffffff' }}>
@@ -1154,9 +1256,9 @@ const Dashboard = () => {
           </Typography>
 
           <Chip
-            label="100% CRYPTOGRAPHICALLY AUTHENTICATED"
+            label={identityData.sbtTokenId || 'ERC-5192 SBT #1'}
             size="small"
-            sx={{ bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 800, fontSize: '0.7rem' }}
+            sx={{ bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 800, fontSize: '0.72rem' }}
           />
         </DialogContent>
 
@@ -1253,7 +1355,7 @@ const Dashboard = () => {
     "created": "2026-01-15T00:00:00Z",
     "verificationMethod": "${identityData.did}#keys-1",
     "proofPurpose": "assertionMethod",
-    "proofValue": "${selectedProof.hash.slice(0, 32)}..."
+    "proofValue": "${(selectedProof.hash || selectedProof.transaction_hash || selectedProof.blockchain_tx_hash || '').slice(0, 32)}..."
   }
 }`}
                 </Box>

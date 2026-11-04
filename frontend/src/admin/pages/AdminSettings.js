@@ -225,7 +225,7 @@ const AdminSettings = () => {
                     Operator Identity
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                    Officer profile in sovereign registry
+                    Officer profile in verified registry
                   </Typography>
                 </Box>
               </Box>
@@ -254,7 +254,7 @@ const AdminSettings = () => {
 
                 <Box>
                   <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
-                    Institutional Email
+                    Official Email
                   </Typography>
                   <TextField
                     fullWidth

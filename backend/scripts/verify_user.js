@@ -67,7 +67,7 @@ async function main() {
   }
 
   try {
-    console.log(`Verifying user ${userId} with token transfer of ${transferAmount} AVAX...`);
+    console.log(`Verifying user ${userId} with token transfer of ${transferAmount} ETH...`);
     
     // Login as admin
     console.log('Logging in as admin...');
@@ -88,7 +88,7 @@ async function main() {
       console.log('\n💰 Token Transfer Details:');
       if (result.transaction.success) {
         console.log(`Status: Success`);
-        console.log(`Amount: ${result.transaction.amount} AVAX`);
+        console.log(`Amount: ${result.transaction.amount} ETH`);
         console.log(`Transaction Hash: ${result.transaction.transactionHash}`);
         console.log(`Explorer URL: https://testnet.snowtrace.io/tx/${result.transaction.transactionHash}`);
       } else {

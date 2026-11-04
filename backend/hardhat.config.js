@@ -1,9 +1,7 @@
 /**
- * Hardhat configuration for DBIS
- * Supports both local development and Avalanche Fuji testnet
+ * Hardhat configuration for TrueID
+ * Supports both local development and Ethereum Sepolia testnet
  */
-require('@nomiclabs/hardhat-waffle');
-require('@nomiclabs/hardhat-ethers');
 require('dotenv').config();
 
 // Load private key from .env file
@@ -14,13 +12,26 @@ const PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || '0x000000000000000000000000
  */
 module.exports = {
   solidity: {
-    version: "0.8.17",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200
+    compilers: [
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200
+          }
+        }
+      },
+      {
+        version: "0.8.17",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200
+          }
+        }
       }
-    }
+    ]
   },
   paths: {
     sources: "./blockchain/contracts",
@@ -28,8 +39,12 @@ module.exports = {
     cache: "./blockchain/cache",
     artifacts: "./blockchain/artifacts"
   },
-  defaultNetwork: "sepolia",
+  defaultNetwork: "localhost",
   networks: {
+    localhost: {
+      url: "http://127.0.0.1:8545",
+      chainId: 31337
+    },
     // Ethereum Sepolia Testnet configuration
     sepolia: {
       url: process.env.SEPOLIA_RPC_URL || process.env.BLOCKCHAIN_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",

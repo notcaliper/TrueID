@@ -1,0 +1,33 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployedAt": "2026-11-04T20:52:18.584Z",
+  "deployer": "0x45B27dc6bE8B48188e31F90699e5E67A835f7B2b",
+  "contracts": {
+    "TrueIDZKVerifier": {
+      "address": "0x1778458F5fb52C3a01082C4a75E2440A32e9011D",
+      "txHash": "0xd9b829298e95b34ca608f634721264a239605512f8525c19ca7e6ff5ad8e8589",
+      "explorer": "https://sepolia.etherscan.io/address/0x1778458F5fb52C3a01082C4a75E2440A32e9011D"
+    },
+    "TrueIDSoulboundBadge": {
+      "address": "0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf",
+      "txHash": "0x6423c20f8dd415ed8a32783fed626c6fe8ae03297e7dd61dbb169c24c5d93dba",
+      "explorer": "https://sepolia.etherscan.io/address/0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf"
+    },
+    "TrueIDDIDRegistry": {
+      "address": "0x6877d0edD489fdCa49Cb9086684E6868e1153985",
+      "txHash": "0x545a1f73e808270b3a131a5d599bdac6af49eef2b0aed0230ddcdbb6a91d19ed",
+      "explorer": "https://sepolia.etherscan.io/address/0x6877d0edD489fdCa49Cb9086684E6868e1153985"
+    },
+    "TrueIDCredentialRegistry": {
+      "address": "0x13b46Af37e8cc566446647deD8b6A0b4b7CE54B2",
+      "txHash": "0x3591687bd6c2c16b4a00545a61872b0b16ecb6c67112e6051d0bbc9b8dbdf899",
+      "explorer": "https://sepolia.etherscan.io/address/0x13b46Af37e8cc566446647deD8b6A0b4b7CE54B2"
+    },
+    "IdentityManagement": {
+      "address": "0xDAA6c4D8fc7B4AAc7B6f7724939b6dB548dF1F02",
+      "txHash": "0xb9c4bbeea9531a530e28ce04693fc81e5c38e0b44c7a6471ded6989ea10719c2",
+      "explorer": "https://sepolia.etherscan.io/address/0xDAA6c4D8fc7B4AAc7B6f7724939b6dB548dF1F02"
+    }
+  }
+}

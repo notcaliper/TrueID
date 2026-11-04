@@ -527,7 +527,7 @@ const AdminProfessionalRecords = () => {
               Professional Records Registry
             </Typography>
             <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 640 }}>
-              Audit institutional diplomas, corporate employment proofs, and cryptographic certificate hashes.
+              Audit academic diplomas, corporate employment proofs, and cryptographic certificate hashes.
             </Typography>
           </Box>
 

@@ -417,7 +417,7 @@ const BiometricVerification = ({
       <Typography variant="body2" color="#94a3b8" sx={{ mb: 3 }}>
         {mode === 'update'
           ? 'Align your face inside the target frame. TrueID extracts 68 topological landmark vectors and cryptographically syncs them with the decentralized registry.'
-          : 'Position your face inside the target frame. TrueID extracts 68 invariant geometric landmark nodes to cryptographically verify sovereign proof-of-liveness.'}
+          : 'Position your face inside the target frame. TrueID extracts 68 invariant geometric landmark nodes to cryptographically verify genuine proof-of-liveness.'}
       </Typography>
 
       {error && (

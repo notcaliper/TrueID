@@ -1,28 +1,24 @@
 /**
- * Script to check wallet balances on Avalanche Fuji Testnet
+ * Script to check wallet balances on Ethereum Sepolia Testnet
  */
 const ethers = require('ethers');
 require('dotenv').config();
 
 /**
- * Check wallet balance on Avalanche Fuji Testnet
+ * Check wallet balance on Ethereum Sepolia Testnet
  * @param {string} address - Wallet address to check
- * @returns {Promise<string>} Balance in AVAX
+ * @returns {Promise<string>} Balance in ETH
  */
 async function checkWalletBalance(address) {
   try {
     // Initialize provider
-    const rpcUrl = process.env.AVALANCHE_FUJI_RPC_URL;
-    if (!rpcUrl) {
-      throw new Error('AVALANCHE_FUJI_RPC_URL not defined in environment variables');
-    }
-    const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    const rpcUrl = process.env.SEPOLIA_RPC_URL || process.env.BLOCKCHAIN_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
+    const provider = ethers.JsonRpcProvider ? new ethers.JsonRpcProvider(rpcUrl) : new ethers.providers.JsonRpcProvider(rpcUrl);
     
     // Get balance
     const balance = await provider.getBalance(address);
-    
-    // Convert from wei to AVAX (18 decimals)
-    return ethers.utils.formatEther(balance);
+    const formatEther = ethers.formatEther || ethers.utils.formatEther;
+    return formatEther(balance);
   } catch (error) {
     console.error('Error getting wallet balance:', error);
     throw error;
@@ -47,8 +43,8 @@ async function main() {
     console.log('\n=== Admin Wallet ===');
     console.log('Address:', adminAddress);
     const adminBalance = await checkWalletBalance(adminAddress);
-    console.log('Balance:', adminBalance, 'AVAX');
-    console.log('Explorer URL:', `https://testnet.snowtrace.io/address/${adminAddress}`);
+    console.log('Balance:', adminBalance, 'ETH');
+    console.log('Explorer URL:', `https://sepolia.etherscan.io/address/${adminAddress}`);
     
     // Check if we should query the database for user wallets
     const args = process.argv.slice(2);
@@ -60,8 +56,8 @@ async function main() {
       console.log('\n=== User Wallet ===');
       console.log('Address:', userAddress);
       const userBalance = await checkWalletBalance(userAddress);
-      console.log('Balance:', userBalance, 'AVAX');
-      console.log('Explorer URL:', `https://testnet.snowtrace.io/address/${userAddress}`);
+      console.log('Balance:', userBalance, 'ETH');
+      console.log('Explorer URL:', `https://sepolia.etherscan.io/address/${userAddress}`);
     }
   } catch (error) {
     console.error('Error:', error.message);
@@ -81,7 +77,7 @@ async function checkAllUserWallets() {
     
     // Query user wallets from database
     const result = await db.query(
-      'SELECT id, name, avax_address FROM users WHERE avax_address IS NOT NULL',
+      'SELECT id, name, COALESCE(wallet_address, avax_address) as wallet_address FROM users WHERE wallet_address IS NOT NULL OR avax_address IS NOT NULL',
       []
     );
     
@@ -95,10 +91,10 @@ async function checkAllUserWallets() {
     // Check balance for each wallet
     for (const user of result.rows) {
       try {
-        const balance = await checkWalletBalance(user.avax_address);
+        const balance = await checkWalletBalance(user.wallet_address);
         console.log(`User ID: ${user.id}, Name: ${user.name}`);
-        console.log(`Address: ${user.avax_address}`);
-        console.log(`Balance: ${balance} AVAX`);
+        console.log(`Address: ${user.wallet_address}`);
+        console.log(`Balance: ${balance} ETH`);
         console.log('---');
       } catch (err) {
         console.error(`Error checking balance for user ${user.id}:`, err.message);

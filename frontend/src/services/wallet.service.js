@@ -41,22 +41,15 @@ class WalletService {
       }
     }
 
-    // Fallback if no Web3 extension is installed
-    return {
-      address: '0x742d35Cc6634C0532925a3b844Bc9e7595f8dEe3',
-      balance: '0.0000',
-      network: 'Ethereum Sepolia Testnet',
-      chainId: 11155111,
-      currency: 'ETH',
-      connected: true
-    };
+    throw new Error('No Ethereum wallet extension detected (e.g. MetaMask). Please install an extension to connect.');
   }
 
   /**
-   * Query live balance of address
+   * Query live balance of address via Web3 or Sepolia RPC
    */
   async getBalance(address) {
-    if (typeof window !== 'undefined' && window.ethereum && address) {
+    if (!address) return '0.0000';
+    if (typeof window !== 'undefined' && window.ethereum) {
       try {
         const balanceHex = await window.ethereum.request({
           method: 'eth_getBalance',
@@ -64,9 +57,28 @@ class WalletService {
         });
         return (parseInt(balanceHex, 16) / 1e18).toFixed(4);
       } catch {
-        // Return default on RPC failure
-        return '0.0000';
+        // Fall back to direct RPC
       }
+    }
+
+    try {
+      const rpcUrl = process.env.REACT_APP_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
+      const response = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_getBalance',
+          params: [address, 'latest'],
+          id: 1
+        })
+      });
+      const data = await response.json();
+      if (data && data.result) {
+        return (parseInt(data.result, 16) / 1e18).toFixed(4);
+      }
+    } catch (e) {
+      console.warn('Direct RPC balance fetch error:', e);
     }
     return '0.0000';
   }

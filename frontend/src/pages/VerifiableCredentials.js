@@ -7,8 +7,6 @@ import {
   CardContent,
   Button,
   Alert,
-  CircularProgress,
-  Divider,
   Chip,
   Dialog,
   DialogTitle,
@@ -19,8 +17,7 @@ import {
   MenuItem,
   IconButton,
   Tooltip,
-  InputAdornment,
-  useTheme
+  InputAdornment
 } from '@mui/material';
 import {
   AddRounded,
@@ -29,21 +26,16 @@ import {
   SchoolRounded,
   WorkRounded,
   WorkspacePremiumRounded,
-  OpenInNewRounded,
   ContentCopyRounded,
   SearchRounded,
   CloudUploadRounded,
   CloseRounded,
   CheckCircleRounded,
-  HourglassEmptyRounded,
-  FilterListRounded,
   DescriptionRounded,
   RefreshRounded,
   GppGoodRounded,
   FactCheckRounded,
-  BadgeRounded,
-  AutoAwesomeRounded,
-  FilePresentRounded
+  BadgeRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
@@ -52,8 +44,8 @@ import { userAPI, documentAPI } from '../services/api.service';
 const VerifiableCredentials = () => {
   const { user } = useAuth();
   const { isLight } = useColorMode();
-  const theme = useTheme();
 
+  // eslint-disable-next-line no-unused-vars
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -67,61 +59,6 @@ const VerifiableCredentials = () => {
   const [copiedHash, setCopiedHash] = useState(null);
 
   // Default Verified Credentials
-  const defaultVerifiedRecords = useMemo(() => [
-    {
-      id: 'REC-001',
-      title: 'Master of Science in Distributed Computing',
-      institution: 'Stanford University (ID: 0x9812)',
-      record_type: 'EDUCATION',
-      description: 'Specialization in zero-knowledge consensus, peer-to-peer topology, and cryptographic state machines.',
-      start_date: '2022-09-01',
-      end_date: '2024-06-15',
-      data_hash: '0x8f4d99a2c3b4a567890123456789abcdef0123456789abcdef0123456789319b',
-      verification_status: 'VERIFIED',
-      on_blockchain: true,
-      blockchain_tx_hash: '0x4f8e91d2c3b4a567890123456789abcdef0123456789abcdef0123456789abcd'
-    },
-    {
-      id: 'REC-002',
-      title: 'Lead Cryptographic Security Architect',
-      institution: 'Ethereum Foundation / Sovereign Labs',
-      record_type: 'EMPLOYMENT',
-      description: 'Principal designer of decentralized biometric credential standard and smart contract soulbound registry.',
-      start_date: '2024-07-01',
-      end_date: null,
-      data_hash: '0x7e2a44d1c3b4a567890123456789abcdef0123456789abcdef0123456789502c',
-      verification_status: 'VERIFIED',
-      on_blockchain: true,
-      blockchain_tx_hash: '0x3a91b2c3d4e5f60718293a4b5c6d7e8f9012345678901234567890123456e8b2'
-    },
-    {
-      id: 'REC-003',
-      title: 'W3C Verifiable Credentials Professional',
-      institution: 'Decentralized Identity Foundation (DIF)',
-      record_type: 'CERTIFICATION',
-      description: 'Accreditation in W3C DID Core 1.0, JSON-LD signature suites, and selective disclosure protocols.',
-      start_date: '2026-01-10',
-      end_date: '2029-01-10',
-      data_hash: '0x3c99bb82c3b4a567890123456789abcdef0123456789abcdef0123456789110a',
-      verification_status: 'VERIFIED',
-      on_blockchain: true,
-      blockchain_tx_hash: '0x99f4c3a1b2d5e6f708192a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b28dc'
-    },
-    {
-      id: 'REC-004',
-      title: 'Digital Resident & Citizen Passport',
-      institution: 'TrueID Sovereign Ministry #01',
-      record_type: 'GOVERNMENT',
-      description: 'Permanent national digital identification and biometric face check pass.',
-      start_date: '2026-11-01',
-      end_date: null,
-      data_hash: '0x6b14aa77c3b4a567890123456789abcdef0123456789abcdef012345678989ee',
-      verification_status: 'VERIFIED',
-      on_blockchain: true,
-      blockchain_tx_hash: '0x6b14aa77c3b4a567890123456789abcdef0123456789abcdef012345678989ee'
-    }
-  ], []);
-
   const [recordForm, setRecordForm] = useState({
     title: '',
     institution: '',
@@ -140,19 +77,15 @@ const VerifiableCredentials = () => {
     try {
       const response = await userAPI.getProfessionalRecords();
       const serverRecords = response.data?.records || [];
-      if (serverRecords.length > 0) {
-        setRecords(serverRecords);
-      } else {
-        setRecords(defaultVerifiedRecords);
-      }
+      setRecords(serverRecords);
     } catch (err) {
-      console.warn('Using credential cache:', err);
-      setRecords(defaultVerifiedRecords);
+      console.warn('Credential sync notice:', err);
+      setRecords([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [defaultVerifiedRecords]);
+  }, []);
 
   useEffect(() => {
     fetchRecords();
@@ -373,7 +306,7 @@ const VerifiableCredentials = () => {
           <Typography sx={{ color: isLight ? '#64748b' : '#8b949e' }}>Verifiable Credentials</Typography>
           <span>/</span>
           <Typography sx={{ color: isLight ? '#0f172a' : '#f8fafc', fontWeight: 700, fontFamily: 'monospace' }}>
-            {user?.government_id || 'JIFPM9413P'}
+            {user?.government_id || ''}
           </Typography>
         </Box>
 
@@ -421,7 +354,7 @@ const VerifiableCredentials = () => {
         </Box>
       </Box>
 
-      {/* 2. Top Sovereign Credentials Banner (Dashboard Style) */}
+      {/* 2. Top Verified Credentials Banner (Dashboard Style) */}
       <Card
         sx={{
           p: { xs: 2.5, md: 3 },
@@ -704,7 +637,6 @@ const VerifiableCredentials = () => {
       <Grid container spacing={2.5}>
         {filteredRecords.map((record) => {
           const typeMeta = getTypeMeta(record.record_type);
-          const isVerified = record.verification_status === 'VERIFIED';
 
           return (
             <Grid size={12} key={record.id}>
@@ -761,7 +693,7 @@ const VerifiableCredentials = () => {
                         </Box>
 
                         <Typography variant="subtitle2" sx={{ color: '#2563eb', fontWeight: 700, mb: 0.8 }}>
-                          {record.institution || 'Accredited Sovereign Authority'}
+                          {record.institution || 'Accredited Authority'}
                         </Typography>
 
                         {record.description && (
@@ -776,10 +708,10 @@ const VerifiableCredentials = () => {
                             <span style={{ color: isLight ? '#334155' : '#cbd5e1', fontWeight: 600 }}>Period:</span> {formatDate(record.start_date)} — {formatDate(record.end_date)}
                           </Typography>
 
-                          {record.data_hash && (
+                          {(record.blockchain_tx_hash || record.data_hash) && (
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                               <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 600 }}>
-                                SHA-256 Hash:
+                                On-Chain Hash:
                               </Typography>
                               <Typography
                                 variant="caption"
@@ -793,12 +725,12 @@ const VerifiableCredentials = () => {
                                   fontSize: '0.72rem'
                                 }}
                               >
-                                {record.data_hash.slice(0, 12)}...{record.data_hash.slice(-8)}
+                                {(record.blockchain_tx_hash || record.data_hash || '').slice(0, 12)}...{(record.blockchain_tx_hash || record.data_hash || '').slice(-8)}
                               </Typography>
                               <Tooltip title={copiedHash === `hash-${record.id}` ? 'Copied Hash!' : 'Copy Hash'}>
                                 <IconButton
                                   size="small"
-                                  onClick={() => copyToClipboard(record.data_hash, `hash-${record.id}`)}
+                                  onClick={() => copyToClipboard(record.blockchain_tx_hash || record.data_hash, `hash-${record.id}`)}
                                   sx={{ color: copiedHash === `hash-${record.id}` ? '#16a34a' : isLight ? '#64748b' : '#8b949e', p: 0.3 }}
                                 >
                                   <ContentCopyRounded sx={{ fontSize: 14 }} />
@@ -815,7 +747,7 @@ const VerifiableCredentials = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Chip
                           icon={<CheckCircleRounded sx={{ fontSize: '14px !important', color: '#16a34a !important' }} />}
-                          label={record.verification_status || 'VERIFIED'}
+                          label={record.verification_status || 'PENDING'}
                           size="small"
                           sx={{
                             fontWeight: 700,
@@ -949,11 +881,11 @@ const VerifiableCredentials = () => {
               <TextField
                 fullWidth
                 required
-                label="Issuing Institution"
+                label="Issuing Organization"
                 name="institution"
                 value={recordForm.institution}
                 onChange={handleFormChange}
-                placeholder="e.g., Stanford University"
+                placeholder="e.g., University / Organization Name"
                 size="small"
                 InputLabelProps={{ shrink: true }}
                 sx={{
@@ -1116,7 +1048,7 @@ const VerifiableCredentials = () => {
                   SHA-256 NOTARY PROOF HASH
                 </Typography>
                 <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isLight ? '#f1f5f9' : '#1e2124', fontFamily: 'monospace', fontSize: '0.8rem', color: '#2563eb', wordBreak: 'break-all' }}>
-                  {selectedProof.data_hash}
+                  {selectedProof.blockchain_tx_hash || selectedProof.data_hash || 'Verified on Ethereum Sepolia'}
                 </Box>
               </Box>
 
@@ -1145,18 +1077,18 @@ const VerifiableCredentials = () => {
   "id": "urn:uuid:${selectedProof.id}",
   "type": ["VerifiableCredential", "${selectedProof.record_type}"],
   "issuer": "${selectedProof.institution}",
-  "issuanceDate": "${selectedProof.start_date}T00:00:00Z",
+  "issuanceDate": "${selectedProof.start_date || new Date().toISOString()}T00:00:00Z",
   "credentialSubject": {
-    "id": "did:trueid:0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+    "id": "did:trueid:${user?.wallet_address || ''}",
     "qualification": "${selectedProof.title}",
     "status": "${selectedProof.verification_status}"
   },
   "proof": {
     "type": "Ed25519Signature2020",
     "created": "2026-11-05T00:00:00Z",
-    "verificationMethod": "did:trueid:0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045#key-1",
+    "verificationMethod": "did:trueid:${user?.wallet_address || ''}#key-1",
     "proofPurpose": "assertionMethod",
-    "proofValue": "${selectedProof.data_hash.slice(0, 32)}..."
+    "proofValue": "${(selectedProof.blockchain_tx_hash || selectedProof.data_hash || '').slice(0, 32)}..."
   }
 }`}
                 </Box>

@@ -1,27 +1,28 @@
 /**
  * Wallet Service
- * Handles Avalanche C-Chain wallet operations
+ * Handles EVM / Ethereum Sepolia wallet operations
  */
-const ethers = require('ethers');
+const { ethers } = require('ethers');
 
 /**
- * Initialize connection to Avalanche Fuji Testnet
- * @returns {ethers.providers.JsonRpcProvider} Provider instance
+ * Initialize connection to Ethereum Sepolia Testnet
+ * @returns {ethers.JsonRpcProvider} Provider instance
  */
 const initProvider = () => {
-  const rpcUrl = process.env.BLOCKCHAIN_RPC_URL || process.env.SEPOLIA_RPC_URL || process.env.AVALANCHE_FUJI_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
-  return new ethers.providers.JsonRpcProvider(rpcUrl);
+  const rpcUrl = process.env.SEPOLIA_RPC_URL;
+  if (!rpcUrl) {
+    throw new Error('SEPOLIA_RPC_URL environment variable is required');
+  }
+  return ethers.JsonRpcProvider ? new ethers.JsonRpcProvider(rpcUrl) : new ethers.providers.JsonRpcProvider(rpcUrl);
 };
 
 /**
- * Generate a new random wallet
+ * Generate a new random EVM wallet
  * @returns {Object} Object containing wallet address and private key
  */
 exports.generateWallet = () => {
   try {
-    // Create a random EVM wallet
     const wallet = ethers.Wallet.createRandom();
-    
     return {
       address: wallet.address,
       privateKey: wallet.privateKey
@@ -35,15 +36,13 @@ exports.generateWallet = () => {
 /**
  * Get wallet balance
  * @param {String} address - Wallet address
- * @returns {String} Balance in AVAX
+ * @returns {String} Balance in ETH
  */
 exports.getBalance = async (address) => {
   try {
     const provider = initProvider();
     const balance = await provider.getBalance(address);
-    
-    // Convert from wei to AVAX (18 decimals)
-    return ethers.utils.formatEther(balance);
+    return ethers.formatEther ? ethers.formatEther(balance) : ethers.utils.formatEther(balance);
   } catch (error) {
     console.error('Error getting wallet balance:', error);
     throw new Error('Failed to get wallet balance');
@@ -51,67 +50,57 @@ exports.getBalance = async (address) => {
 };
 
 /**
- * Validate if an address is a valid Ethereum/Avalanche address
+ * Validate if an address is a valid Ethereum address
  * @param {String} address - Address to validate
  * @returns {Boolean} True if valid, false otherwise
  */
 exports.isValidAddress = (address) => {
   try {
-    return ethers.utils.isAddress(address);
+    return ethers.isAddress ? ethers.isAddress(address) : ethers.utils.isAddress(address);
   } catch (error) {
     return false;
   }
 };
 
 /**
- * Transfer AVAX tokens from admin wallet to user wallet during verification
+ * Transfer ETH tokens from admin wallet to user wallet during verification
  * @param {String} toAddress - User's wallet address to receive tokens
- * @param {Number} amount - Amount of AVAX to transfer (default: 0.03)
+ * @param {Number} amount - Amount of ETH to transfer (default: 0.005)
  * @returns {Object} Transaction details
  */
-exports.transferTokens = async (toAddress, amount = 0.03) => {
+exports.transferTokens = async (toAddress, amount = 0.005) => {
   try {
-    // Validate the destination address
     if (!exports.isValidAddress(toAddress)) {
       throw new Error(`Invalid destination address: ${toAddress}`);
     }
     
-    // Get admin private key from environment variables
-    const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
+    const adminPrivateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
     if (!adminPrivateKey) {
-      throw new Error('ADMIN_PRIVATE_KEY not found in environment variables');
+      throw new Error('ADMIN_WALLET_PRIVATE_KEY environment variable is required');
     }
 
-    // Connect to the Avalanche Fuji Testnet
     const provider = initProvider();
-    
-    // Create wallet from admin private key
     const adminWallet = new ethers.Wallet(adminPrivateKey, provider);
     
-    // Check admin wallet balance
     const adminBalance = await provider.getBalance(adminWallet.address);
-    const adminBalanceInAVAX = ethers.utils.formatEther(adminBalance);
+    const parseEther = ethers.parseEther || ethers.utils.parseEther;
+    const formatEther = ethers.formatEther || ethers.utils.formatEther;
+    const amountInWei = parseEther(amount.toString());
     
-    // Convert amount to wei (AVAX has 18 decimals)
-    const amountInWei = ethers.utils.parseEther(amount.toString());
+    const adminBalanceBigInt = BigInt(adminBalance.toString());
+    const amountBigInt = BigInt(amountInWei.toString());
     
-    // Check if admin has enough balance
-    if (adminBalance.lt(amountInWei)) {
-      throw new Error(`Insufficient balance. Admin has ${adminBalanceInAVAX} AVAX, trying to send ${amount} AVAX`);
+    if (adminBalanceBigInt < amountBigInt) {
+      throw new Error(`Insufficient balance. Admin has ${formatEther(adminBalance)} ETH, trying to send ${amount} ETH`);
     }
     
-    // Create transaction
     const tx = {
       to: toAddress,
-      value: amountInWei,
-      gasLimit: 21000, // Standard gas limit for simple transfers
+      value: amountInWei
     };
     
-    // Send transaction
     const transaction = await adminWallet.sendTransaction(tx);
-    
-    // Wait for transaction to be mined
-    const receipt = await transaction.wait();
+    const receipt = await transaction.wait(1);
     
     return {
       success: true,
@@ -121,10 +110,10 @@ exports.transferTokens = async (toAddress, amount = 0.03) => {
       to: toAddress,
       amount: amount,
       gasUsed: receipt.gasUsed.toString(),
-      explorerUrl: `https://testnet.snowtrace.io/tx/${transaction.hash}`
+      explorerUrl: `https://sepolia.etherscan.io/tx/${transaction.hash}`
     };
   } catch (error) {
-    console.error('Error transferring AVAX tokens:', error);
+    console.error('Error transferring ETH tokens:', error);
     return {
       success: false,
       error: error.message

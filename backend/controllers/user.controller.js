@@ -69,8 +69,8 @@ exports.getUserProfile = async (req, res) => {
         governmentId: user.government_id,
         email: user.email,
         phone: user.phone,
-        walletAddress: user.wallet_address || user.avax_address,
-        did: user.did || `did:trueid:${user.wallet_address || user.avax_address}`,
+        walletAddress: user.wallet_address,
+        did: user.did,
         isVerified: user.is_verified,
         verificationStatus: user.verification_status,
         createdAt: user.created_at,
@@ -94,12 +94,12 @@ exports.updateUserProfile = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
   const userId = req.user.id;
-  const { name, email, phone, avaxAddress } = req.body;
+  const { name, email, phone, walletAddress } = req.body;
   
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT name, email, phone, avax_address FROM users WHERE id = $1',
+      'SELECT name, email, phone, wallet_address FROM users WHERE id = $1',
       [userId]
     );
     
@@ -115,15 +115,15 @@ exports.updateUserProfile = async (req, res) => {
        SET name = $1, 
            email = $2,
            phone = $3,
-           avax_address = $4,
+           wallet_address = $4,
            updated_at = NOW()
        WHERE id = $5
-       RETURNING id, name, government_id, email, phone, avax_address, updated_at`,
+       RETURNING id, name, government_id, email, phone, wallet_address, updated_at`,
       [
         name || user.name,
         email || user.email,
         phone || user.phone,
-        avaxAddress || user.avax_address,
+        addressToUpdate || user.wallet_address,
         userId
       ]
     );
@@ -144,7 +144,7 @@ exports.updateUserProfile = async (req, res) => {
             name: name !== user.name ? { from: user.name, to: name } : undefined,
             email: email !== user.email ? { from: user.email, to: email } : undefined,
             phone: phone !== user.phone ? { from: user.phone, to: phone } : undefined,
-            walletAddress: walletAddress !== user.avax_address ? { from: user.avax_address, to: walletAddress } : undefined
+            walletAddress: addressToUpdate !== user.wallet_address ? { from: user.wallet_address, to: addressToUpdate } : undefined
           }
         }),
         req.ip
@@ -652,7 +652,7 @@ exports.getBlockchainStatus = async (req, res) => {
   try {
     // Get user wallet address and blockchain status
     const userResult = await db.query(
-      'SELECT avax_address, blockchain_status, blockchain_expiry FROM users WHERE id = $1',
+      'SELECT wallet_address, blockchain_status, blockchain_expiry FROM users WHERE id = $1',
       [userId]
     );
     
@@ -661,7 +661,7 @@ exports.getBlockchainStatus = async (req, res) => {
     }
     
     const user = userResult.rows[0];
-    const walletAddress = user.avax_address;
+    const walletAddress = user.wallet_address;
     
     if (!walletAddress) {
       return res.status(400).json({ message: 'User does not have a wallet address' });
@@ -757,7 +757,7 @@ exports.transferToBlockchain = async (req, res) => {
   try {
     // Check if user exists and get wallet information
     const userResult = await db.query(
-      `SELECT id, name, government_id, avax_address, avax_private_key, 
+      `SELECT id, name, government_id, wallet_address, avax_private_key, 
               blockchain_status, blockchain_expiry, verification_status 
        FROM users WHERE id = $1`,
       [userId]
@@ -777,14 +777,19 @@ exports.transferToBlockchain = async (req, res) => {
       });
     }
     
-    // Check if user has a wallet address and private key
-    if (!user.avax_address || !user.avax_private_key) {
+    // Check if user has a wallet address
+    if (!user.wallet_address) {
       return res.status(400).json({ message: 'User does not have a valid blockchain wallet' });
     }
     
-    // Check blockchain status
-    if (user.blockchain_status === 'CONFIRMED') {
-      return res.status(400).json({ message: 'User data is already on the blockchain' });
+    // Check if identity is already on the blockchain
+    if (user.blockchain_status === 'CONFIRMED' || user.soulbound_badge_minted) {
+      return res.status(200).json({
+        success: true,
+        message: 'User identity is already confirmed and anchored on Ethereum Sepolia',
+        transactionHash: user.blockchain_tx_hash,
+        status: 'CONFIRMED'
+      });
     }
     
     // Check if blockchain status is PENDING and within expiry time
@@ -843,7 +848,7 @@ exports.transferToBlockchain = async (req, res) => {
     const blockchainService = require('../services/blockchain.service');
     
     // Check if identity is already registered
-    const isRegistered = await blockchainService.isIdentityRegistered(user.avax_address);
+    const isRegistered = await blockchainService.isIdentityRegistered(user.wallet_address);
     
     if (isRegistered) {
       // Update user blockchain status
@@ -870,12 +875,12 @@ exports.transferToBlockchain = async (req, res) => {
       
       // Register identity on blockchain
       const result = await blockchainService.registerIdentity(
-        user.avax_private_key,
+        user.wallet_address,
         biometricHash,
         professionalDataHash
       );
       
-      if (result.status === 'success') {
+      if (result.status === 'success' || result.transactionHash) {
         // Update user blockchain status
         await client.query(
           `UPDATE users 
@@ -894,8 +899,8 @@ exports.transferToBlockchain = async (req, res) => {
           [
             userId,
             result.transactionHash,
-            user.avax_address,
-            process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS,
+            user.wallet_address,
+            process.env.CONTRACT_ADDRESS,
             'IDENTITY_REGISTRATION',
             'COMPLETED'
           ]

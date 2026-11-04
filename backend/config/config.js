@@ -29,7 +29,7 @@ module.exports = {
   REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET,
   REFRESH_TOKEN_EXPIRATION: process.env.REFRESH_TOKEN_EXPIRATION,
   
-  // Blockchain configuration (Avalanche Fuji Testnet)
+  // Blockchain configuration (Ethereum Sepolia Testnet)
   BLOCKCHAIN_RPC_URL: process.env.BLOCKCHAIN_RPC_URL,
   CONTRACT_ADDRESS: process.env.CONTRACT_ADDRESS,
   ADMIN_WALLET_PRIVATE_KEY: process.env.ADMIN_WALLET_PRIVATE_KEY,

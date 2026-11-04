@@ -19,7 +19,7 @@ const baseUrl = process.env.API_URL || 'http://localhost:3000/api';
 
 async function verifyUser() {
   try {
-    console.log(`Attempting to verify user ID: ${userId} with ${transferAmount} AVAX`);
+    console.log(`Attempting to verify user ID: ${userId} with ${transferAmount} ETH`);
     
     // Step 1: Login as admin to get token
     console.log('Logging in as admin...');
@@ -51,7 +51,7 @@ async function verifyUser() {
       console.log('\nTransaction Details:');
       console.log('-------------------');
       console.log(`Success: ${verifyResponse.data.transaction.success}`);
-      console.log(`Amount: ${verifyResponse.data.transaction.amount} AVAX`);
+      console.log(`Amount: ${verifyResponse.data.transaction.amount} ETH`);
       
       if (verifyResponse.data.transaction.transactionHash) {
         console.log(`Transaction Hash: ${verifyResponse.data.transaction.transactionHash}`);

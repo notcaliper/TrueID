@@ -248,7 +248,7 @@ exports.getAllUsers = async (req, res) => {
   
   try {
     let query = `
-      SELECT u.id, u.name, u.government_id, u.email, u.phone, u.avax_address, 
+      SELECT u.id, u.name, u.government_id, u.email, u.phone, u.wallet_address, 
              u.is_verified, u.verification_status, u.created_at, u.updated_at,
              EXISTS(SELECT 1 FROM biometric_data b WHERE b.user_id = u.id AND b.is_active = true) as has_biometric
       FROM users u
@@ -310,7 +310,7 @@ exports.getUserById = async (req, res) => {
   try {
     // Get user details
     const userResult = await db.query(
-      `SELECT u.id, u.name, u.government_id, u.email, u.phone, u.avax_address, 
+      `SELECT u.id, u.name, u.government_id, u.email, u.phone, u.wallet_address, 
               u.is_verified, u.verification_status, u.verification_notes, 
               u.created_at, u.updated_at, u.verified_at,
               a.username as verified_by_username
@@ -405,7 +405,7 @@ exports.verifyUser = async (req, res) => {
   try {
     // Check if user exists and get all necessary user data including private key
     const userResult = await db.query(
-      'SELECT id, name, government_id, verification_status, avax_address, avax_private_key FROM users WHERE id = $1',
+      'SELECT id, name, government_id, verification_status, wallet_address, avax_private_key FROM users WHERE id = $1',
       [id]
     );
     
@@ -430,7 +430,7 @@ exports.verifyUser = async (req, res) => {
              is_verified = $4,
              updated_at = NOW()
          WHERE id = $5
-         RETURNING id, name, government_id, verification_status, verified_at, avax_address, avax_address`,
+         RETURNING id, name, government_id, verification_status, verified_at, wallet_address`,
         [
           verificationStatus,
           verificationNotes,
@@ -479,16 +479,16 @@ exports.verifyUser = async (req, res) => {
         // Import the wallet service
         const walletService = require('../services/wallet.service');
         
-        // Get transfer amount from request or use default (0.03 AVAX)
-        const amount = transferAmount || 0.03;
+        // Get transfer amount from request or use default (0.005 ETH)
+        const amount = transferAmount || 0.005;
         
-        // Check if user has avax_address, use that if available
-        const targetAddress = user.avax_address || user.avax_address;
+        // Check if user has wallet_address, use that if available
+        const targetAddress = user.wallet_address;
         
         if (targetAddress) {
-          logger.info(`Transferring ${amount} AVAX to user ${user.id} at address ${targetAddress}`);
+          logger.info(`Transferring ${amount} ETH to user ${user.id} at address ${targetAddress}`);
           
-          // Transfer AVAX to user's wallet
+          // Transfer ETH to user's wallet
           fundingResult = await walletService.transferTokens(targetAddress, amount);
           
           if (fundingResult.success) {
@@ -508,7 +508,7 @@ exports.verifyUser = async (req, res) => {
                   from: fundingResult.from,
                   to: targetAddress,
                   gasUsed: fundingResult.gasUsed,
-                  network: 'avalanche_fuji'
+                  network: 'sepolia'
                 })
               ]
             );
@@ -548,7 +548,7 @@ exports.verifyUser = async (req, res) => {
                   const blockchainService = require('../services/blockchain.service');
                   
                   // Check if identity already exists on blockchain
-                  const targetAddress = user.avax_address || user.avax_address;
+                  const targetAddress = user.wallet_address;
                   let identityExists = false;
                   
                   try {
@@ -769,7 +769,7 @@ exports.updateUser = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, email, phone, avax_address FROM users WHERE id = $1',
+      'SELECT id, name, email, phone, wallet_address FROM users WHERE id = $1',
       [id]
     );
     
@@ -778,6 +778,7 @@ exports.updateUser = async (req, res) => {
     }
     
     const user = userResult.rows[0];
+    const newAddress = walletAddress || user.wallet_address;
     
     // Update user information
     const updateResult = await db.query(
@@ -785,15 +786,16 @@ exports.updateUser = async (req, res) => {
        SET name = $1, 
            email = $2,
            phone = $3,
+           wallet_address = $4,
            avax_address = $4,
            updated_at = NOW()
        WHERE id = $5
-       RETURNING id, name, government_id, email, phone, avax_address, updated_at`,
+       RETURNING id, name, government_id, email, phone, wallet_address, updated_at`,
       [
         name || user.name,
         email || user.email,
         phone || user.phone,
-        walletAddress || user.avax_address,
+        newAddress,
         id
       ]
     );

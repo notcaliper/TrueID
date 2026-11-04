@@ -68,6 +68,21 @@ try {
   // Use fallback ABI
 }
 
+// Load TrueID Smart Contract Suite ABIs
+let CredentialRegistryABI = [];
+let SoulboundBadgeABI = [];
+let DIDRegistryABI = [];
+let ZKVerifierABI = [];
+
+try {
+  CredentialRegistryABI = require('../blockchain/artifacts/blockchain/contracts/TrueIDCredentialRegistry.sol/TrueIDCredentialRegistry.json').abi;
+  SoulboundBadgeABI = require('../blockchain/artifacts/blockchain/contracts/TrueIDSoulboundBadge.sol/TrueIDSoulboundBadge.json').abi;
+  DIDRegistryABI = require('../blockchain/artifacts/blockchain/contracts/TrueIDDIDRegistry.sol/TrueIDDIDRegistry.json').abi;
+  ZKVerifierABI = require('../blockchain/artifacts/blockchain/contracts/TrueIDZKVerifier.sol/TrueIDZKVerifier.json').abi;
+} catch (e) {
+  // Fallbacks if compiled artifacts are not present
+}
+
 // Role constants
 const USER_ROLE = id("USER");
 const GOVERNMENT_ROLE = id("GOVERNMENT");
@@ -79,16 +94,23 @@ const VERIFIER_ROLE = id("VERIFIER");
  * @returns {Object} Blockchain configuration
  */
 const getBlockchainConfig = () => {
-  const rpcUrl = process.env.SEPOLIA_RPC_URL || process.env.BLOCKCHAIN_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
-  const contractAddress = process.env.SEPOLIA_CONTRACT_ADDRESS || process.env.CONTRACT_ADDRESS || process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS;
+  const rpcUrl = process.env.SEPOLIA_RPC_URL;
+  const contractAddress = process.env.CONTRACT_ADDRESS;
   const chainId = 11155111;
   const networkName = 'Ethereum Sepolia Testnet';
+
+  if (!rpcUrl) {
+    throw new Error('SEPOLIA_RPC_URL environment variable is required');
+  }
+  if (!contractAddress) {
+    throw new Error('CONTRACT_ADDRESS environment variable is required');
+  }
 
   return {
     network: 'sepolia',
     rpcUrl,
     contractAddress,
-    privateKey: process.env.ADMIN_PRIVATE_KEY || process.env.ADMIN_WALLET_PRIVATE_KEY,
+    privateKey: process.env.ADMIN_WALLET_PRIVATE_KEY,
     networkName,
     chainId,
     currency: 'ETH',
@@ -100,7 +122,7 @@ const getBlockchainConfig = () => {
  * Initialize blockchain provider and contract
  * @returns {Object} Provider and contract instances
  */
-const initBlockchain = () => {
+const initBlockchain = exports.initBlockchain = () => {
   try {
     const config = getBlockchainConfig();
     const { rpcUrl, contractAddress, privateKey, networkName, chainId } = config;
@@ -189,27 +211,51 @@ exports.isContractAccessible = async () => {
  * @returns {Boolean} True if identity is registered
  */
 exports.isIdentityRegistered = async (walletAddress) => {
+  if (!walletAddress) return false;
   try {
-    const { contract } = initBlockchain();
+    const { provider } = initBlockchain();
     
-    try {
-      // Get biometric hash to check if identity exists
-      const biometricHash = await contract.getBiometricHash(walletAddress);
-      
-      // If we get here, the identity exists and has a biometric hash
-      return true;
-    } catch (contractError) {
-      // If the error contains 'Identity does not exist', the identity is not registered
-      if (contractError.reason === 'Identity does not exist' || 
-          (contractError.errorArgs && contractError.errorArgs[0] === 'Identity does not exist')) {
-        return false;
+    // 1. Check Soulbound Badge contract (ERC-5192)
+    const sbtAddress = process.env.SOULBOUND_BADGE_ADDRESS;
+    if (sbtAddress) {
+      try {
+        const sbtContract = new ethers.Contract(
+          sbtAddress,
+          [
+            'function userPrimaryBadge(address) view returns (uint256)',
+            'function balanceOf(address) view returns (uint256)'
+          ],
+          provider
+        );
+        const [badgeId, balance] = await Promise.all([
+          sbtContract.userPrimaryBadge(walletAddress).catch(() => 0n),
+          sbtContract.balanceOf(walletAddress).catch(() => 0n)
+        ]);
+        if (Number(badgeId) > 0 || Number(balance) > 0) {
+          return true;
+        }
+      } catch (sbtErr) {
+        // Continue to check identity management
       }
-      
-      // For any other contract error, rethrow it
-      throw contractError;
     }
+    
+    // 2. Check Identity Management contract
+    try {
+      const { contract } = initBlockchain();
+      if (typeof contract.hasRegisteredIdentity === 'function') {
+        const hasReg = await contract.hasRegisteredIdentity(walletAddress);
+        if (hasReg) return true;
+      }
+      const biometricHash = await contract.getBiometricHash(walletAddress);
+      if (biometricHash && biometricHash !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+        return true;
+      }
+    } catch (contractError) {
+      // Continue
+    }
+
+    return false;
   } catch (error) {
-    // Log the error but don't throw, just return false
     console.error('Check identity registration error:', error);
     return false;
   }
@@ -422,13 +468,42 @@ exports.getBiometricHash = async (walletAddress) => {
  * @returns {Boolean} True if identity is verified
  */
 exports.isIdentityVerified = async (walletAddress) => {
+  if (!walletAddress) return false;
   try {
+    const { provider } = initBlockchain();
+    
+    // Check Soulbound badge
+    const sbtAddress = process.env.SOULBOUND_BADGE_ADDRESS;
+    if (sbtAddress) {
+      try {
+        const sbtContract = new ethers.Contract(
+          sbtAddress,
+          [
+            'function userPrimaryBadge(address) view returns (uint256)',
+            'function locked(uint256) view returns (bool)'
+          ],
+          provider
+        );
+        const badgeId = await sbtContract.userPrimaryBadge(walletAddress).catch(() => 0n);
+        if (Number(badgeId) > 0) {
+          const isLocked = await sbtContract.locked(badgeId).catch(() => true);
+          if (isLocked) return true;
+        }
+      } catch (sbtErr) {
+        // Continue
+      }
+    }
+
     const { contract } = initBlockchain();
-    const verified = await contract.isIdentityVerified(walletAddress);
-    return verified;
+    try {
+      const verified = await contract.isIdentityVerified(walletAddress);
+      return Boolean(verified);
+    } catch {
+      return false;
+    }
   } catch (error) {
     console.error('Check identity verification error:', error);
-    throw new Error('Failed to check if identity is verified on blockchain');
+    return false;
   }
 };
 
@@ -441,7 +516,7 @@ exports.getProfessionalRecordCount = async (walletAddress) => {
   try {
     const { contract } = initBlockchain();
     const count = await contract.getProfessionalRecordCount(walletAddress);
-    return count.toNumber();
+    return Number(count);
   } catch (error) {
     console.error('Get professional record count error:', error);
     throw new Error('Failed to get professional record count from blockchain');
@@ -460,11 +535,11 @@ exports.getProfessionalRecord = async (walletAddress, recordIndex) => {
     const record = await contract.getProfessionalRecord(walletAddress, recordIndex);
     return {
       dataHash: record.dataHash,
-      startDate: record.startDate.toNumber(),
-      endDate: record.endDate.toNumber(),
+      startDate: Number(record.startDate),
+      endDate: Number(record.endDate),
       verifier: record.verifier,
       isVerified: record.isVerified,
-      createdAt: record.createdAt.toNumber()
+      createdAt: Number(record.createdAt)
     };
   } catch (error) {
     console.error('Get professional record error:', error);
@@ -534,7 +609,7 @@ exports.verifyDocumentHash = async (hash) => {
     
     return {
       exists: result.exists,
-      timestamp: result.timestamp.toNumber(),
+      timestamp: Number(result.timestamp),
       issuer: result.issuer,
       network: networkName
     };
@@ -608,7 +683,7 @@ exports.processExpiredBlockchainStatuses = async (db) => {
     
     // Get users with expired blockchain status
     const expiredUsersResult = await client.query(
-      `SELECT id, name, government_id, avax_address, blockchain_status, blockchain_expiry, blockchain_tx_hash
+      `SELECT id, name, government_id, wallet_address, blockchain_status, blockchain_expiry, blockchain_tx_hash
        FROM users
        WHERE blockchain_status = 'PENDING'
        AND blockchain_expiry < NOW()`
@@ -628,8 +703,9 @@ exports.processExpiredBlockchainStatuses = async (db) => {
       
       // Check if user data exists on blockchain despite expiry
       let dataOnBlockchain = false;
-      if (user.avax_address) {
-        dataOnBlockchain = await checkUserDataOnBlockchain(user.avax_address);
+      const userAddress = user.wallet_address;
+      if (userAddress) {
+        dataOnBlockchain = await checkUserDataOnBlockchain(userAddress);
       }
       
       if (dataOnBlockchain) {
@@ -670,7 +746,7 @@ exports.processExpiredBlockchainStatuses = async (db) => {
         // If data is not on blockchain, reset blockchain status and transfer funds back to admin
         console.log(`User ${user.id} data not found on blockchain, resetting blockchain status and transferring funds back`);
         
-        // Get the transaction details to determine how much AVAX was sent
+        // Get the transaction details to determine how much ETH was sent
         const txResult = await client.query(
           `SELECT tx_hash, from_address, to_address, amount, created_at 
            FROM blockchain_transactions 
@@ -709,7 +785,7 @@ exports.processExpiredBlockchainStatuses = async (db) => {
             // Create wallet instance from user's private key
             // We need to retrieve the user's private key from the database
             const userWalletResult = await client.query(
-              'SELECT avax_address, avax_private_key FROM users WHERE id = $1',
+              'SELECT wallet_address, avax_private_key FROM users WHERE id = $1',
               [user.id]
             );
             
@@ -828,3 +904,151 @@ exports.processExpiredBlockchainStatuses = async (db) => {
     client.release();
   }
 };
+
+/**
+ * ============================================================================
+ * TrueID Smart Contract Suite Integration (Sepolia)
+ * 1. TrueIDCredentialRegistry (W3C Verifiable Credentials for /professional-records)
+ * 2. TrueIDSoulboundBadge (ERC-5192 Soulbound Credentials)
+ * 3. TrueIDDIDRegistry (W3C Decentralized Identifiers did:trueid:<address>)
+ * 4. TrueIDZKVerifier (Zero-Knowledge Proofs)
+ * ============================================================================
+ */
+
+exports.getCredentialRegistryContract = () => {
+  const { wallet } = initBlockchain();
+  const address = process.env.CREDENTIAL_REGISTRY_ADDRESS;
+  if (!address) throw new Error('CREDENTIAL_REGISTRY_ADDRESS environment variable is required');
+  return new ethers.Contract(address, CredentialRegistryABI, wallet);
+};
+
+exports.getSoulboundBadgeContract = () => {
+  const { wallet } = initBlockchain();
+  const address = process.env.SOULBOUND_BADGE_ADDRESS;
+  if (!address) throw new Error('SOULBOUND_BADGE_ADDRESS environment variable is required');
+  return new ethers.Contract(address, SoulboundBadgeABI, wallet);
+};
+
+exports.getDIDRegistryContract = () => {
+  const { wallet } = initBlockchain();
+  const address = process.env.DID_REGISTRY_ADDRESS;
+  if (!address) throw new Error('DID_REGISTRY_ADDRESS environment variable is required');
+  return new ethers.Contract(address, DIDRegistryABI, wallet);
+};
+
+exports.getZKVerifierContract = () => {
+  const { wallet } = initBlockchain();
+  const address = process.env.ZK_VERIFIER_ADDRESS;
+  if (!address) throw new Error('ZK_VERIFIER_ADDRESS environment variable is required');
+  return new ethers.Contract(address, ZKVerifierABI, wallet);
+};
+
+/**
+ * Register W3C Verifiable Credential on-chain in TrueIDCredentialRegistry
+ */
+exports.registerW3CCredential = async ({
+  credentialId,
+  subjectAddress,
+  recordType, // 0: EDUCATION, 1: EMPLOYMENT, 2: CERTIFICATION, 3: GOVERNMENT, 4: LICENSE
+  institution,
+  credentialHash,
+  credentialURI = '',
+  validityDuration = 0
+}) => {
+  const contract = exports.getCredentialRegistryContract();
+  const credIdBytes = credentialId.startsWith('0x') && credentialId.length === 66 
+    ? credentialId 
+    : id(credentialId);
+  const credHashBytes = credentialHash.startsWith('0x') && credentialHash.length === 66
+    ? credentialHash
+    : id(credentialHash);
+
+  const typeMap = {
+    'EDUCATION': 0,
+    'ACADEMIC': 0,
+    'EMPLOYMENT': 1,
+    'CERTIFICATION': 2,
+    'GOVERNMENT': 3,
+    'LICENSE': 4
+  };
+
+  const enumType = typeof recordType === 'number' ? recordType : (typeMap[recordType] ?? 0);
+
+  const tx = await contract.registerCredential(
+    credIdBytes,
+    subjectAddress,
+    enumType,
+    institution || 'TrueID Accredited Issuer',
+    credHashBytes,
+    credentialURI,
+    validityDuration
+  );
+
+  const receipt = await tx.wait(1);
+  return {
+    txHash: tx.hash,
+    blockNumber: receipt.blockNumber,
+    credentialId: credIdBytes,
+    subject: subjectAddress,
+    status: 'CONFIRMED'
+  };
+};
+
+/**
+ * Mint ERC-5192 Soulbound Token to citizen
+ */
+exports.mintSoulboundBadgeOnChain = async ({
+  recipientAddress,
+  badgeType = 'IDENTITY_VERIFIED',
+  metadataURI = '',
+  identityCommitment = '0x0000000000000000000000000000000000000000000000000000000000000000'
+}) => {
+  const contract = exports.getSoulboundBadgeContract();
+  const commitmentBytes = identityCommitment.startsWith('0x') && identityCommitment.length === 66
+    ? identityCommitment
+    : id(identityCommitment);
+
+  const tx = await contract.mintBadge(
+    recipientAddress,
+    badgeType,
+    metadataURI,
+    commitmentBytes
+  );
+
+  const receipt = await tx.wait(1);
+  return {
+    txHash: tx.hash,
+    blockNumber: receipt.blockNumber,
+    recipient: recipientAddress,
+    badgeType,
+    status: 'CONFIRMED'
+  };
+};
+
+/**
+ * Update W3C DID biometric commitment in TrueIDDIDRegistry
+ */
+exports.updateDIDBiometricCommitment = async (identityAddress, commitment) => {
+  const contract = exports.getDIDRegistryContract();
+  const commitmentBytes = commitment.startsWith('0x') && commitment.length === 66
+    ? commitment
+    : id(commitment);
+
+  const tx = await contract.setBiometricCommitment(identityAddress, commitmentBytes);
+  const receipt = await tx.wait(1);
+  return {
+    txHash: tx.hash,
+    blockNumber: receipt.blockNumber,
+    identity: identityAddress,
+    status: 'CONFIRMED'
+  };
+};
+
+/**
+ * Verify Groth16 zero-knowledge proof
+ */
+exports.verifyZeroKnowledgeProof = async (a, b, c, input) => {
+  const contract = exports.getZKVerifierContract();
+  return await contract.verifyProof(a, b, c, input);
+};
+

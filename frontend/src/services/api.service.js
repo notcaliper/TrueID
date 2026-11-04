@@ -73,7 +73,7 @@ export const authAPI = {
       governmentId: userData.governmentId,
       email: userData.email,
       phone: userData.phone,
-      avaxAddress: userData.walletAddress || userData.avaxAddress
+      walletAddress: userData.walletAddress || userData.wallet_address
     });
   },
 
@@ -214,10 +214,8 @@ export const blockchainAPI = {
     return api.get(`/blockchain/transaction/${txHash}`);
   },
 
-  getTransactions: async () => {
-    const res = await api.get('/blockchain/status');
-    const recentTx = res?.data?.recentTransactions || [];
-    return { data: { transactions: recentTx } };
+  getTransactions: async (page = 1, limit = 10) => {
+    return api.get(`/blockchain/transactions?page=${page}&limit=${limit}`);
   },
 
   verifyIdentityOnBlockchain: async () => {
@@ -248,10 +246,11 @@ export const walletAPI = {
     ]);
     const user = profileRes?.data?.user || {};
     const status = statusRes?.data?.status || {};
+    const resolvedAddress = user.walletAddress || status.walletAddress || '';
     return {
       data: {
-        address: user.walletAddress || status.walletAddress || '0xc628d3e2b63cCeb6038Ffe05A8E18B1e9304BBC5',
-        did: user.did || `did:trueid:${user.walletAddress || '0xc628d3e2b63cCeb6038Ffe05A8E18B1e9304BBC5'}`,
+        address: resolvedAddress,
+        did: user.did || (resolvedAddress ? `did:trueid:${resolvedAddress}` : ''),
         balance: '0.0000',
         network: 'Ethereum Sepolia Testnet'
       }
@@ -288,9 +287,8 @@ export const documentAPI = {
 // Activity & Notifications API
 // =============================================================================
 export const activityAPI = {
-  getActivityLogs: async () => {
-    const res = await api.get('/blockchain/status').catch(() => ({ data: {} }));
-    return { data: res?.data?.recentTransactions || [] };
+  getActivityLogs: async (page = 1, limit = 10) => {
+    return api.get(`/blockchain/transactions?page=${page}&limit=${limit}`);
   },
 
   getNotifications: async () => {
@@ -305,7 +303,7 @@ export const activityAPI = {
     const profileRes = await userAPI.getProfile().catch(() => ({ data: {} }));
     return {
       data: {
-        verificationStatus: profileRes?.data?.user?.verificationStatus || 'VERIFIED',
+        verificationStatus: profileRes?.data?.user?.verificationStatus || profileRes?.data?.user?.verification_status || 'PENDING',
         professionalRecordsCount: profileRes?.data?.professionalRecordsCount || 0
       }
     };

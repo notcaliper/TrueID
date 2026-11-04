@@ -24,9 +24,8 @@
     "test:backend": "cd backend && npm test",
     "test:frontend": "cd frontend && npm test",
     "clean": "rimraf node_modules backend/node_modules frontend/node_modules scripts/node_modules",
-    "blockchain:deploy:fuji": "cd backend && npm run blockchain:deploy:fuji",
-    "blockchain:verify:fuji": "cd backend && npm run blockchain:verify:fuji",
-    "setup:avax-testnet": "cd backend && npm run setup:avax-testnet"
+    "blockchain:deploy:sepolia": "cd backend && npm run blockchain:deploy:sepolia",
+    "blockchain:verify:sepolia": "cd backend && npm run blockchain:verify:sepolia"
   },
   "dependencies": {
     "@craco/craco": "^7.1.0",

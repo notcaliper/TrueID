@@ -9,9 +9,9 @@ const config = {
     password: 'pro344342'
   },
   blockchain: {
-    rpcUrl: 'https://api.avax-test.network/ext/bc/C/rpc',
-    chainId: 43113,
-    contractAddress: '0x266B577380aE3De838A66DEf28fffD5e75c5816E'
+    rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+    chainId: 11155111,
+    contractAddress: '0xDAA6c4D8fc7B4AAc7B6f7724939b6dB548dF1F02'
   }
 };
 
@@ -89,7 +89,7 @@ async function checkVerificationStatus() {
     if (walletAddress) {
       // Get wallet balance
       const balance = await provider.getBalance(walletAddress);
-      console.log('Balance:', ethers.formatEther(balance), 'AVAX');
+      console.log('Balance:', ethers.formatEther(balance), 'ETH');
       console.log('Snowtrace:', `https://testnet.snowtrace.io/address/${walletAddress}`);
     } else {
       console.log('\nNo wallet address found for this account.');
@@ -99,7 +99,7 @@ async function checkVerificationStatus() {
     console.log('\nBlockchain Status:');
     console.log('-------------------');
     console.log('Contract Address:', config.blockchain.contractAddress);
-    console.log('Network: Avalanche Fuji Testnet (Chain ID:', config.blockchain.chainId, ')');
+    console.log('Network: Ethereum Sepolia Testnet (Chain ID:', config.blockchain.chainId, ')');
     
     // Display blockchain status from API response
     if (blockchainData.status) {

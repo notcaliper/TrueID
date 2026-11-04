@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     verified_at timestamp without time zone,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    wallet_address text,
     avax_address text,
     avax_private_key text,
     password character varying(255),
@@ -147,6 +148,7 @@ CREATE TABLE IF NOT EXISTS biometric_verifications (
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_users_government_id ON users USING btree (government_id);
+CREATE INDEX IF NOT EXISTS idx_users_wallet_address ON users USING btree (wallet_address);
 CREATE INDEX IF NOT EXISTS idx_users_avax_address ON users USING btree (avax_address);
 CREATE INDEX IF NOT EXISTS idx_biometric_data_facemesh_hash ON biometric_data(facemesh_hash);
 CREATE INDEX IF NOT EXISTS idx_biometric_data_user_id ON biometric_data(user_id);

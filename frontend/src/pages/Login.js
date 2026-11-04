@@ -212,7 +212,7 @@ const Login = () => {
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 5 }}>
-              {['Zero-Knowledge Biometrics', 'Tamper-Proof Ledger Proofs', 'Self-Sovereign Identity Control'].map((item) => (
+              {['Zero-Knowledge Biometrics', 'Tamper-Proof Ledger Proofs', 'Decentralized Identity Control'].map((item) => (
                 <Box key={item} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10b981', boxShadow: '0 0 6px #10b981' }} />
                   <Typography variant="body2" sx={{ color: '#cbd5e1', fontWeight: 500 }}>

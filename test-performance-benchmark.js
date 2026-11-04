@@ -17,7 +17,7 @@
  *   - Backend server running on port 5000
  *   - Admin account (admin2 / SecurePass123)
  *   - PostgreSQL database connected
- *   - Avalanche Fuji testnet configured (for blockchain tests)
+ *   - Ethereum Sepolia testnet configured (for blockchain tests)
  */
 
 const axios = require('axios');
@@ -270,7 +270,7 @@ async function benchAdminLogin() {
 // 7) Admin Verification Pipeline (heaviest endpoint — 2 blockchain txs)
 async function benchAdminVerification() {
   console.log('\n✅ Benchmarking: Admin User Verification (Blockchain Pipeline)');
-  console.log('  ⚠️  This includes: AVAX wallet funding + identity registration on-chain');
+  console.log('  ⚠️  This includes: ETH wallet funding + identity registration on-chain');
 
   const result = await benchmark('Admin Verify User (Full Pipeline)', async () => {
     // Find the test user

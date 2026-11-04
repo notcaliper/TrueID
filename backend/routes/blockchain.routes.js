@@ -63,6 +63,20 @@ router.get('/verify/:hash', blockchainController.verifyDocumentHash);
 router.post('/verify/:id', authenticateAdmin, blockchainController.verifyProfessionalRecord);
 
 /**
+ * @route GET /api/blockchain/suite
+ * @desc Get TrueID Smart Contract Suite live status and addresses
+ * @access Public
+ */
+router.get('/suite', blockchainController.getSuiteStatus);
+
+/**
+ * @route GET /api/blockchain/transaction/:txHash
+ * @desc Get status and confirmations for a transaction
+ * @access Public
+ */
+router.get('/transaction/:txHash', blockchainController.getTransactionStatus);
+
+/**
  * @route GET /api/blockchain/transactions
  * @desc Get blockchain transactions for a user
  * @access User

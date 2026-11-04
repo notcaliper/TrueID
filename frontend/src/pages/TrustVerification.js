@@ -5,56 +5,41 @@ import {
   Typography,
   Grid,
   Card,
-  CardContent,
   Button,
-  Alert,
-  CircularProgress,
   Chip,
-  LinearProgress,
-  Divider,
-  IconButton,
-  Tooltip,
-  useTheme
+  LinearProgress
 } from '@mui/material';
 import {
-  CheckCircleRounded,
   RefreshRounded,
   SecurityRounded,
   VerifiedUserRounded,
   FingerprintRounded,
-  ShieldRounded,
   GppGoodRounded,
   BadgeRounded,
-  LanRounded,
-  LockRounded,
   CheckRounded,
-  ArrowForwardRounded,
-  FactCheckRounded,
-  DoneAllRounded,
   TaskAltRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
-import { userAPI, blockchainAPI } from '../services/api.service';
+import { userAPI } from '../services/api.service';
 
 const TrustVerification = () => {
   const { user } = useAuth();
   const { isLight } = useColorMode();
-  const theme = useTheme();
 
-  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [error, setError] = useState(null);
 
   const [verificationData, setVerificationData] = useState({
-    status: 'VERIFIED',
-    governmentId: user?.government_id || 'JIFPM9413P',
-    trustScore: 99.8,
-    submittedAt: 'Nov 4, 2026, 11:20 PM',
-    verifiedAt: 'Nov 5, 2026, 12:33 AM',
-    verifiedBy: 'TrueID Identity Authority #01 (Notary Node 0x9812)',
-    contractAddress: '0x266B577380aE3De838A66DEf28fffD5e75c5816E',
-    lastSync: 'Nov 5, 2026, 12:45 AM'
+    status: user?.verification_status || 'PENDING',
+    governmentId: user?.government_id || '',
+    trustScore: user?.trust_score || 0,
+    submittedAt: '',
+    verifiedAt: '',
+    verifiedBy: '',
+    contractAddress: process.env.REACT_APP_CONTRACT_ADDRESS || '',
+    lastSync: ''
   });
 
   const fetchVerificationStatus = useCallback(async () => {
@@ -64,13 +49,16 @@ const TrustVerification = () => {
     try {
       const response = await userAPI.getVerificationStatus();
       const rawData = response?.data?.data || response?.data || {};
-      const status = (rawData?.status || rawData?.identity?.status || 'VERIFIED').toUpperCase();
+      const status = (rawData?.status || rawData?.identity?.status || user?.verification_status || 'PENDING').toUpperCase();
 
       setVerificationData(prev => ({
         ...prev,
-        status: status === 'VERIFIED' ? 'VERIFIED' : status,
-        governmentId: user?.government_id || prev.governmentId,
-        verifiedBy: rawData.verifiedBy || prev.verifiedBy,
+        status: status,
+        governmentId: user?.government_id || rawData?.government_id || '',
+        verifiedBy: rawData?.verifiedBy || 'TrueID Identity Notary Authority',
+        submittedAt: rawData?.submittedAt || prev.submittedAt,
+        verifiedAt: rawData?.verifiedAt || prev.verifiedAt,
+        contractAddress: rawData?.contractAddress || process.env.REACT_APP_CONTRACT_ADDRESS || '',
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
     } catch (err) {
@@ -85,35 +73,35 @@ const TrustVerification = () => {
   }, [fetchVerificationStatus]);
 
   const isVerified = verificationData.status === 'VERIFIED';
-  const trustScorePercentage = isVerified ? 99.8 : 72.0;
+  const trustScorePercentage = isVerified ? 100 : 0;
 
   // 4 Core Trust Pillar Metrics
   const trustPillars = [
     {
       title: 'Overall Trust Score',
       value: `${trustScorePercentage}%`,
-      status: 'EXCELLENT STANDING',
-      desc: 'Top 0.1% compliance standing • Highest Trust Rating',
-      tag: 'Tier 1 Citizen',
-      color: '#16a34a',
-      bg: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.12)',
+      status: isVerified ? 'EXCELLENT STANDING' : 'PENDING REVIEW',
+      desc: isVerified ? 'Highest Compliance Standing • Verified' : 'Awaiting identity verification attestations',
+      tag: isVerified ? 'Verified Citizen' : 'Citizen Applicant',
+      color: isVerified ? '#16a34a' : '#d97706',
+      bg: isLight ? (isVerified ? '#f0fdf4' : '#fffbeb') : (isVerified ? 'rgba(22, 163, 74, 0.12)' : 'rgba(217, 119, 6, 0.12)'),
       icon: <VerifiedUserRounded sx={{ fontSize: 24 }} />
     },
     {
       title: 'National KYC Attestation',
-      value: verificationData.governmentId,
-      status: 'OFFICIALLY NOTARIZED',
-      desc: 'Ministry of Electronics & IT certified identity registry record',
-      tag: 'Authority Seal',
+      value: verificationData.governmentId || 'Not Registered',
+      status: isVerified ? 'VERIFIED' : 'PENDING',
+      desc: isVerified ? 'Verified identity registry record' : 'Awaiting verification check',
+      tag: isVerified ? 'Verified' : 'Pending',
       color: '#2563eb',
       bg: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.12)',
       icon: <BadgeRounded sx={{ fontSize: 24 }} />
     },
     {
       title: '3D FaceMesh Liveness',
-      value: '68 Nodes Matched',
-      status: 'HARDWARE ENCLAVE SECURE',
-      desc: 'Confidence: 0.994 • Zero spoofing or deepfake attempts detected',
+      value: user?.facemesh_hash ? 'Enrolled Active' : 'Pending Scan',
+      status: user?.facemesh_hash ? 'HARDWARE ENCLAVE SECURE' : 'PENDING BIOMETRIC',
+      desc: user?.facemesh_hash ? 'Facial geometry matched with high confidence' : 'No biometric vectors enrolled',
       tag: 'ZK Liveness',
       color: '#7c3aed',
       bg: isLight ? '#f5f3ff' : 'rgba(124, 58, 237, 0.12)',
@@ -121,9 +109,9 @@ const TrustVerification = () => {
     },
     {
       title: 'Blockchain Record',
-      value: 'Permanent Badge',
-      status: 'VERIFIED & RECORDED',
-      desc: 'Smart contract record permanently saved with 16 blockchain confirmations',
+      value: user?.soulbound_token_id ? `Badge #${user.soulbound_token_id}` : (isVerified ? 'Badge Anchored' : 'Pending Mint'),
+      status: isVerified ? 'VERIFIED & RECORDED' : 'AWAITING MINING',
+      desc: 'Smart contract record permanently anchored on Ethereum Sepolia',
       tag: 'Permanent',
       color: '#0891b2',
       bg: isLight ? '#ecfeff' : 'rgba(8, 145, 178, 0.12)',
@@ -138,9 +126,9 @@ const TrustVerification = () => {
       stepNum: '01',
       title: 'National ID Check & Registration',
       desc: 'Government ID card, citizen documents, and account details submitted and verified.',
-      timestamp: verificationData.submittedAt,
-      authority: 'Government Identity Authority',
-      proofHash: '0x3a91...e8b2',
+      timestamp: verificationData.submittedAt || 'Completed',
+      authority: verificationData.verifiedBy || 'Identity Registry',
+      proofHash: verificationData.governmentId || 'ID Document Verified',
       completed: true,
       status: 'VERIFIED'
     },
@@ -149,20 +137,20 @@ const TrustVerification = () => {
       stepNum: '02',
       title: 'Camera Face Verification',
       desc: 'Live camera scan matched your face against your ID photo. Real person check passed.',
-      timestamp: 'Nov 4, 2026, 11:22 PM',
+      timestamp: 'Completed',
       authority: 'Device Camera Verification',
-      proofHash: '0x99f4...28dc',
-      completed: true,
-      status: 'VERIFIED'
+      proofHash: user?.facemesh_hash ? `${user.facemesh_hash.slice(0, 10)}...` : 'Biometrics Active',
+      completed: Boolean(user?.facemesh_hash),
+      status: user?.facemesh_hash ? 'VERIFIED' : 'PENDING'
     },
     {
       id: 3,
       stepNum: '03',
       title: 'Official Officer Review',
       desc: 'Authorized notary reviewed your details against government records and approved your application.',
-      timestamp: 'Nov 4, 2026, 11:25 PM',
-      authority: verificationData.verifiedBy,
-      proofHash: '0x4f8e...abcd',
+      timestamp: verificationData.verifiedAt || (isVerified ? 'Completed' : 'Pending'),
+      authority: verificationData.verifiedBy || 'Notary Officer',
+      proofHash: user?.wallet_address ? `${user.wallet_address.slice(0, 8)}...${user.wallet_address.slice(-6)}` : 'Officer Signature',
       completed: isVerified,
       status: isVerified ? 'VERIFIED' : 'IN REVIEW'
     },
@@ -171,9 +159,9 @@ const TrustVerification = () => {
       stepNum: '04',
       title: 'Blockchain Digital ID Created',
       desc: 'Your permanent digital identity badge was created on the blockchain network.',
-      timestamp: verificationData.verifiedAt,
+      timestamp: verificationData.verifiedAt || (isVerified ? 'Anchored' : 'Pending'),
       authority: 'Ethereum Sepolia Network',
-      proofHash: '0x8f4d...319b',
+      proofHash: user?.soulbound_token_id ? `Soulbound Token #${user.soulbound_token_id}` : (user?.blockchain_tx_hash ? `${user.blockchain_tx_hash.slice(0, 10)}...` : 'Pending Mint'),
       completed: isVerified,
       status: isVerified ? 'SAVED' : 'WAITING'
     }
@@ -382,7 +370,7 @@ const TrustVerification = () => {
               Tier 1 Identity Clearance
             </Typography>
             <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.7rem' }}>
-              Audited by: {verificationData.verifiedBy.slice(0, 24)}...
+              Audited by: {(verificationData.verifiedBy || 'TrueID Identity Registry').slice(0, 24)}...
             </Typography>
           </Box>
         </Box>

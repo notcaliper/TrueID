@@ -1,6 +1,6 @@
 # TrueID Frontend
 
-TrueID is a decentralized identity verification platform built on the Avalanche blockchain. This frontend application provides a user interface for managing digital identities, wallet operations, and verification status.
+TrueID is a decentralized identity verification platform built on Ethereum Sepolia. This frontend application provides a user interface for managing digital identities, wallet operations, and verification status.
 
 ## Features
 
@@ -9,7 +9,7 @@ TrueID is a decentralized identity verification platform built on the Avalanche 
 - **Wallet Management**: View balance and transaction history
 - **Identity Verification**: Track verification status in real-time
 - **Professional Records**: Manage and view professional credentials
-- **Blockchain Integration**: Interact with Avalanche C-Chain for identity management
+- **Blockchain Integration**: Interact with Ethereum Sepolia for identity management
 - **Real-time Updates**: Automatic refresh of data every 15 seconds
 
 ## Prerequisites
@@ -38,8 +38,8 @@ yarn install
 
 # Create .env file
 echo 'REACT_APP_API_URL=http://localhost:5000
-REACT_APP_AVALANCHE_CONTRACT_ADDRESS=0x266B577380aE3De838A66DEf28fffD5e75c5816E
-REACT_APP_AVALANCHE_NETWORK=fuji' > .env
+REACT_APP_CONTRACT_ADDRESS=0xDAA6c4D8fc7B4AAc7B6f7724939b6dB548dF1F02
+REACT_APP_BLOCKCHAIN_NETWORK=sepolia' > .env
 ```
 
 ## Available Scripts
@@ -206,9 +206,9 @@ Create a `.env` file in the frontend directory with the following variables:
 
 ```env
 REACT_APP_API_URL=http://localhost:5000
-REACT_APP_AVALANCHE_CONTRACT_ADDRESS=0x266B577380aE3De838A66DEf28fffD5e75c5816E
-REACT_APP_AVALANCHE_NETWORK=fuji
-REACT_APP_AVALANCHE_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
+REACT_APP_CONTRACT_ADDRESS=0xDAA6c4D8fc7B4AAc7B6f7724939b6dB548dF1F02
+REACT_APP_BLOCKCHAIN_NETWORK=sepolia
+REACT_APP_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 ```
 
 ### CORS Configuration
@@ -219,10 +219,10 @@ The backend is configured to allow requests from multiple frontend origins:
 
 ### Blockchain Configuration
 
-- **Network**: Avalanche Fuji Testnet
-- **Contract Address**: 0x266B577380aE3De838A66DEf28fffD5e75c5816E
-- **RPC URL**: https://api.avax-test.network/ext/bc/C/rpc
-- **Chain ID**: 43113 (Fuji Testnet)
+- **Network**: Ethereum Sepolia Testnet
+- **Contract Address**: 0xDAA6c4D8fc7B4AAc7B6f7724939b6dB548dF1F02
+- **RPC URL**: https://ethereum-sepolia-rpc.publicnode.com
+- **Chain ID**: 11155111 (Sepolia Testnet)
 
 ### Security
 
