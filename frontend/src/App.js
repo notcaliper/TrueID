@@ -3,19 +3,19 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ColorModeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
-// Pages
+// Citizen Sovereign Identity Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
-import WalletPage from './pages/WalletPage';
-import VerificationStatus from './pages/VerificationStatus';
-import ProfessionalRecords from './pages/ProfessionalRecords';
-import BlockchainStatus from './pages/BlockchainStatus';
-import BiometricVerificationPage from './pages/BiometricVerificationPage';
+import Wallet from './pages/Wallet';
+import TrustVerification from './pages/TrustVerification';
+import VerifiableCredentials from './pages/VerifiableCredentials';
+import BlockchainLedger from './pages/BlockchainLedger';
+import BiometricVault from './pages/BiometricVault';
 import NotFound from './pages/NotFound';
 
-// Admin Portal
+// Government & Authority Admin Portal
 import AdminRoute from './admin/components/AdminRoute';
 import AdminLayout from './admin/components/AdminLayout';
 import AdminLogin from './admin/pages/AdminLogin';
@@ -26,7 +26,7 @@ import AdminProfessionalRecords from './admin/pages/AdminProfessionalRecords';
 import AdminActivityLogs from './admin/pages/AdminActivityLogs';
 import AdminSettings from './admin/pages/AdminSettings';
 
-// Components
+// Shared Components
 import Layout from './components/Layout';
 import LoadingScreen from './components/LoadingScreen';
 
@@ -64,11 +64,11 @@ function App() {
             }>
               <Route index element={<Dashboard />} />
               <Route path="profile" element={<Profile />} />
-              <Route path="wallet" element={<WalletPage />} />
-              <Route path="verification-status" element={<VerificationStatus />} />
-              <Route path="professional-records" element={<ProfessionalRecords />} />
-              <Route path="blockchain-status" element={<BlockchainStatus />} />
-              <Route path="biometric-verification" element={<BiometricVerificationPage />} />
+              <Route path="wallet" element={<Wallet />} />
+              <Route path="verification-status" element={<TrustVerification />} />
+              <Route path="professional-records" element={<VerifiableCredentials />} />
+              <Route path="blockchain-status" element={<BlockchainLedger />} />
+              <Route path="biometric-verification" element={<BiometricVault />} />
             </Route>
 
             {/* Government / Authority Admin Portal */}

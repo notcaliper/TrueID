@@ -79,7 +79,7 @@ const Dashboard = () => {
     verificationStatus: 'VERIFIED',
     walletAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
     trustScore: 99.8,
-    tier: 'Tier 1 Sovereign Citizen',
+    tier: 'Verified Citizen Tier 1',
     recordsCount: 4,
     facemeshStatus: '68 Nodes Active (SHA-256)',
     enclaveStatus: 'Hardware Protected',
@@ -98,13 +98,19 @@ const Dashboard = () => {
         userAPI.getBiometricStatus()
       ]);
 
-      const verStatus = verRes.status === 'fulfilled' && verRes.value?.data?.status ? verRes.value.data.status : 'VERIFIED';
+      const verStatus = verRes.status === 'fulfilled' && (verRes.value?.data?.data?.status || verRes.value?.data?.status)
+        ? (verRes.value?.data?.data?.status || verRes.value?.data?.status)
+        : (user?.verification_status || 'VERIFIED');
       const records = recRes.status === 'fulfilled' && recRes.value?.data?.records ? recRes.value.data.records : [];
+      const bcData = bcRes.status === 'fulfilled' ? (bcRes.value?.data?.status || bcRes.value?.data?.data || bcRes.value?.data) : null;
+      const citizenWallet = user?.wallet_address || user?.avax_address || bcData?.walletAddress || '0xc628d3e2b63cCeb6038Ffe05A8E18B1e9304BBC5';
 
       setIdentityData(prev => ({
         ...prev,
-        name: user?.name || prev.name,
+        name: user?.name || user?.full_name || prev.name,
         governmentId: user?.government_id || prev.governmentId,
+        walletAddress: citizenWallet,
+        did: `did:trueid:${citizenWallet}`,
         verificationStatus: verStatus,
         recordsCount: records.length || 4,
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
@@ -127,51 +133,51 @@ const Dashboard = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // 4 Core Identity Pillars (Not tiny token chips!)
+  // 4 Core Identity Pillars (Simple English)
   const corePillars = [
     {
-      title: 'National KYC Identity',
+      title: 'National ID Card',
       idVal: identityData.governmentId,
-      status: 'VERIFIED & NOTARIZED',
-      desc: 'Government Registry Attestation confirmed and sealed by Authority Notary',
-      tag: 'Authority Seal',
-      linkText: 'View Identity Vault',
+      status: 'VERIFIED & APPROVED',
+      desc: 'Government identity record confirmed and approved by official notary',
+      tag: 'Official Approval',
+      linkText: 'View ID Details',
       linkTo: '/profile',
       icon: <BadgeRounded sx={{ fontSize: 24 }} />,
       color: '#2563eb',
       bg: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.12)'
     },
     {
-      title: 'Biometric Liveness & FaceMesh',
-      idVal: '68 Nodes • Enclave Protected',
-      status: 'PROOF-OF-LIVENESS PASSED',
-      desc: 'Anti-spoofing depth & micro-expression verified with 0.99 confidence',
-      tag: 'Secure Enclave',
-      linkText: 'Biometric Vault',
+      title: 'Face Verification',
+      idVal: 'Face Match Active',
+      status: 'FACE SCAN PASSED',
+      desc: 'Real-time camera face check passed and securely stored on your device',
+      tag: 'Device Secured',
+      linkText: 'Open Face Scan',
       linkTo: '/biometric-verification',
       icon: <FingerprintRounded sx={{ fontSize: 24 }} />,
       color: '#7c3aed',
       bg: isLight ? '#f5f3ff' : 'rgba(124, 58, 237, 0.12)'
     },
     {
-      title: 'Soulbound Identity Token (SBT)',
-      idVal: 'ERC-5192 #002 (Non-Transferable)',
-      status: 'ANCHORED ON SEPOLIA',
-      desc: 'Cryptographic identity root anchored to smart contract 0x266B...816E',
-      tag: '16 Confirmations',
-      linkText: 'Explore Ledger',
+      title: 'Blockchain Record',
+      idVal: 'Permanent Digital Badge',
+      status: 'SAVED ON BLOCKCHAIN',
+      desc: 'Your verified identity badge is permanently recorded on the blockchain network',
+      tag: 'Permanent Record',
+      linkText: 'View on Blockchain',
       linkTo: '/blockchain-status',
       icon: <SecurityRounded sx={{ fontSize: 24 }} />,
       color: '#16a34a',
       bg: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.12)'
     },
     {
-      title: 'W3C Verifiable Credentials',
-      idVal: '4 Attested Institutional Claims',
-      status: 'CRYPTOGRAPHICALLY VALID',
-      desc: 'Stanford Degree, Ethereum Foundation Work, DIF Cert, Citizen Passport',
-      tag: 'W3C Standards',
-      linkText: 'Manage Claims',
+      title: 'Verified Documents',
+      idVal: '4 Approved Documents',
+      status: 'ALL VERIFIED',
+      desc: 'College degrees, work experience, certificates, and ID papers',
+      tag: 'Approved Papers',
+      linkText: 'View Documents',
       linkTo: '/professional-records',
       icon: <SchoolRounded sx={{ fontSize: 24 }} />,
       color: '#0891b2',
@@ -183,36 +189,36 @@ const Dashboard = () => {
   const credentialRecords = [
     {
       id: 'REC-001',
-      type: 'ACADEMIC DEGREE',
-      title: 'Master of Science in Distributed Computing',
-      issuer: 'Stanford University (ID: 0x9812)',
+      type: 'COLLEGE DEGREE',
+      title: 'Master of Science in Computer Science',
+      issuer: 'Stanford University',
       hash: '0x8f4d99a2c3b4a567890123456789abcdef0123456789abcdef0123456789319b',
       issuedAt: 'June 2024',
       status: 'VERIFIED'
     },
     {
       id: 'REC-002',
-      type: 'PROFESSIONAL EMPLOYMENT',
-      title: 'Lead Cryptographic Security Architect',
-      issuer: 'Ethereum Foundation / Sovereign Labs',
+      type: 'WORK EXPERIENCE',
+      title: 'Lead Security Engineer',
+      issuer: 'Ethereum Foundation',
       hash: '0x7e2a44d1c3b4a567890123456789abcdef0123456789abcdef0123456789502c',
       issuedAt: 'March 2025',
       status: 'VERIFIED'
     },
     {
       id: 'REC-003',
-      type: 'INDUSTRY CERTIFICATION',
-      title: 'W3C Verifiable Credentials Professional',
-      issuer: 'Decentralized Identity Foundation (DIF)',
+      type: 'PROFESSIONAL CERTIFICATE',
+      title: 'Certified Security Architect',
+      issuer: 'Linux Foundation',
       hash: '0x3c99bb82c3b4a567890123456789abcdef0123456789abcdef0123456789110a',
       issuedAt: 'January 2026',
       status: 'VERIFIED'
     },
     {
       id: 'REC-004',
-      type: 'GOVERNMENT LICENSE',
-      title: 'Digital Resident & Citizen Passport',
-      issuer: 'TrueID Sovereign Ministry #01',
+      type: 'GOVERNMENT ID',
+      title: 'Digital Citizen Identity Pass',
+      issuer: 'Digital Identity Authority',
       hash: '0x6b14aa77c3b4a567890123456789abcdef0123456789abcdef012345678989ee',
       issuedAt: 'November 2026',
       status: 'VERIFIED'
@@ -222,22 +228,22 @@ const Dashboard = () => {
   // Identity Activity Audit Trail
   const auditLogs = [
     {
-      title: 'FaceMesh 3D Biometric Liveness Challenge Completed',
-      actor: 'Local Hardware Enclave (Poseidon ZKP)',
+      title: 'Face verification completed successfully',
+      actor: 'Camera Face Check',
       time: '12 minutes ago',
       status: 'SUCCESS',
       color: '#16a34a'
     },
     {
-      title: 'Soulbound SBT Token #002 Anchored to Ethereum Sepolia',
-      actor: 'TrueID Notary Authority Node #01',
+      title: 'Identity badge recorded on blockchain',
+      actor: 'Official TrueID System',
       time: '1 hour ago',
       status: 'CONFIRMED',
       color: '#2563eb'
     },
     {
-      title: 'National Identity Document Verified by Government Officer',
-      actor: 'Ministry of Electronics & IT Authority',
+      title: 'National ID verified by authority officer',
+      actor: 'Government Verification Officer',
       time: 'Yesterday',
       status: 'APPROVED',
       color: '#16a34a'
@@ -263,7 +269,7 @@ const Dashboard = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: isLight ? '#64748b' : '#8b949e', fontSize: '0.84rem' }}>
           <Typography component={RouterLink} to="/" sx={{ color: isLight ? '#64748b' : '#8b949e', textDecoration: 'none', '&:hover': { color: '#2563eb' } }}>
-            TrueID Sovereign Portal
+            TrueID Identity Portal
           </Typography>
           <span>/</span>
           <Typography sx={{ color: isLight ? '#64748b' : '#8b949e' }}>Citizen Identity Vault</Typography>
@@ -384,7 +390,7 @@ const Dashboard = () => {
                   {identityData.did}
                 </Typography>
 
-                <Tooltip title={copied ? 'Copied Sovereign DID!' : 'Copy DID'}>
+                <Tooltip title={copied ? 'Copied DID!' : 'Copy DID'}>
                   <IconButton size="small" onClick={handleCopyDID} sx={{ color: isLight ? '#64748b' : '#9ca3af', p: 0.6 }}>
                     <ContentCopyRounded sx={{ fontSize: 16 }} />
                   </IconButton>
@@ -412,7 +418,7 @@ const Dashboard = () => {
                   }}
                 />
                 <Chip
-                  label="Sepolia SBT Token #002"
+                  label="Blockchain Badge"
                   size="small"
                   sx={{
                     bgcolor: isLight ? '#f1f5f9' : '#1e2124',
@@ -424,7 +430,7 @@ const Dashboard = () => {
                   }}
                 />
                 <Chip
-                  label="FaceMesh 68 Enclave (Active)"
+                  label="Face Verified"
                   size="small"
                   sx={{
                     bgcolor: isLight ? '#f1f5f9' : '#1e2124',
@@ -436,7 +442,7 @@ const Dashboard = () => {
                   }}
                 />
                 <Chip
-                  label="Zero-Knowledge Shielded"
+                  label="Privacy Protected"
                   size="small"
                   sx={{
                     bgcolor: isLight ? '#f1f5f9' : '#1e2124',
@@ -463,7 +469,7 @@ const Dashboard = () => {
             }}
           >
             <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block' }}>
-              SOVEREIGN TRUST SCORE
+              IDENTITY TRUST SCORE
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 0.5, my: 0.2 }}>
               <Typography variant="h3" sx={{ fontWeight: 800, color: '#16a34a', letterSpacing: '-0.03em', lineHeight: 1 }}>
@@ -474,7 +480,7 @@ const Dashboard = () => {
               </Typography>
             </Box>
             <Typography variant="caption" sx={{ color: isLight ? '#16a34a' : '#4ade80', fontWeight: 700, display: 'block' }}>
-              Tier 1 Institutional Clearance
+              Tier 1 Full Clearance
             </Typography>
             <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.7rem' }}>
               Zero fraud flags • 4 Attested Claims
@@ -623,10 +629,10 @@ const Dashboard = () => {
                   </Box>
                   <Box>
                     <Typography variant="subtitle2" sx={{ color: '#ffffff', fontWeight: 800, letterSpacing: '0.05em' }}>
-                      TRUEID SOVEREIGN REPUBLIC
+                      TRUEID DIGITAL PASS
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                      Decentralized Digital Identity Authority • W3C DID Standard
+                      Official Identity Card • Verified Citizen
                     </Typography>
                   </Box>
                 </Box>
@@ -634,12 +640,12 @@ const Dashboard = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Chip
                     icon={<ContactlessRounded sx={{ color: '#38bdf8 !important', fontSize: 16 }} />}
-                    label="SMART CHIP RFID"
+                    label="NFC ACTIVE"
                     size="small"
                     sx={{ bgcolor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', fontWeight: 700, fontSize: '0.68rem', border: '1px solid rgba(56, 189, 248, 0.3)' }}
                   />
                   <Chip
-                    label="ERC-5192 SOULBOUND"
+                    label="PERMANENT BADGE"
                     size="small"
                     sx={{ bgcolor: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', fontWeight: 700, fontSize: '0.68rem', border: '1px solid rgba(34, 197, 94, 0.3)' }}
                   />
@@ -692,7 +698,7 @@ const Dashboard = () => {
               <Box sx={{ pt: 2, mt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
                 <Box>
                   <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', display: 'block' }}>
-                    SOVEREIGN DECENTRALIZED IDENTIFIER (DID)
+                    DIGITAL IDENTIFIER (DID)
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#e2e8f0', fontFamily: 'monospace', fontSize: '0.8rem' }}>
                     {identityData.did}
@@ -916,7 +922,7 @@ const Dashboard = () => {
                     99.8%
                   </Typography>
                   <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 600 }}>
-                    Institutional Grade Sovereign Trust
+                    Highest Verified Trust
                   </Typography>
                 </Box>
                 <Chip
@@ -955,7 +961,7 @@ const Dashboard = () => {
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                     <Typography variant="body2" sx={{ fontWeight: 600, color: isLight ? '#334155' : '#cbd5e1', fontSize: '0.82rem' }}>
-                      Institutional W3C Attestations
+                      Verified Documents & Credentials
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#2563eb', fontSize: '0.82rem' }}>
                       98%
@@ -989,7 +995,7 @@ const Dashboard = () => {
               }}
             >
               <Typography variant="subtitle2" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', mb: 2 }}>
-                HARDWARE & PRIVACY ENCLAVE
+                DEVICE & PRIVACY SECURITY
               </Typography>
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -999,10 +1005,10 @@ const Dashboard = () => {
                   </Box>
                   <Box>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#0f172a' : '#ffffff', fontSize: '0.84rem' }}>
-                      Zero-Knowledge Enclave
+                      On-Device Protection
                     </Typography>
                     <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e' }}>
-                      Raw biometric templates never leave device
+                      Your photos and face data stay safe on your phone or computer
                     </Typography>
                   </Box>
                 </Box>
@@ -1013,10 +1019,10 @@ const Dashboard = () => {
                   </Box>
                   <Box>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#0f172a' : '#ffffff', fontSize: '0.84rem' }}>
-                      Hardware Keystore
+                      Hardware Security Key
                     </Typography>
                     <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e' }}>
-                      ARM TrustZone / Secure Enclave binding
+                      Protected by device fingerprint and secure chip
                     </Typography>
                   </Box>
                 </Box>

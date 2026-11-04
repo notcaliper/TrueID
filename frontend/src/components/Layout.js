@@ -39,13 +39,13 @@ import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
 
 const navTabs = [
-  { label: 'Citizen Dashboard', path: '/', icon: <DashboardRounded sx={{ fontSize: 16 }} /> },
-  { label: 'Identity Profile', path: '/profile', icon: <PersonRounded sx={{ fontSize: 16 }} /> },
-  { label: 'Trust & Verification', path: '/verification-status', icon: <VerifiedUserRounded sx={{ fontSize: 16 }} /> },
-  { label: 'Biometric Vault', path: '/biometric-verification', icon: <FingerprintRounded sx={{ fontSize: 16 }} /> },
-  { label: 'Verifiable Credentials', path: '/professional-records', icon: <WorkspacePremiumRounded sx={{ fontSize: 16 }} /> },
-  { label: 'Web3 Wallet', path: '/wallet', icon: <AccountBalanceWalletRounded sx={{ fontSize: 16 }} /> },
-  { label: 'Blockchain Ledger', path: '/blockchain-status', icon: <SecurityRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Dashboard', path: '/', icon: <DashboardRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Profile', path: '/profile', icon: <PersonRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Verification', path: '/verification-status', icon: <VerifiedUserRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Face Scan', path: '/biometric-verification', icon: <FingerprintRounded sx={{ fontSize: 16 }} /> },
+  { label: 'My Documents', path: '/professional-records', icon: <WorkspacePremiumRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Wallet', path: '/wallet', icon: <AccountBalanceWalletRounded sx={{ fontSize: 16 }} /> },
+  { label: 'Blockchain Status', path: '/blockchain-status', icon: <SecurityRounded sx={{ fontSize: 16 }} /> },
 ];
 
 const Layout = () => {
@@ -59,7 +59,7 @@ const Layout = () => {
   const [copied, setCopied] = useState(false);
   const [searchVal, setSearchVal] = useState('');
 
-  const citizenAddress = user?.wallet_address || '0x4f8e91d2c3b4a567890123456789abcdef012345';
+  const citizenAddress = user?.wallet_address || user?.avax_address || '0xc628d3e2b63cCeb6038Ffe05A8E18B1e9304BBC5';
 
   const isTabActive = (path) => {
     if (path === '/') return location.pathname === '/' || location.pathname === '/dashboard';

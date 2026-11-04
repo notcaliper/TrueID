@@ -29,7 +29,7 @@ exports.getUserProfile = async (req, res) => {
   try {
     // Get user details
     const userResult = await db.query(
-      `SELECT id, name, government_id, email, phone, avax_address,
+      `SELECT id, name, government_id, email, phone, wallet_address, avax_address, did,
               is_verified, verification_status, created_at, updated_at
        FROM users
        WHERE id = $1`,
@@ -69,7 +69,8 @@ exports.getUserProfile = async (req, res) => {
         governmentId: user.government_id,
         email: user.email,
         phone: user.phone,
-        walletAddress: user.avax_address || user.avax_address,
+        walletAddress: user.wallet_address || user.avax_address,
+        did: user.did || `did:trueid:${user.wallet_address || user.avax_address}`,
         isVerified: user.is_verified,
         verificationStatus: user.verification_status,
         createdAt: user.created_at,

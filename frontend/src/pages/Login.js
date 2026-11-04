@@ -205,7 +205,7 @@ const Login = () => {
             </Box>
             
             <Typography variant="h5" fontWeight={700} gutterBottom color="text.primary">
-              Institutional Digital Identity
+              Official Digital Identity
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 4, lineHeight: 1.7 }}>
               Next-generation decentralized biometric authentication and tamper-proof verification on the blockchain.

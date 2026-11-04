@@ -53,7 +53,7 @@ export const getTheme = (mode = 'light') => {
     },
 
     typography: {
-      fontFamily: '"Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       h1: { fontWeight: 800, letterSpacing: '-0.025em', color: isLight ? '#0f172a' : '#ffffff' },
       h2: { fontWeight: 700, letterSpacing: '-0.02em', color: isLight ? '#0f172a' : '#ffffff' },
       h3: { fontWeight: 700, letterSpacing: '-0.015em', color: isLight ? '#0f172a' : '#ffffff' },
@@ -79,7 +79,7 @@ export const getTheme = (mode = 'light') => {
             color: isLight ? '#0f172a' : '#ffffff',
             margin: 0,
             padding: 0,
-            fontFamily: '"Plus Jakarta Sans", "Inter", -apple-system, sans-serif',
+            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             WebkitFontSmoothing: 'antialiased',
           },
         },
