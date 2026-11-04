@@ -2,8 +2,8 @@ const ethers = require('ethers');
 
 async function checkBalance() {
   try {
-    const provider = new ethers.JsonRpcProvider('https://api.avax-test.network/ext/bc/C/rpc');
-    const address = '0x47168A987D52D18e5e3558A90606818DA09Bd472';
+    const provider = new ethers.JsonRpcProvider('https://ethereum-sepolia-rpc.publicnode.com');
+    const address = '0x45B27dc6bE8B48188e31F90699e5E67A835f7B2b';
     
     console.log('Checking balance for:', address);
     console.log('Provider:', provider);
@@ -15,7 +15,7 @@ async function checkBalance() {
     console.log('Raw balance:', balance.toString());
     
     const formattedBalance = ethers.formatEther(balance);
-    console.log('Formatted balance:', formattedBalance, 'AVAX');
+    console.log('Formatted balance:', formattedBalance, 'ETH');
   } catch (error) {
     console.error('Error:', error);
   }

@@ -5,10 +5,8 @@ import {
   Typography,
   Grid,
   Card,
-  CardContent,
   Button,
   Alert,
-  CircularProgress,
   Divider,
   Table,
   TableBody,
@@ -22,8 +20,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
-  useTheme
+  DialogActions
 } from '@mui/material';
 import {
   AccountBalanceWalletRounded,
@@ -32,15 +29,11 @@ import {
   CheckCircleRounded,
   RefreshRounded,
   SecurityRounded,
-  SwapHorizRounded,
   QrCodeRounded,
-  ArrowForwardRounded,
   GppGoodRounded,
   KeyRounded,
   ElectricBoltRounded,
-  LanRounded,
   CloseRounded,
-  CheckRounded,
   HistoryRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
@@ -51,9 +44,7 @@ import walletService from '../services/wallet.service';
 const Wallet = () => {
   const { user } = useAuth();
   const { isLight } = useColorMode();
-  const theme = useTheme();
 
-  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -61,49 +52,16 @@ const Wallet = () => {
   const [externalWallet, setExternalWallet] = useState(null);
   const [qrModalOpen, setQrModalOpen] = useState(false);
 
-  const defaultAddress = user?.wallet_address || user?.avax_address || '0xc628d3e2b63cCeb6038Ffe05A8E18B1e9304BBC5';
+  const defaultAddress = user?.wallet_address || '';
 
   const [walletData, setWalletData] = useState({
     address: defaultAddress,
-    did: `did:trueid:${defaultAddress}`,
-    balance: '12.4560',
+    did: defaultAddress ? `did:trueid:${defaultAddress}` : '',
+    balance: '0.0000',
     network: 'Ethereum Sepolia Testnet (Chain ID: 11155111)',
-    contractAddress: '0x266B577380aE3De838A66DEf28fffD5e75c5816E',
-    lastSync: 'Nov 5, 2026, 12:45 AM',
-    transactions: [
-      {
-        hash: '0x4f8e91d2c3b4a567890123456789abcdef0123456789abcdef0123456789abcd',
-        type: 'SOULBOUND SBT MINT',
-        target: 'Token #002 (Non-Transferable)',
-        status: 'CONFIRMED',
-        confirmations: 16,
-        time: '1 hour ago'
-      },
-      {
-        hash: '0x3a91b2c3d4e5f60718293a4b5c6d7e8f9012345678901234567890123456e8b2',
-        type: 'GOV KYC ATTESTATION',
-        target: 'Registry JIFPM9413P Notarized',
-        status: 'CONFIRMED',
-        confirmations: 42,
-        time: 'Yesterday'
-      },
-      {
-        hash: '0x99f4c3a1b2d5e6f708192a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b28dc',
-        type: 'W3C CREDENTIAL ANCHOR',
-        target: 'Stanford M.S. Degree Claim',
-        status: 'CONFIRMED',
-        confirmations: 128,
-        time: 'Nov 3, 2026'
-      },
-      {
-        hash: '0x6b14aa77c3b4a567890123456789abcdef0123456789abcdef012345678989ee',
-        type: 'KEYSTORE DERIVATION',
-        target: 'Ed25519 Controller Key Enclave',
-        status: 'CONFIRMED',
-        confirmations: 256,
-        time: 'Nov 1, 2026'
-      }
-    ]
+    contractAddress: process.env.REACT_APP_CONTRACT_ADDRESS || '',
+    lastSync: '',
+    transactions: []
   });
 
   const fetchWalletData = useCallback(async () => {
@@ -111,22 +69,33 @@ const Wallet = () => {
     setError(null);
 
     try {
-      const [profileRes, statusRes] = await Promise.allSettled([
+      const [profileRes, txRes] = await Promise.allSettled([
         userAPI.getProfile(),
-        blockchainAPI.getBlockchainStatus()
+        blockchainAPI.getTransactions(1, 10)
       ]);
 
       const profileAddress = profileRes.status === 'fulfilled' && profileRes.value?.data?.user?.walletAddress 
         ? profileRes.value.data.user.walletAddress 
         : defaultAddress;
 
-      const balance = await walletService.getBalance(profileAddress, true).catch(() => '12.4560');
+      const balance = await walletService.getBalance(profileAddress).catch(() => '0.0000');
+      const rawTxList = txRes.status === 'fulfilled' ? (txRes.value?.data?.transactions || txRes.value?.data?.data?.transactions || []) : [];
 
       setWalletData(prev => ({
         ...prev,
         address: profileAddress,
-        did: `did:trueid:${profileAddress}`,
-        balance: balance || '12.4560',
+        did: profileAddress ? `did:trueid:${profileAddress}` : '',
+        balance: balance,
+        transactions: rawTxList.map(tx => ({
+          hash: tx.transaction_hash || '',
+          type: tx.transaction_type ? tx.transaction_type.replace(/_/g, ' ') : 'NOTARY ATTESTATION',
+          target: (tx.data?.institution && tx.data?.title)
+            ? `${tx.data.institution} - ${tx.data.title}`
+            : (tx.data?.reason || tx.data?.title || (tx.transaction_type === 'SOULBOUND_BADGE_MINT' ? 'Soulbound Identity Badge #1' : tx.transaction_type ? tx.transaction_type.replace(/_/g, ' ') : 'Ledger Attestation')),
+          status: tx.status || 'CONFIRMED',
+          confirmations: tx.confirmations || 1,
+          time: tx.created_at ? new Date(tx.created_at).toLocaleDateString() : 'Recent'
+        })),
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
     } catch (err) {
@@ -138,6 +107,10 @@ const Wallet = () => {
 
   useEffect(() => {
     fetchWalletData();
+    const interval = setInterval(() => {
+      fetchWalletData();
+    }, 15000);
+    return () => clearInterval(interval);
   }, [fetchWalletData]);
 
   const copyToClipboard = (text) => {
@@ -154,11 +127,7 @@ const Wallet = () => {
       setExternalWallet(walletInfo);
     } catch (err) {
       console.error('Error connecting wallet:', err);
-      // Simulate connection for showcase if no browser extension
-      setExternalWallet({
-        address: '0x71C...B29a',
-        network: 'Ethereum Sepolia'
-      });
+      setError(err.message || 'Failed to connect Web3 extension.');
     } finally {
       setConnectingWallet(false);
     }
@@ -220,7 +189,7 @@ const Wallet = () => {
           <Typography sx={{ color: isLight ? '#64748b' : '#8b949e' }}>Web3 Wallet</Typography>
           <span>/</span>
           <Typography sx={{ color: isLight ? '#0f172a' : '#f8fafc', fontWeight: 700, fontFamily: 'monospace' }}>
-            {walletData.address.slice(0, 10)}...{walletData.address.slice(-6)}
+            {walletData.address ? `${walletData.address.slice(0, 10)}...${walletData.address.slice(-6)}` : 'Connecting...'}
           </Typography>
         </Box>
 
@@ -269,7 +238,7 @@ const Wallet = () => {
         </Box>
       </Box>
 
-      {/* 2. Top Sovereign Web3 Banner (Dashboard Style) */}
+      {/* 2. Top Web3 Identity Banner (Dashboard Style) */}
       <Card
         sx={{
           p: { xs: 2.5, md: 3 },
@@ -617,8 +586,15 @@ const Wallet = () => {
                   </TableHead>
 
                   <TableBody>
-                    {walletData.transactions.map((tx, idx) => (
-                      <TableRow key={idx} hover sx={{ '&:hover': { bgcolor: isLight ? '#f8fafc !important' : '#1e2124 !important' } }}>
+                    {walletData.transactions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center" sx={{ py: 4, color: isLight ? '#64748b' : '#8b949e', fontSize: '0.82rem' }}>
+                          No ledger transactions found for this citizen wallet.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      walletData.transactions.map((tx, idx) => (
+                        <TableRow key={idx} hover sx={{ '&:hover': { bgcolor: isLight ? '#f8fafc !important' : '#1e2124 !important' } }}>
                         <TableCell>
                           <Chip
                             label={tx.type}
@@ -671,7 +647,7 @@ const Wallet = () => {
                           />
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )))}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -786,10 +762,10 @@ const Wallet = () => {
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 600 }}>
-                    Consensus Notary Node
+                    Consensus Network Node
                   </Typography>
                   <Typography variant="caption" sx={{ fontWeight: 700, color: isLight ? '#0f172a' : '#ffffff' }}>
-                    Gov Node #01 Authority (0x9812)
+                    Ethereum Sepolia (11155111)
                   </Typography>
                 </Box>
 

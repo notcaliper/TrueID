@@ -126,7 +126,7 @@ app.post('/push/:userId', verifyToken, async (req, res) => {
     
     // Check if user exists
     const userResult = await pool.query(
-      'SELECT id, name, government_id, avax_address FROM users WHERE id = $1',
+      'SELECT id, name, government_id, wallet_address FROM users WHERE id = $1',
       [userId]
     );
     
@@ -137,7 +137,7 @@ app.post('/push/:userId', verifyToken, async (req, res) => {
     const user = userResult.rows[0];
     
     // Check if user has a wallet address
-    if (!user.avax_address) {
+    if (!user.wallet_address) {
       return res.status(400).json({ message: 'User does not have a wallet address' });
     }
     

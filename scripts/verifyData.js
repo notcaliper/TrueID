@@ -10,8 +10,8 @@ async function main() {
     process.exit(1);
   }
 
-  // Setup blockchain provider using Avalanche Fuji Testnet RPC URL
-  const rpcUrl = process.env.AVALANCHE_FUJI_RPC_URL;
+  // Setup blockchain provider using Ethereum Sepolia Testnet RPC URL
+  const rpcUrl = process.env.SEPOLIA_RPC_URL || process.env.BLOCKCHAIN_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
   let provider;
   if (ethers.providers && ethers.providers.JsonRpcProvider) {
     provider = new ethers.providers.JsonRpcProvider(rpcUrl);

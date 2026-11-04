@@ -343,7 +343,7 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
             <h4 style={{ margin: 0 }}>Identity Verified: {userInfo.name}</h4>
           </div>
           <p style={{ margin: 0, fontSize: 13, color: '#cbd5e1' }}>
-            Government ID: <strong>{userInfo.governmentId || userInfo.government_id}</strong> • Wallet: <code>{userInfo.walletAddress || userInfo.avax_address}</code>
+            Government ID: <strong>{userInfo.governmentId || userInfo.government_id}</strong> • Wallet: <code>{userInfo.walletAddress || userInfo.wallet_address}</code>
           </p>
         </div>
       )}

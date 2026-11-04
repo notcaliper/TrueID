@@ -1,32 +1,46 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
+
+/**
+ * @dev Interface for the ERC-5192 standard: Minimal Soulbound NFTs
+ * https://eips.ethereum.org/EIPS/eip-5192
+ */
+interface IERC5192 {
+    /// @notice Emitted when the locking status of an NFT is set to locked.
+    event Locked(uint256 tokenId);
+
+    /// @notice Emitted when the locking status of an NFT is set to unlocked.
+    event Unlocked(uint256 tokenId);
+
+    /// @notice Returns the locking status of an Soulbound NFT.
+    /// @dev All TrueID identity badges are non-transferable and permanently locked.
+    function locked(uint256 tokenId) external view returns (bool);
+}
 
 /**
  * @title TrueIDSoulboundBadge
  * @author TrueID Protocol
- * @notice ERC-5192 compliant Soulbound Credential Token (SBT) for TrueID users.
- *         Tokens are permanently bound to the user's wallet address and cannot be transferred.
+ * @notice Production ERC-5192 compliant Soulbound Credential Token (SBT) for TrueID citizens.
+ *         Tokens are permanently bound to citizen wallet addresses and cannot be sold, traded, or transferred.
  */
-contract TrueIDSoulboundBadge {
-    string public name = "TrueID Soulbound Identity Badge";
+contract TrueIDSoulboundBadge is IERC5192 {
+    string public name = "TrueID Digital Identity Badge";
     string public symbol = "TRUEID-SBT";
     address public owner;
-    address public identityContract;
+    address public registryContract;
 
     uint256 private _nextTokenId = 1;
 
-    // ERC-5192 Minimal Soulbound Token Interface Event
-    event Locked(uint256 tokenId);
-    event Unlocked(uint256 tokenId);
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event BadgeMinted(address indexed recipient, uint256 indexed tokenId, string badgeType, uint256 timestamp);
     event BadgeRevoked(uint256 indexed tokenId, address indexed recipient, uint256 timestamp);
 
     struct Badge {
-        string badgeType;          // E.g., "IDENTITY_VERIFIED", "PLATINUM_TIER", "KYC_COMPLIANT"
-        string metadataURI;        // Decentralized IPFS/Arweave metadata URI
+        string badgeType;          // E.g., "IDENTITY_VERIFIED", "KYC_COMPLIANT", "TIER_1_CITIZEN"
+        string metadataURI;        // Decentralized IPFS metadata URI containing W3C credentials
+        bytes32 identityCommitment; // Poseidon hash of citizen biometric face vector
         uint256 issuedAt;          // Timestamp of issuance
-        bool isValid;              // Revocation state
+        bool isValid;              // Active/revoked state
     }
 
     mapping(uint256 => address) private _owners;
@@ -40,7 +54,7 @@ contract TrueIDSoulboundBadge {
     }
 
     modifier onlyAuthorized() {
-        require(msg.sender == owner || msg.sender == identityContract, "Caller not authorized");
+        require(msg.sender == owner || msg.sender == registryContract, "Caller not authorized");
         _;
     }
 
@@ -48,29 +62,28 @@ contract TrueIDSoulboundBadge {
         owner = msg.sender;
     }
 
-    function setIdentityContract(address _identityContract) external onlyOwner {
-        require(_identityContract != address(0), "Invalid address");
-        identityContract = _identityContract;
+    function setRegistryContract(address _registryContract) external onlyOwner {
+        require(_registryContract != address(0), "Invalid registry address");
+        registryContract = _registryContract;
     }
 
     /**
-     * @notice ERC-5192 locked query - soulbound badges are permanently locked
+     * @notice ERC-5192 locked status check.
+     *         TrueID badges are non-transferable (soulbound) and permanently locked.
      */
-    function locked(uint256 tokenId) external view returns (bool) {
+    function locked(uint256 tokenId) external view override returns (bool) {
         require(_owners[tokenId] != address(0), "Token does not exist");
         return true;
     }
 
     /**
-     * @notice Mint a non-transferable Soulbound badge to a verified user
-     * @param recipient User address
-     * @param badgeType Badge category (e.g. "IDENTITY_VERIFIED")
-     * @param metadataURI Metadata pointer
+     * @notice Mint an ERC-5192 soulbound badge to a verified citizen
      */
     function mintBadge(
         address recipient,
         string calldata badgeType,
-        string calldata metadataURI
+        string calldata metadataURI,
+        bytes32 identityCommitment
     ) external onlyAuthorized returns (uint256) {
         require(recipient != address(0), "Cannot mint to zero address");
 
@@ -81,13 +94,18 @@ contract TrueIDSoulboundBadge {
         badges[tokenId] = Badge({
             badgeType: badgeType,
             metadataURI: metadataURI,
+            identityCommitment: identityCommitment,
             issuedAt: block.timestamp,
             isValid: true
         });
 
-        userPrimaryBadge[recipient] = tokenId;
+        if (userPrimaryBadge[recipient] == 0) {
+            userPrimaryBadge[recipient] = tokenId;
+        }
 
+        // Emit ERC-721 mint event (from address 0)
         emit Transfer(address(0), recipient, tokenId);
+        // Emit ERC-5192 Locked event signifying permanent soulbound attachment
         emit Locked(tokenId);
         emit BadgeMinted(recipient, tokenId, badgeType, block.timestamp);
 
@@ -95,10 +113,12 @@ contract TrueIDSoulboundBadge {
     }
 
     /**
-     * @notice Revoke a badge in case of identity revocation
+     * @notice Revoke a badge in case of verified fraud or user request
      */
     function revokeBadge(uint256 tokenId) external onlyAuthorized {
         require(_owners[tokenId] != address(0), "Token does not exist");
+        require(badges[tokenId].isValid, "Badge is already revoked");
+
         badges[tokenId].isValid = false;
         address recipient = _owners[tokenId];
 
@@ -106,46 +126,44 @@ contract TrueIDSoulboundBadge {
     }
 
     /**
-     * @notice Check badge status for a user
+     * @notice Check badge status
      */
-    function hasValidBadge(address user) external view returns (bool, uint256, string memory) {
-        uint256 tokenId = userPrimaryBadge[user];
-        if (tokenId == 0 || _owners[tokenId] != user) {
-            return (false, 0, "");
-        }
-        Badge memory b = badges[tokenId];
-        return (b.isValid, tokenId, b.badgeType);
+    function isBadgeValid(uint256 tokenId) external view returns (bool) {
+        return _owners[tokenId] != address(0) && badges[tokenId].isValid;
     }
 
-    function ownerOf(uint256 tokenId) public view returns (address) {
+    function ownerOf(uint256 tokenId) external view returns (address) {
         address tokenOwner = _owners[tokenId];
         require(tokenOwner != address(0), "Token does not exist");
         return tokenOwner;
     }
 
     function balanceOf(address account) external view returns (uint256) {
-        require(account != address(0), "Cannot query zero address");
+        require(account != address(0), "Zero address inquiry");
         return _balances[account];
     }
 
     /**
-     * @dev Prevent any transfers - enforces Soulbound property
+     * @notice Soulbound guarantee: Prevent any token transfer per ERC-5192
      */
     function transferFrom(address, address, uint256) external pure {
-        revert("Soulbound: Token is permanently non-transferable");
+        revert("Soulbound: Token transfer is permanently forbidden by ERC-5192");
     }
 
     function safeTransferFrom(address, address, uint256) external pure {
-        revert("Soulbound: Token is permanently non-transferable");
+        revert("Soulbound: Token transfer is permanently forbidden by ERC-5192");
     }
 
     function safeTransferFrom(address, address, uint256, bytes calldata) external pure {
-        revert("Soulbound: Token is permanently non-transferable");
+        revert("Soulbound: Token transfer is permanently forbidden by ERC-5192");
     }
-}
 
-library AddressUtils {
-    function isValidUser(address actual, address expected) internal pure returns (bool) {
-        return actual == expected;
+    // ERC-165 interface detection
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return
+            interfaceId == 0x01ffc9a7 || // ERC-165
+            interfaceId == 0x80ac58cd || // ERC-721
+            interfaceId == 0x5bced89b || // ERC-721Metadata
+            interfaceId == 0xb45a3c0e;   // ERC-5192 (Locked)
     }
 }

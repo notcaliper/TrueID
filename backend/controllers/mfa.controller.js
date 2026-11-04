@@ -219,7 +219,7 @@ exports.verifyMFALogin = async (req, res) => {
     const sessionResult = await db.query(
       `SELECT ms.*, u.mfa_secret, u.mfa_backup_codes, u.id as user_id, 
               u.username, u.name, u.government_id, u.email, u.phone,
-              u.is_verified, u.verification_status, u.avax_address
+              u.is_verified, u.verification_status, u.wallet_address
        FROM mfa_sessions ms
        JOIN users u ON ms.user_id = u.id
        WHERE ms.temp_token = $1 AND ms.expires_at > NOW() AND ms.used_at IS NULL`,

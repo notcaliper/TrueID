@@ -28,7 +28,7 @@ const collectUserData = async (db, userId) => {
   const userResult = await db.query(
     `SELECT id, username, name, government_id, email, phone, 
             wallet_address, is_verified, verification_status, 
-            created_at, updated_at, avax_address
+            created_at, updated_at, wallet_address
      FROM users WHERE id = $1`,
     [userId]
   );

@@ -372,8 +372,8 @@ const BiometricNexus = ({ dashboardData, user }) => {
 
         <NodeStatus 
           top="70%" left="75%" 
-          title="AVAX LEDGER" 
-          status={`${parseFloat(dashboardData.walletBalance || '0').toFixed(2)} AVAX`} 
+          title="SEPOLIA LEDGER" 
+          status={`${parseFloat(dashboardData.walletBalance || '0').toFixed(4)} ETH`} 
           icon={WalletIcon}
           color="#3b82f6"
         />

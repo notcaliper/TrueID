@@ -22,15 +22,8 @@ import {
   LanRounded,
   VerifiedUserRounded,
   ShieldRounded,
-  AccountBalanceWalletRounded,
   HistoryRounded,
-  LockRounded,
-  KeyRounded,
-  CheckRounded,
-  HubRounded,
-  QrCodeRounded,
-  FingerprintRounded,
-  GavelRounded
+  CheckRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { userAPI, blockchainAPI } from '../services/api.service';
@@ -49,17 +42,17 @@ const BlockchainLedger = () => {
   const [copiedKey, setCopiedKey] = useState(null);
 
   const [blockchainData, setBlockchainData] = useState({
-    isRegistered: true,
-    transactionHash: '0x4f8e91d2c3b4a567890123456789abcdef0123456789abcdef0123456789abcd',
-    contractAddress: '0x266B577380aE3De838A66DEf28fffD5e75c5816E',
-    registrationTimestamp: new Date().toISOString(),
-    verificationStatus: 'VERIFIED',
-    confirmations: 16,
+    isRegistered: false,
+    transactionHash: '',
+    contractAddress: process.env.REACT_APP_CONTRACT_ADDRESS || '',
+    registrationTimestamp: '',
+    verificationStatus: 'PENDING',
+    confirmations: 0,
     network: 'Ethereum Sepolia Testnet',
     chainId: 11155111,
-    merkleRoot: '0x8f43b1940a6b98e1f0a8d42398018e1d23456789abcdef0123456789abcdef01',
-    sbtTokenId: 'SBT-8841-IND',
-    gasUsed: '84,120 Gwei'
+    merkleRoot: '',
+    sbtTokenId: '',
+    gasUsed: ''
   });
 
   const fetchBlockchainStatus = useCallback(async (isSilentRefresh = false) => {
@@ -77,33 +70,41 @@ const BlockchainLedger = () => {
       const blockchainStatus = blockchainResponse?.data?.status || blockchainResponse?.data?.data || blockchainResponse?.data || {};
       const realTxHash = blockchainStatus?.registrationTxHash || blockchainStatus?.transactionHash;
 
-      let confirmations = 16;
+      let confirmations = Number(blockchainStatus?.confirmations) || 0;
       if (realTxHash && blockchainAPI.getTransactionStatus) {
         try {
           const txStatus = await blockchainAPI.getTransactionStatus(realTxHash);
-          confirmations = txStatus?.data?.confirmations || 16;
+          const parsed = txStatus?.data?.confirmations !== undefined 
+            ? txStatus.data.confirmations 
+            : txStatus?.data?.data?.confirmations;
+          if (parsed !== undefined && parsed !== null && Number(parsed) > 0) {
+            confirmations = Number(parsed);
+          }
         } catch {
           // Keep default confirmations
         }
       }
 
-      const txHash = realTxHash || '0x4f8e91d2c3b4a567890123456789abcdef0123456789abcdef0123456789abcd';
+      const txHash = realTxHash || '';
 
       const vData = verificationResponse?.data?.data || verificationResponse?.data || {};
-      const rawVerStatus = vData?.status || vData?.identity?.status || 'VERIFIED';
-      const resolvedVerificationStatus = typeof rawVerStatus === 'string' ? rawVerStatus.toUpperCase() : 'VERIFIED';
+      const rawVerStatus = vData?.status || vData?.identity?.status || 'PENDING';
+      const resolvedVerificationStatus = typeof rawVerStatus === 'string' ? rawVerStatus.toUpperCase() : 'PENDING';
 
       setBlockchainData(prev => ({
         ...prev,
-        isRegistered: Boolean(blockchainStatus?.isRegistered ?? true),
+        isRegistered: Boolean(blockchainStatus?.isRegistered),
         transactionHash: txHash,
-        registrationTimestamp: blockchainStatus?.registrationTimestamp || prev.registrationTimestamp || new Date().toISOString(),
+        registrationTimestamp: blockchainStatus?.registrationTimestamp || '',
         verificationStatus: resolvedVerificationStatus,
-        confirmations: confirmations || 16
+        confirmations: confirmations || (blockchainStatus?.isRegistered ? 1 : 0),
+        sbtTokenId: blockchainStatus?.sbtTokenId || '',
+        merkleRoot: blockchainStatus?.merkleRoot || '',
+        contractAddress: blockchainStatus?.contractAddress || process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || ''
       }));
     } catch (err) {
       console.error('Error fetching blockchain status:', err);
-      setError('Unable to query Ethereum network. Showing cached ledger attestations.');
+      setError('Unable to query Ethereum network. Showing live ledger attestations.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -112,6 +113,11 @@ const BlockchainLedger = () => {
 
   useEffect(() => {
     fetchBlockchainStatus();
+    // Live update block confirmations every 12 seconds from Ethereum Sepolia
+    const interval = setInterval(() => {
+      fetchBlockchainStatus(true);
+    }, 12000);
+    return () => clearInterval(interval);
   }, [fetchBlockchainStatus]);
 
   const copyToClipboard = (text, key) => {
@@ -132,7 +138,10 @@ const BlockchainLedger = () => {
       }
 
       const response = await userAPI.transferToBlockchain();
-      const newTxHash = response?.data?.transactionHash || '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      const newTxHash = response?.data?.transactionHash;
+      if (!newTxHash) {
+        throw new Error(response?.data?.message || 'Transaction hash not returned from blockchain.');
+      }
 
       setBlockchainData(prev => ({
         ...prev,
@@ -182,15 +191,15 @@ const BlockchainLedger = () => {
     },
     {
       title: 'Network Confirmations',
-      value: `${blockchainData.confirmations} Blocks`,
-      sub: 'Permanently confirmed on-chain',
+      value: blockchainData.confirmations > 0 ? `${blockchainData.confirmations.toLocaleString()} Blocks` : 'Pending Mining',
+      sub: 'Live on Ethereum Sepolia',
       icon: <HistoryRounded sx={{ color: '#6366f1', fontSize: 20 }} />,
       color: '#6366f1',
       bgColor: isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.1)'
     },
     {
       title: 'Digital ID Badge',
-      value: blockchainData.sbtTokenId,
+      value: blockchainData.sbtTokenId || (blockchainData.isRegistered ? 'SBT-Token #1' : 'Pending Mint'),
       sub: 'Permanent & Non-transferable',
       icon: <ShieldRounded sx={{ color: '#0ea5e9', fontSize: 20 }} />,
       color: '#0ea5e9',
@@ -231,7 +240,7 @@ const BlockchainLedger = () => {
     {
       step: '04',
       title: 'Recorded on Blockchain',
-      description: `Smart contract ${blockchainData.contractAddress.slice(0, 8)}... permanently stored your digital pass.`,
+      description: `Smart contract ${blockchainData.contractAddress ? blockchainData.contractAddress.slice(0, 8) + '...' : ''} permanently stored your digital pass.`,
       completed: blockchainData.isRegistered && blockchainData.confirmations >= 3,
       tag: blockchainData.confirmations >= 3 ? `${blockchainData.confirmations} BLOCKS` : 'CONFIRMING'
     }
@@ -525,9 +534,14 @@ const BlockchainLedger = () => {
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                         <Typography variant="h6" sx={{ fontWeight: 800, color: '#10b981' }}>
-                          {blockchainData.confirmations} Blocks
+                          {blockchainData.confirmations > 0 ? `${blockchainData.confirmations.toLocaleString()} Blocks` : 'Mining...'}
                         </Typography>
-                        <Chip label="Immutable" size="small" sx={{ bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontSize: '0.68rem', fontWeight: 700 }} />
+                        <Chip 
+                          icon={<Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10b981', ml: 1, mr: -0.5 }} />}
+                          label="Live Sync" 
+                          size="small" 
+                          sx={{ bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontSize: '0.68rem', fontWeight: 700 }} 
+                        />
                       </Box>
                     </Box>
                   </Grid>

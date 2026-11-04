@@ -127,3 +127,12 @@ mcp_config.json
 .mcp/
 *.mcp.json
 
+# Hardhat & Blockchain compilation artifacts
+artifacts/
+cache/
+backend/blockchain/artifacts/
+backend/blockchain/cache/
+typechain/
+typechain-types/
+
+

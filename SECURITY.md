@@ -15,7 +15,7 @@ The following versions of TrueID components are currently supported with securit
 | TrueID Core Backend | `v1.0.x` / `main` | :white_check_mark: | Primary REST API & Authentication |
 | Government Portal | `v1.0.x` / `main` | :white_check_mark: | Administrative Dashboard |
 | Android Mobile Client | `v1.0.x` / `main` | :white_check_mark: | Biometric Mesh & Wallet App |
-| Smart Contracts | `v1.0.x` | :white_check_mark: | Avalanche Fuji & Polygon Testnet |
+| Smart Contracts | `v1.0.x` | :white_check_mark: | Ethereum Sepolia Testnet |
 | Legacy Releases | `< 1.0.0` | :x: | Unsupported |
 
 ---

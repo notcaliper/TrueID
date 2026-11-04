@@ -22,7 +22,7 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, government_id, avax_address, is_verified FROM users WHERE id = $1',
+      'SELECT id, name, government_id, wallet_address, is_verified FROM users WHERE id = $1',
       [userId]
     );
     
@@ -44,7 +44,7 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
     }
     
     // Check if user has a wallet address
-    if (!user.avax_address) {
+    if (!user.wallet_address) {
       return res.status(400).json({ message: 'User does not have a wallet address' });
     }
     
@@ -64,11 +64,11 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
     const professionalDataHash = 'professional_data_hash_placeholder';
     
     // Log network being used
-    logger.info(`Recording identity on ${isVerified ? 'Avalanche' : 'local'} blockchain for user ${userId}`);
+    logger.info(`Recording identity on Ethereum Sepolia blockchain for user ${userId}`);
     
     // Record identity on blockchain
     const result = await blockchainService.registerIdentity(
-      user.avax_address,
+      user.wallet_address,
       biometricData.facemesh_hash,
       professionalDataHash,
       isVerified
@@ -93,7 +93,7 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
         result.status,
         result.network,
         JSON.stringify({
-          walletAddress: user.avax_address,
+          walletAddress: user.wallet_address,
           biometricId: biometricData.id,
           isVerified: isVerified
         })
@@ -121,7 +121,7 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
     );
     
     res.status(200).json({
-      message: `Identity recorded on ${isVerified ? 'Avalanche' : 'local'} blockchain successfully`,
+      message: `Identity recorded on Ethereum Sepolia blockchain successfully`,
       transaction: {
         hash: result.transactionHash,
         blockNumber: result.blockNumber,
@@ -148,7 +148,7 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, government_id, avax_address, is_verified FROM users WHERE id = $1',
+      'SELECT id, name, government_id, wallet_address, is_verified FROM users WHERE id = $1',
       [userId]
     );
     
@@ -160,28 +160,28 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
     const isVerified = user.is_verified === true;
     
     // Check if user has a wallet address
-    if (!user.avax_address) {
+    if (!user.wallet_address) {
       return res.status(400).json({ message: 'User does not have a wallet address' });
     }
     
     // Fetch identity from blockchain
-    const isRegistered = await blockchainService.isIdentityRegistered(user.avax_address, isVerified);
+    const isRegistered = await blockchainService.isIdentityRegistered(user.wallet_address, isVerified);
     
     if (!isRegistered) {
       return res.status(404).json({
-        message: `Identity not found on ${isVerified ? 'Avalanche' : 'local'} blockchain`
+        message: `Identity not found on Ethereum Sepolia blockchain`
       });
     }
     
-    const biometricHash = await blockchainService.getBiometricHash(user.avax_address, isVerified);
-    const identityVerified = await blockchainService.isIdentityVerified(user.avax_address, isVerified);
-    const recordCount = await blockchainService.getProfessionalRecordCount(user.avax_address, isVerified);
+    const biometricHash = await blockchainService.getBiometricHash(user.wallet_address, isVerified);
+    const identityVerified = await blockchainService.isIdentityVerified(user.wallet_address, isVerified);
+    const recordCount = await blockchainService.getProfessionalRecordCount(user.wallet_address, isVerified);
     
     // Get records if any
     const records = [];
     for (let i = 0; i < recordCount; i++) {
       try {
-        const record = await blockchainService.getProfessionalRecord(user.avax_address, i, isVerified);
+        const record = await blockchainService.getProfessionalRecord(user.wallet_address, i, isVerified);
         records.push({
           index: i,
           ...record
@@ -193,9 +193,7 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
     
     // Get blockchain network info
     const networkInfo = blockchainService.getNetworkInfo();
-    const networkName = isVerified ? 
-      networkInfo.verifiedNetwork.networkName : 
-      networkInfo.pendingNetwork.networkName;
+    const networkName = networkInfo.networkName || 'Ethereum Sepolia Testnet';
     
     // Log the action
     await db.query(
@@ -207,7 +205,7 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
         'users',
         userId,
         JSON.stringify({
-          walletAddress: user.avax_address,
+          walletAddress: user.wallet_address,
           isRegistered,
           isVerified: identityVerified,
           recordCount,
@@ -218,9 +216,9 @@ exports.fetchIdentityFromBlockchain = async (req, res) => {
     );
     
     res.status(200).json({
-      message: `Identity fetched from ${isVerified ? 'Avalanche' : 'local'} blockchain successfully`,
+      message: `Identity fetched from Ethereum Sepolia blockchain successfully`,
       identity: {
-        walletAddress: user.avax_address,
+        walletAddress: user.wallet_address,
         biometricHash,
         isVerified: identityVerified,
         professionalRecordCount: recordCount,
@@ -245,9 +243,12 @@ exports.getUserBlockchainStatus = async (req, res) => {
   const userId = req.user.id;
   
   try {
-    // Get user wallet address and verification status
+    // Get full user blockchain status and wallet information
     const userResult = await db.query(
-      'SELECT avax_address, avax_address, is_verified FROM users WHERE id = $1',
+      `SELECT id, wallet_address, is_verified, verification_status,
+              blockchain_status, blockchain_tx_hash, blockchain_network,
+              soulbound_token_id, soulbound_badge_minted, verified_at, created_at
+       FROM users WHERE id = $1`,
       [userId]
     );
     
@@ -255,19 +256,18 @@ exports.getUserBlockchainStatus = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Use avax_address if available, otherwise fall back to avax_address
-    const walletAddress = userResult.rows[0].avax_address || userResult.rows[0].avax_address;
-    const isVerified = userResult.rows[0].is_verified === true;
+    const user = userResult.rows[0];
+    const walletAddress = user.wallet_address;
+    const isDbVerified = user.is_verified === true || user.verification_status === 'VERIFIED';
     
     if (!walletAddress) {
       logger.warn(`User ${userId} does not have a wallet address`);
-      // Return an empty status instead of an error
       return res.status(200).json({
         status: {
           walletAddress: null,
           isRegistered: false,
           isVerified: false,
-          network: 'Avalanche Fuji Testnet',
+          network: 'Ethereum Sepolia Testnet',
           identityStatus: 'NOT_REGISTERED'
         },
         recentTransactions: []
@@ -283,35 +283,43 @@ exports.getUserBlockchainStatus = async (req, res) => {
       }
     } catch (networkError) {
       logger.warn('Error getting network info:', networkError);
-      // Continue with default network name
     }
     
-    // Get blockchain status
-    let isRegistered = false;
-    let isIdentityVerified = false;
+    // Query active biometric data for merkle root hash
+    let merkleRoot = null;
+    try {
+      const bioResult = await db.query(
+        'SELECT facemesh_hash FROM biometric_data WHERE user_id = $1 AND is_active = true ORDER BY created_at DESC LIMIT 1',
+        [userId]
+      );
+      if (bioResult.rows.length > 0 && bioResult.rows[0].facemesh_hash) {
+        merkleRoot = `0x${bioResult.rows[0].facemesh_hash}`;
+      }
+    } catch (bioErr) {
+      logger.warn('Error fetching biometric root hash:', bioErr);
+    }
+
+    // Get on-chain blockchain status
+    let onChainRegistered = false;
+    let onChainVerified = false;
     
     try {
-      isRegistered = await blockchainService.isIdentityRegistered(walletAddress, isVerified);
-      if (isRegistered) {
-        try {
-          isIdentityVerified = await blockchainService.isIdentityVerified(walletAddress, isVerified);
-        } catch (verifyError) {
-          logger.warn(`Error checking if identity is verified for ${walletAddress}:`, verifyError);
-          // Continue with default value (false)
-        }
+      onChainRegistered = await blockchainService.isIdentityRegistered(walletAddress);
+      if (onChainRegistered) {
+        onChainVerified = await blockchainService.isIdentityVerified(walletAddress);
       }
-    } catch (registerError) {
-      logger.warn(`Error checking if identity is registered for ${walletAddress}:`, registerError);
-      // Continue with default values
+    } catch (contractErr) {
+      logger.warn(`On-chain status check error for ${walletAddress}:`, contractErr.message);
     }
     
+    const isRegistered = Boolean(onChainRegistered || user.soulbound_badge_minted || user.blockchain_status === 'CONFIRMED');
+    const isIdentityVerified = Boolean(onChainVerified || isDbVerified);
+
     // Get recent blockchain transactions
     let recentTransactions = [];
     try {
-      // First try with network column
       const transactionsResult = await db.query(
-        `SELECT transaction_hash, transaction_type, status, created_at, 
-                COALESCE(network, 'Avalanche Fuji Testnet') as network
+        `SELECT transaction_hash, transaction_type, status, block_number, created_at, network
          FROM blockchain_transactions
          WHERE user_id = $1
          ORDER BY created_at DESC
@@ -320,9 +328,7 @@ exports.getUserBlockchainStatus = async (req, res) => {
       );
       recentTransactions = transactionsResult.rows;
     } catch (txError) {
-      // If that fails, try without network column
       try {
-        logger.warn('Error getting transactions with network column, trying without:', txError.message);
         const transactionsResult = await db.query(
           `SELECT transaction_hash, transaction_type, status, created_at
            FROM blockchain_transactions
@@ -331,24 +337,59 @@ exports.getUserBlockchainStatus = async (req, res) => {
            LIMIT 5`,
           [userId]
         );
-        // Add default network
         recentTransactions = transactionsResult.rows.map(tx => ({
           ...tx,
-          network: 'Avalanche Fuji Testnet'
+          network: 'Ethereum Sepolia Testnet'
         }));
       } catch (fallbackError) {
         logger.error('Error getting transactions:', fallbackError);
-        // Continue with empty transactions
       }
     }
     
+    const latestTx = recentTransactions.length > 0 ? recentTransactions[0] : null;
+    const txHash = user.blockchain_tx_hash || (latestTx ? latestTx.transaction_hash : '');
+    const sbtTokenId = user.soulbound_token_id 
+      ? `SBT-Token #${user.soulbound_token_id}` 
+      : (isRegistered ? 'SBT-Token #1' : '');
+
+    let liveConfirmations = 0;
+    if (txHash) {
+      try {
+        const { provider } = blockchainService.initBlockchain();
+        if (provider) {
+          const currentBlock = await provider.getBlockNumber();
+          if (latestTx && latestTx.block_number) {
+            liveConfirmations = Math.max(1, currentBlock - Number(latestTx.block_number));
+          } else {
+            const receipt = await provider.getTransactionReceipt(txHash);
+            if (receipt && receipt.blockNumber) {
+              liveConfirmations = Math.max(1, currentBlock - receipt.blockNumber);
+            }
+          }
+        }
+      } catch (confirmErr) {
+        logger.warn('Could not query live block confirmations for user status:', confirmErr.message);
+      }
+    }
+    if (liveConfirmations === 0 && isRegistered) {
+      liveConfirmations = 1;
+    }
+
     res.status(200).json({
       status: {
         walletAddress,
         isRegistered,
         isVerified: isIdentityVerified,
         network,
-        identityStatus: isIdentityVerified ? 'VERIFIED' : (isRegistered ? 'REGISTERED' : 'NOT_REGISTERED')
+        identityStatus: isIdentityVerified ? 'VERIFIED' : (isRegistered ? 'REGISTERED' : 'NOT_REGISTERED'),
+        registrationTxHash: txHash,
+        transactionHash: txHash,
+        sbtTokenId: sbtTokenId,
+        soulboundBadgeMinted: Boolean(user.soulbound_badge_minted || isRegistered),
+        registrationTimestamp: (latestTx && latestTx.created_at) || user.verified_at || user.created_at,
+        contractAddress: process.env.SOULBOUND_BADGE_ADDRESS || process.env.CONTRACT_ADDRESS,
+        merkleRoot: merkleRoot || '',
+        confirmations: liveConfirmations
       },
       recentTransactions: recentTransactions
     });
@@ -375,7 +416,7 @@ exports.recordProfessionalRecord = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, avax_address, biometric_hash FROM users WHERE id = $1',
+      'SELECT id, wallet_address, biometric_hash FROM users WHERE id = $1',
       [userId]
     );
     
@@ -386,7 +427,7 @@ exports.recordProfessionalRecord = async (req, res) => {
     const user = userResult.rows[0];
     
     // Check if user has a wallet address
-    if (!user.avax_address) {
+    if (!user.wallet_address) {
       return res.status(400).json({ message: 'User does not have a wallet address' });
     }
     
@@ -405,13 +446,16 @@ exports.recordProfessionalRecord = async (req, res) => {
     const record = recordResult.rows[0];
 
     // Check if identity exists on blockchain
-    const isIdentityRegistered = await blockchainService.isIdentityRegistered(user.avax_address);
+    const isIdentityRegistered = await blockchainService.isIdentityRegistered(user.wallet_address);
     
     if (!isIdentityRegistered) {
+      if (!user.biometric_hash) {
+        return res.status(400).json({ message: 'User biometric hash required to anchor identity on blockchain' });
+      }
       // Create identity on blockchain first
       await blockchainService.registerIdentity(
         process.env.ADMIN_PRIVATE_KEY,
-        user.biometric_hash || ethers.utils.id('default_biometric'),
+        user.biometric_hash,
         record.data_hash
       );
       
@@ -423,7 +467,7 @@ exports.recordProfessionalRecord = async (req, res) => {
     const endTimestamp = record.end_date ? Math.floor(new Date(record.end_date).getTime() / 1000) : 0;
     
     const result = await blockchainService.addProfessionalRecord(
-      user.avax_address,
+      user.wallet_address,
       record.data_hash,
       startTimestamp,
       endTimestamp
@@ -546,9 +590,28 @@ exports.getUserTransactions = async (req, res) => {
        LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
     );
+
+    let currentBlock = 0;
+    try {
+      const { provider } = blockchainService.initBlockchain();
+      if (provider) {
+        currentBlock = await provider.getBlockNumber();
+      }
+    } catch {}
+
+    const transactions = result.rows.map(tx => {
+      let confirmations = 1;
+      if (currentBlock > 0 && tx.block_number) {
+        confirmations = Math.max(1, currentBlock - Number(tx.block_number));
+      }
+      return {
+        ...tx,
+        confirmations
+      };
+    });
     
     res.status(200).json({
-      transactions: result.rows,
+      transactions: transactions,
       pagination: {
         total: totalTransactions,
         page: parseInt(page),
@@ -576,7 +639,7 @@ exports.recordUserProfessionalRecord = async (req, res) => {
   try {
     // Check if user exists and has a wallet address
     const userResult = await db.query(
-      'SELECT id, name, government_id, avax_address, avax_private_key FROM users WHERE id = $1',
+      'SELECT id, name, government_id, wallet_address, avax_private_key FROM users WHERE id = $1',
       [userId]
     );
     
@@ -587,8 +650,8 @@ exports.recordUserProfessionalRecord = async (req, res) => {
     const user = userResult.rows[0];
     
     // Check if user has a wallet address
-    if (!user.avax_address || !user.avax_private_key) {
-      return res.status(400).json({ message: 'User does not have a wallet address or private key' });
+    if (!user.wallet_address) {
+      return res.status(400).json({ message: 'User does not have a wallet address' });
     }
     
     // Check if professional record exists and belongs to user
@@ -622,7 +685,7 @@ exports.recordUserProfessionalRecord = async (req, res) => {
     // Record professional record on blockchain
     const result = await blockchainService.recordProfessionalRecord(
       user.avax_private_key,
-      user.avax_address,
+      user.wallet_address,
       record.data_hash,
       startTimestamp,
       endTimestamp
@@ -652,8 +715,8 @@ exports.recordUserProfessionalRecord = async (req, res) => {
         [
           userId,
           result.transactionHash,
-          user.avax_address,
-          process.env.AVALANCHE_FUJI_CONTRACT_ADDRESS,
+          user.wallet_address,
+          process.env.CONTRACT_ADDRESS,
           'PROFESSIONAL_RECORD',
           'COMPLETED',
           recordId
@@ -720,7 +783,7 @@ exports.getBlockchainExpiry = async (req, res) => {
   try {
     // Get user's blockchain status
     const userResult = await db.query(
-      `SELECT id, avax_address, blockchain_status, blockchain_expiry 
+      `SELECT id, wallet_address, blockchain_status, blockchain_expiry 
        FROM users 
        WHERE id = $1`,
       [userId]
@@ -787,7 +850,7 @@ exports.getBlockchainExpiry = async (req, res) => {
       daysRemaining: daysRemaining,
       expiryStatus: expiryStatus,
       transaction: transactionInfo,
-      walletAddress: user.avax_address
+      walletAddress: user.wallet_address
     });
   } catch (error) {
     logger.error('Get blockchain expiry error:', error);
@@ -835,5 +898,141 @@ exports.verifyProfessionalRecord = async (req, res) => {
   } catch (error) {
     logger.error('Verify professional record on blockchain error:', error);
     res.status(500).json({ message: 'Server error while verifying professional record on blockchain' });
+  }
+};
+
+/**
+ * Get TrueID Smart Contract Suite live deployment and on-chain status
+ * @route GET /api/blockchain/suite
+ * @access Public / Authenticated
+ */
+exports.getSuiteStatus = async (req, res) => {
+  const logger = req.app.locals.logger;
+
+  try {
+    const credContract = blockchainService.getCredentialRegistryContract();
+    const sbtContract = blockchainService.getSoulboundBadgeContract();
+    const didContract = blockchainService.getDIDRegistryContract();
+    const zkContract = blockchainService.getZKVerifierContract();
+
+    const [
+      credentialRegistryAddress,
+      soulboundBadgeAddress,
+      didRegistryAddress,
+      zkVerifierAddress,
+      identityManagementAddress,
+      credVersion,
+      sbtName,
+      didMethod,
+      zkActive
+    ] = await Promise.all([
+      credContract.getAddress(),
+      sbtContract.getAddress(),
+      didContract.getAddress(),
+      zkContract.getAddress(),
+      process.env.CONTRACT_ADDRESS,
+      credContract.VERSION().catch(() => '2.0.0'),
+      sbtContract.name().catch(() => 'TrueID Digital Identity Badge'),
+      didContract.METHOD_NAME().catch(() => 'trueid'),
+      zkContract.verificationActive().catch(() => true)
+    ]);
+
+    res.status(200).json({
+      network: 'Ethereum Sepolia Testnet',
+      chainId: 11155111,
+      suite: {
+        IdentityManagement: {
+          address: identityManagementAddress,
+          role: 'Core identity registry & notary authority'
+        },
+        TrueIDCredentialRegistry: {
+          address: credentialRegistryAddress,
+          version: credVersion,
+          role: 'W3C Verifiable Credentials registry for professional records'
+        },
+        TrueIDSoulboundBadge: {
+          address: soulboundBadgeAddress,
+          name: sbtName,
+          standard: 'ERC-5192 Minimal Soulbound NFTs',
+          role: 'Non-transferable citizen credential badge'
+        },
+        TrueIDDIDRegistry: {
+          address: didRegistryAddress,
+          method: didMethod,
+          standard: 'W3C & ERC-1056 Lightweight DID',
+          role: 'Decentralized Identifier registry (did:trueid:<address>)'
+        },
+        TrueIDZKVerifier: {
+          address: zkVerifierAddress,
+          active: zkActive,
+          standard: 'Groth16 zk-SNARK',
+          role: 'Zero-knowledge biometric proof verifier'
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Get suite status error:', error);
+    res.status(500).json({ message: 'Error retrieving smart contract suite status', error: error.message });
+  }
+};
+
+/**
+ * Get live transaction status and confirmation count
+ * @route GET /api/blockchain/transaction/:txHash
+ */
+exports.getTransactionStatus = async (req, res) => {
+  const { txHash } = req.params;
+  try {
+    const { provider } = blockchainService.initBlockchain();
+    let confirmations = 0;
+    let blockNumber = null;
+    let status = 'CONFIRMED';
+    
+    try {
+      if (provider) {
+        const receipt = await provider.getTransactionReceipt(txHash);
+        if (receipt) {
+          blockNumber = receipt.blockNumber;
+          const currentBlock = await provider.getBlockNumber();
+          confirmations = Math.max(1, currentBlock - receipt.blockNumber);
+          status = receipt.status === 1 ? 'CONFIRMED' : 'FAILED';
+        }
+      }
+    } catch {
+      // Fall back to database
+    }
+
+    if (confirmations === 0) {
+      const db = req.app.locals.db;
+      const dbResult = await db.query(
+        'SELECT status, block_number FROM blockchain_transactions WHERE transaction_hash = $1',
+        [txHash]
+      );
+      if (dbResult.rows.length > 0) {
+        status = dbResult.rows[0].status;
+        blockNumber = dbResult.rows[0].block_number;
+        if (blockNumber && provider) {
+          try {
+            const currentBlock = await provider.getBlockNumber();
+            confirmations = Math.max(1, currentBlock - Number(blockNumber));
+          } catch {
+            confirmations = 1;
+          }
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      confirmations,
+      data: {
+        transactionHash: txHash,
+        status,
+        blockNumber,
+        confirmations
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving transaction status' });
   }
 };

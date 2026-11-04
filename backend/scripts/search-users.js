@@ -112,7 +112,7 @@ async function searchUsers(criteria) {
 
       console.log('\n💼 Blockchain Information:');
       console.log('Wallet Address:', user.wallet_address || 'Not set');
-      console.log('AVAX Address:', user.avax_address || 'Not set');
+      console.log('Wallet Address:', user.wallet_address || user.avax_address || 'Not set');
       console.log('Blockchain Status:', user.blockchain_status);
       console.log('Blockchain Expiry:', user.blockchain_expiry || 'No expiry');
 

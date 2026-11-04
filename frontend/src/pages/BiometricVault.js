@@ -175,7 +175,7 @@ const BiometricVault = () => {
           <Typography sx={{ color: isLight ? '#64748b' : '#8b949e' }}>Biometric Vault</Typography>
           <span>/</span>
           <Typography sx={{ color: isLight ? '#0f172a' : '#f8fafc', fontWeight: 700, fontFamily: 'monospace' }}>
-            {user?.government_id || 'JIFPM9413P'}
+            {user?.government_id || ''}
           </Typography>
         </Box>
 
@@ -205,7 +205,7 @@ const BiometricVault = () => {
         </Box>
       </Box>
 
-      {/* 2. Top Sovereign Biometric Banner (Dashboard Style) */}
+      {/* 2. Top Biometric Banner (Dashboard Style) */}
       <Card
         sx={{
           p: { xs: 2.5, md: 3 },
@@ -477,7 +477,7 @@ const BiometricVault = () => {
               }}
             >
               <BiometricVerification
-                userId={user?.id || 2}
+                userId={user?.id}
                 onVerificationComplete={handleVerificationComplete}
               />
             </Box>

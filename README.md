@@ -10,7 +10,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-v14+-green.svg)](https://nodejs.org)
 [![React](https://img.shields.io/badge/React-v18+-61DAFB?logo=react)](https://reactjs.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-v13+-336791?logo=postgresql)](https://www.postgresql.org)
-[![Avalanche](https://img.shields.io/badge/Avalanche-Fuji-orange?logo=avalanche)](https://www.avax.network)
+[![Ethereum](https://img.shields.io/badge/Ethereum-Sepolia-blue?logo=ethereum)](https://ethereum.org)
 [![Android](https://img.shields.io/badge/Android-SDK%2021+-3DDC84?logo=android)](https://developer.android.com)
 
 Secure biometric authentication backed by blockchain — tamper-proof, privacy-first, and built for scale.
@@ -129,7 +129,7 @@ TrueID combines blockchain technology with biometric authentication to create a 
 <details>
 <summary><b>⛓️ 3. Blockchain Layer</b></summary>
 
-- 📜 **Smart Contracts**: Avalanche Fuji deployment
+- 📜 **Smart Contracts**: Ethereum Sepolia deployment
 - ✍️ **Multi-sig**: Identity verification
 - 📚 **History**: Immutable records
 - ⏱️ **Audit Trail**: Timestamp verification
@@ -255,10 +255,10 @@ TrueID/
         </a>
       </td>
       <td align="center">
-        <a href="https://docs.avax.network/quickstart/fuji-workflow">
-          <img src="docs/assets/avalanche.png" width="50" alt="Avalanche"/>
+        <a href="https://sepolia.etherscan.io">
+          <img src="https://raw.githubusercontent.com/ethereum/ethereum-org-website/master/src/assets/assets/eth-diamond-purple.png" width="50" alt="Ethereum"/>
           <br/>
-          <sub>Avalanche Fuji</sub>
+          <sub>Ethereum Sepolia</sub>
         </a>
       </td>
     </tr>
@@ -300,7 +300,7 @@ TrueID/
       <td align="center">
         <b>6. Deploy</b>
         <br/>
-        <code>cd backend && npm run blockchain:deploy:fuji</code>
+        <code>cd backend && npm run blockchain:deploy:sepolia</code>
       </td>
     </tr>
   </table>
@@ -331,8 +331,9 @@ JWT_EXPIRATION=1h
 REFRESH_TOKEN_SECRET=your_refresh_token_secret
 REFRESH_TOKEN_EXPIRATION=7d
 
-# Blockchain
-BLOCKCHAIN_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
+# Blockchain (Ethereum Sepolia)
+SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+BLOCKCHAIN_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 CONTRACT_ADDRESS=your_contract_address
 ADMIN_WALLET_PRIVATE_KEY=your_private_key
 ```
@@ -343,9 +344,9 @@ ADMIN_WALLET_PRIVATE_KEY=your_private_key
 REACT_APP_API_URL=http://localhost:5000
 
 # Blockchain Configuration
-REACT_APP_AVALANCHE_CONTRACT_ADDRESS=your_contract_address
-REACT_APP_AVALANCHE_NETWORK=fuji
-REACT_APP_AVALANCHE_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
+REACT_APP_CONTRACT_ADDRESS=your_contract_address
+REACT_APP_BLOCKCHAIN_NETWORK=sepolia
+REACT_APP_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 ```
 
 #### Government Portal (.env)
@@ -355,7 +356,7 @@ PORT=8000
 
 # API Configuration
 REACT_APP_API_URL=http://localhost:5000
-REACT_APP_AVALANCHE_CONTRACT_ADDRESS=your_contract_address
+REACT_APP_CONTRACT_ADDRESS=your_contract_address
 ```
 </details>
 
@@ -643,8 +644,8 @@ node setup.js
 - Creates the database if it doesn't exist
 - Runs the schema and migrations
 - Configures JWT secrets (auto-generates or lets you enter your own)
-- Asks for Avalanche wallet private key and derives the address
-- Optionally deploys the smart contract to Avalanche Fuji testnet
+- Asks for Ethereum wallet private key and derives the address
+- Optionally deploys the smart contract suite to Ethereum Sepolia testnet
 - Creates the initial admin account (argon2-hashed password)
 - Writes the complete `.env` file (backs up old one if present)
 - Prints a summary and next steps

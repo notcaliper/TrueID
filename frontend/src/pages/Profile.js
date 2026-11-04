@@ -67,28 +67,34 @@ const Profile = () => {
   const [copied, setCopied] = useState(false);
 
   const [profileData, setProfileData] = useState({
-    name: user?.name || 'Akshay Manbhaw',
-    email: user?.email || 'akshay@trueid.org',
-    phone: user?.phone || '+91 98765 43210',
-    governmentId: user?.government_id || 'JIFPM9413P',
-    did: user?.wallet_address ? `did:trueid:${user.wallet_address}` : 'did:trueid:0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-    lastSync: 'Nov 5, 2026, 12:45 AM'
+    name: user?.name || user?.full_name || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    governmentId: user?.government_id || '',
+    did: user?.wallet_address ? `did:trueid:${user.wallet_address}` : '',
+    verifiedBy: '',
+    lastSync: ''
   });
 
   const fetchProfile = useCallback(async () => {
     setRefreshing(true);
     setError(null);
     try {
-      const response = await userAPI.getProfile();
-      const userData = response.data?.user || response.data || {};
+      const [response, verRes] = await Promise.allSettled([
+        userAPI.getProfile(),
+        userAPI.getVerificationStatus()
+      ]);
+      const userData = response.status === 'fulfilled' ? (response.value?.data?.user || response.value?.data || {}) : {};
+      const verData = verRes.status === 'fulfilled' ? (verRes.value?.data?.data || verRes.value?.data || {}) : {};
       const { name, email, phone, government_id } = userData;
 
       setProfileData(prev => ({
         ...prev,
-        name: name || user?.name || prev.name,
-        email: email || user?.email || prev.email,
-        phone: phone || user?.phone || prev.phone,
-        governmentId: government_id || user?.government_id || prev.governmentId,
+        name: name || user?.name || '',
+        email: email || user?.email || '',
+        phone: phone || user?.phone || '',
+        governmentId: government_id || user?.government_id || '',
+        verifiedBy: verData.verifiedBy ? `Notary Admin (@${verData.verifiedBy})` : (userData.is_verified || user?.is_verified ? 'TrueID Identity Registry' : 'Pending Verification'),
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
 
@@ -156,27 +162,28 @@ const Profile = () => {
     await fetchProfile();
   };
 
-  const displayName = profileData.name || user?.name || 'Akshay Manbhaw';
-  const userInitials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'AM';
+  const displayName = profileData.name || user?.name || user?.username || '';
+  const userInitials = displayName ? displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ID';
 
   // 4 Core Identity Pillars (Consistent with Dashboard)
+  const isVerifiedUser = user?.is_verified || user?.verification_status === 'VERIFIED';
   const profilePillars = [
     {
       title: 'National KYC Identity',
-      idVal: profileData.governmentId,
-      status: 'VERIFIED & NOTARIZED',
-      desc: 'Issued by Digital ID Authority • Official Government Seal Bound',
-      tag: 'Authority Seal',
-      color: '#2563eb',
-      bg: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.12)',
+      idVal: profileData.governmentId || 'Not Registered',
+      status: isVerifiedUser ? 'VERIFIED' : 'PENDING',
+      desc: isVerifiedUser ? 'Identity record officially verified on record' : 'Awaiting identity verification check',
+      tag: isVerifiedUser ? 'Verified' : 'Pending',
+      color: isVerifiedUser ? '#16a34a' : '#d97706',
+      bg: isLight ? (isVerifiedUser ? '#eff6ff' : '#fffbeb') : (isVerifiedUser ? 'rgba(37, 99, 235, 0.12)' : 'rgba(217, 119, 6, 0.12)'),
       icon: <BadgeRounded sx={{ fontSize: 24 }} />
     },
     {
       title: '3D FaceMesh Biometrics',
-      idVal: '68 Nodes • Active Enclave',
-      status: 'PROOF-OF-LIVENESS PASSED',
-      desc: 'Hardware secured facial geometry • 0.99 match confidence',
-      tag: 'Hardware Enclave',
+      idVal: user?.facemesh_hash ? 'Enrolled Active Enclave' : 'Not Enrolled',
+      status: user?.facemesh_hash ? 'LIVENESS VERIFIED' : 'PENDING SCAN',
+      desc: user?.facemesh_hash ? 'Hardware secured facial geometry vector active' : 'No biometric vectors enrolled yet',
+      tag: user?.facemesh_hash ? 'Enrolled' : 'Not Enrolled',
       color: '#7c3aed',
       bg: isLight ? '#f5f3ff' : 'rgba(124, 58, 237, 0.12)',
       icon: <FingerprintRounded sx={{ fontSize: 24 }} />
@@ -403,7 +410,7 @@ const Profile = () => {
             </Box>
           </Box>
 
-          {/* Right: Quick Biometric Action & Sovereign Tier */}
+          {/* Right: Quick Biometric Action & Verification Tier */}
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', md: 'flex-end' }, gap: 1.5 }}>
             <Box
               sx={{
@@ -760,7 +767,7 @@ const Profile = () => {
                       ISSUING AUTHORITY
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#0f172a' : '#ffffff', mt: 0.3 }}>
-                      Ministry of Electronics & IT (Notary #01)
+                      {profileData.verifiedBy || (user?.is_verified ? 'TrueID Identity Registry' : 'Pending Verification')}
                     </Typography>
                   </Box>
 
@@ -771,7 +778,7 @@ const Profile = () => {
                       SHA-256 NOTARY AUDIT HASH
                     </Typography>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#2563eb', fontSize: '0.78rem', wordBreak: 'break-all', mt: 0.3 }}>
-                      0x4f8e91d2c3b4a567890123456789abcdef0123456789abcd
+                      {user?.biometric_hash || user?.wallet_address || 'Not Enrolled'}
                     </Typography>
                   </Box>
                 </Box>
@@ -889,7 +896,7 @@ const Profile = () => {
                     CONTROLLER PUBLIC KEY
                   </Typography>
                   <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isLight ? '#f1f5f9' : '#1e2124', fontFamily: 'monospace', fontSize: '0.8rem', color: '#2563eb', mt: 0.5, wordBreak: 'break-all' }}>
-                    0x98a123f890123456789abcdef0123456789abcdef0123456789abcdef0123456
+                    {user?.wallet_address || 'Not Configured'}
                   </Box>
                 </Box>
 
@@ -898,7 +905,7 @@ const Profile = () => {
                     SOULBOUND SMART CONTRACT ROOT
                   </Typography>
                   <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isLight ? '#f1f5f9' : '#1e2124', fontFamily: 'monospace', fontSize: '0.8rem', color: '#16a34a', mt: 0.5, wordBreak: 'break-all' }}>
-                    0x266B577380aE3De838A66DEf28fffD5e75c5816E
+                    {process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf'}
                   </Box>
                 </Box>
               </Box>
@@ -1052,11 +1059,11 @@ const Profile = () => {
             ID: {profileData.governmentId}
           </Typography>
           <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', display: 'block', mb: 2 }}>
-            Cryptographically sealed and signed by TrueID Sovereign Network.
+            Cryptographically sealed and signed by TrueID Network.
           </Typography>
 
           <Chip
-            label="SOVEREIGN CITIZEN ATTESTATION"
+            label="VERIFIED CITIZEN ATTESTATION"
             size="small"
             sx={{ bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 800, fontSize: '0.7rem' }}
           />

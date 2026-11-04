@@ -7,7 +7,7 @@
  *   3. Create the database & run schema
  *   4. Configure JWT secrets (auto-generate or manual)
  *   5. Configure blockchain wallet (private key, RPC URL)
- *   6. Optionally deploy the smart contract to Avalanche Fuji
+ *   6. Optionally deploy the smart contract suite to Ethereum Sepolia
  *   7. Create the initial admin account
  *   8. Write the .env file
  *   9. Test the connection
@@ -151,10 +151,9 @@ async function main() {
     JWT_EXPIRATION: '24h',
     REFRESH_TOKEN_SECRET: '',
     REFRESH_TOKEN_EXPIRATION: '7d',
-    BLOCKCHAIN_RPC_URL: 'https://api.avax-test.network/ext/bc/C/rpc',
-    AVALANCHE_FUJI_RPC_URL: 'https://api.avax-test.network/ext/bc/C/rpc',
+    BLOCKCHAIN_RPC_URL: 'https://ethereum-sepolia-rpc.publicnode.com',
+    SEPOLIA_RPC_URL: 'https://ethereum-sepolia-rpc.publicnode.com',
     CONTRACT_ADDRESS: '',
-    AVALANCHE_FUJI_CONTRACT_ADDRESS: '',
     ADMIN_WALLET_PRIVATE_KEY: '',
     ADMIN_WALLET_ADDRESS: '',
     ADMIN_PRIVATE_KEY: '',
@@ -351,18 +350,18 @@ async function main() {
 
   // ─── Step 6: Blockchain / Wallet Configuration ────────────────────────────
 
-  section('Step 6/8 — Blockchain & Wallet (Avalanche Fuji Testnet)');
+  section('Step 6/8 — Blockchain & Wallet (Ethereum Sepolia Testnet)');
 
-  console.log('  The system uses Avalanche Fuji C-Chain for on-chain identity.\n');
+  console.log('  The system uses Ethereum Sepolia for on-chain identity.\n');
 
   const configureBlockchain = await askYesNo('Configure blockchain now?', true);
 
   if (configureBlockchain) {
-    config.BLOCKCHAIN_RPC_URL = await ask('Avalanche Fuji RPC URL', 'https://api.avax-test.network/ext/bc/C/rpc');
-    config.AVALANCHE_FUJI_RPC_URL = config.BLOCKCHAIN_RPC_URL;
+    config.BLOCKCHAIN_RPC_URL = await ask('Ethereum Sepolia RPC URL', 'https://ethereum-sepolia-rpc.publicnode.com');
+    config.SEPOLIA_RPC_URL = config.BLOCKCHAIN_RPC_URL;
 
     console.log('\n  You need an admin wallet private key to sign transactions.');
-    console.log('  Get testnet AVAX from: https://faucet.avax.network/\n');
+    console.log('  Get testnet Sepolia ETH from: https://sepoliafaucet.com/\n');
 
     config.ADMIN_WALLET_PRIVATE_KEY = await askPassword('Admin wallet private key (without 0x prefix)');
     // Strip 0x if provided
@@ -383,11 +382,11 @@ async function main() {
         try {
           const provider = new ethers.providers.JsonRpcProvider(config.BLOCKCHAIN_RPC_URL);
           const balance = await provider.getBalance(wallet.address);
-          const avax = ethers.utils.formatEther(balance);
-          if (parseFloat(avax) > 0) {
-            success(`Wallet balance: ${avax} AVAX`);
+          const eth = ethers.formatEther ? ethers.formatEther(balance) : ethers.utils.formatEther(balance);
+          if (parseFloat(eth) > 0) {
+            success(`Wallet balance: ${eth} ETH`);
           } else {
-            warn(`Wallet balance: 0 AVAX — Get testnet tokens from https://faucet.avax.network/`);
+            warn(`Wallet balance: 0 ETH — Get testnet tokens from Sepolia faucet`);
           }
         } catch {
           warn('Could not check wallet balance (RPC may be unreachable).');
@@ -403,7 +402,7 @@ async function main() {
 
     // Contract address
     console.log('');
-    const existingDeployment = path.join(backendDir, 'blockchain', 'deployments', 'avalanche_fuji-deployment.json');
+    const existingDeployment = path.join(backendDir, 'blockchain', 'deployments', 'sepolia-suite-deployment.json');
     let existingContract = '';
     if (fs.existsSync(existingDeployment)) {
       try {
@@ -418,67 +417,38 @@ async function main() {
 
     if (hasContract) {
       config.CONTRACT_ADDRESS = await ask('Contract address', existingContract);
-      config.AVALANCHE_FUJI_CONTRACT_ADDRESS = config.CONTRACT_ADDRESS;
       success('Contract address configured.');
     } else {
       console.log('');
-      const deployNow = await askYesNo('Deploy the IdentityManagement contract now?', true);
+      const deployNow = await askYesNo('Deploy the smart contract suite now?', true);
       if (deployNow) {
-        console.log('\n  Deploying contract to Avalanche Fuji Testnet...');
+        console.log('\n  Deploying contract suite to Ethereum Sepolia Testnet...');
         console.log('  This may take 30-60 seconds...\n');
 
-        // Write a temporary .env so hardhat can read the private key
-        const tempEnv = `ADMIN_PRIVATE_KEY=0x${config.ADMIN_WALLET_PRIVATE_KEY}\nAVALANCHE_FUJI_RPC_URL=${config.BLOCKCHAIN_RPC_URL}\n`;
-        fs.writeFileSync(envFile, tempEnv);
-
         try {
-          const deployScript = path.join(backendDir, 'blockchain', 'scripts', 'deploy-avalanche-proxy.js');
-          const altDeployScript = path.join(backendDir, 'blockchain', 'deploy.js');
-          let deployCmd;
-
-          if (fs.existsSync(deployScript)) {
-            deployCmd = `npx hardhat run --network avalanche_fuji "${deployScript}"`;
-          } else if (fs.existsSync(altDeployScript)) {
-            deployCmd = `node "${altDeployScript}"`;
-          }
+          const deployScript = path.join(backendDir, 'blockchain', 'scripts', 'deploy_suite.js');
+          let deployCmd = `node "${deployScript}"`;
 
           if (deployCmd) {
             const output = execSync(deployCmd, { cwd: backendDir, encoding: 'utf8', timeout: 120000 });
             console.log(output);
 
-            // Try to read the deployment result
-            if (fs.existsSync(existingDeployment)) {
-              const dep = JSON.parse(fs.readFileSync(existingDeployment, 'utf8'));
-              config.CONTRACT_ADDRESS = dep.contractAddress || '';
-              config.AVALANCHE_FUJI_CONTRACT_ADDRESS = config.CONTRACT_ADDRESS;
-              success(`Contract deployed at: ${config.CONTRACT_ADDRESS}`);
+            const match = output.match(/Identity Management:\s+(0x[a-fA-F0-9]{40})/);
+            if (match) {
+              config.CONTRACT_ADDRESS = match[1];
+              success(`Contract suite deployed! IdentityManagement at: ${config.CONTRACT_ADDRESS}`);
             } else {
-              // Try to parse address from output
-              const match = output.match(/0x[a-fA-F0-9]{40}/);
-              if (match) {
-                config.CONTRACT_ADDRESS = match[0];
-                config.AVALANCHE_FUJI_CONTRACT_ADDRESS = config.CONTRACT_ADDRESS;
-                success(`Contract deployed at: ${config.CONTRACT_ADDRESS}`);
-              } else {
-                warn('Could not auto-detect contract address from deploy output.');
-                config.CONTRACT_ADDRESS = await ask('Enter the deployed contract address');
-                config.AVALANCHE_FUJI_CONTRACT_ADDRESS = config.CONTRACT_ADDRESS;
-              }
+              config.CONTRACT_ADDRESS = await ask('Enter the deployed contract address');
             }
-          } else {
-            warn('No deploy script found. Please deploy manually and enter the address.');
-            config.CONTRACT_ADDRESS = await ask('Contract address');
-            config.AVALANCHE_FUJI_CONTRACT_ADDRESS = config.CONTRACT_ADDRESS;
           }
         } catch (err) {
           fail(`Deployment failed: ${err.message}`);
-          warn('You can deploy later with: npm run blockchain:deploy:fuji');
+          warn('You can deploy later with: npm run blockchain:deploy:sepolia');
           config.CONTRACT_ADDRESS = await ask('Contract address (leave blank to skip)', '');
-          config.AVALANCHE_FUJI_CONTRACT_ADDRESS = config.CONTRACT_ADDRESS;
         }
       } else {
         info('Skipping contract deployment.');
-        info('Deploy later with: npm run blockchain:deploy:fuji');
+        info('Deploy later with: npm run blockchain:deploy:sepolia');
       }
     }
   } else {
@@ -571,11 +541,10 @@ JWT_EXPIRATION=${config.JWT_EXPIRATION}
 REFRESH_TOKEN_SECRET=${config.REFRESH_TOKEN_SECRET}
 REFRESH_TOKEN_EXPIRATION=${config.REFRESH_TOKEN_EXPIRATION}
 
-# Blockchain Configuration (Avalanche Fuji Testnet)
-BLOCKCHAIN_RPC_URL=${config.BLOCKCHAIN_RPC_URL}
-AVALANCHE_FUJI_RPC_URL=${config.AVALANCHE_FUJI_RPC_URL}
+# Blockchain Configuration (Ethereum Sepolia Testnet)
+BLOCKCHAIN_RPC_URL=${config.BLOCKCHAIN_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com'}
+SEPOLIA_RPC_URL=${config.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com'}
 CONTRACT_ADDRESS=${config.CONTRACT_ADDRESS}
-AVALANCHE_FUJI_CONTRACT_ADDRESS=${config.AVALANCHE_FUJI_CONTRACT_ADDRESS}
 ADMIN_WALLET_PRIVATE_KEY=${config.ADMIN_WALLET_PRIVATE_KEY}
 ADMIN_WALLET_ADDRESS=${config.ADMIN_WALLET_ADDRESS}
 ADMIN_PRIVATE_KEY=${config.ADMIN_PRIVATE_KEY ? '0x' + config.ADMIN_PRIVATE_KEY : ''}
@@ -621,7 +590,7 @@ INITIAL_ADMIN_PASSWORD=${config.INITIAL_ADMIN_PASSWORD}
   console.log('\n  Next steps:');
   if (!config.CONTRACT_ADDRESS) {
     console.log('    1. Deploy the smart contract:');
-    console.log('       npm run blockchain:deploy:fuji');
+    console.log('       npm run blockchain:deploy:sepolia');
     console.log('       Then add CONTRACT_ADDRESS to your .env file\n');
   }
   console.log('    Start the server:');

@@ -59,7 +59,7 @@ const Layout = () => {
   const [copied, setCopied] = useState(false);
   const [searchVal, setSearchVal] = useState('');
 
-  const citizenAddress = user?.wallet_address || user?.avax_address || '0xc628d3e2b63cCeb6038Ffe05A8E18B1e9304BBC5';
+  const citizenAddress = user?.wallet_address || '';
 
   const isTabActive = (path) => {
     if (path === '/') return location.pathname === '/' || location.pathname === '/dashboard';
@@ -204,7 +204,7 @@ const Layout = () => {
               }}
             >
               <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: theme.palette.text.primary, display: { xs: 'none', sm: 'block' } }}>
-                {user?.name || user?.username || 'NotAkshay'}
+                {user?.name || user?.username || ''}
               </Typography>
               <Avatar
                 sx={{
@@ -215,7 +215,7 @@ const Layout = () => {
                   fontWeight: 700
                 }}
               >
-                {(user?.name || user?.username || 'U')[0].toUpperCase()}
+                {(user?.name || user?.username || 'ID')[0].toUpperCase()}
               </Avatar>
             </Box>
 

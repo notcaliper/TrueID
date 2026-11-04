@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS users (
     soulbound_badge_minted BOOLEAN DEFAULT FALSE,
     
     -- Backward compatibility fields
+    wallet_address TEXT,
     avax_address TEXT,
     avax_private_key TEXT,
     

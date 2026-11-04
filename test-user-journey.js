@@ -186,9 +186,9 @@ async function registerUser() {
     console.log('Verification Status:', userData.verificationStatus);
     
     // Check if wallet was created automatically during registration
-    if (userData.walletAddress || userData.avaxAddress) {
+    if (userData.walletAddress) {
       console.log('Wallet was automatically created during registration ✅');
-      console.log('Wallet Address:', userData.walletAddress || userData.avaxAddress);
+      console.log('Wallet Address:', userData.walletAddress);
     } else {
       console.log('No wallet address found in user data ❌');
       console.log('This may indicate the wallet service is not properly integrated with registration');
@@ -219,8 +219,8 @@ async function getUserProfileAndWallet() {
     console.log('Has Biometric Data:', profileResponse.hasBiometricData || false);
     console.log('Professional Records Count:', profileResponse.professionalRecordsCount || 0);
     
-    // Check for wallet address (could be walletAddress or avaxAddress depending on implementation)
-    const walletAddress = profile.walletAddress || profile.avaxAddress;
+    // Check for wallet address
+    const walletAddress = profile.walletAddress || profile.wallet_address;
     
     if (walletAddress) {
       console.log('Wallet Address:', walletAddress);
@@ -229,7 +229,7 @@ async function getUserProfileAndWallet() {
       try {
         const blockchainStatus = await authRequest('get', `${BLOCKCHAIN_API}/status`);
         if (blockchainStatus && blockchainStatus.balance) {
-          console.log('Wallet Balance:', blockchainStatus.balance, 'AVAX');
+          console.log('Wallet Balance:', blockchainStatus.balance, 'ETH');
         } else {
           console.log('Wallet Balance: Not available from blockchain status');
         }
@@ -451,7 +451,7 @@ async function checkBlockchainStatus() {
     const blockchainResponse = await authRequest('get', `${BLOCKCHAIN_API}/status`);
     
     console.log('Blockchain Status:', blockchainResponse.status?.status || 'Unknown');
-    console.log('Wallet Balance:', blockchainResponse.balance || 'Unknown', 'AVAX');
+    console.log('Wallet Balance:', blockchainResponse.balance || 'Unknown', 'ETH');
     
     // Check if identity is on blockchain - this could be indicated by either:
     // 1. The onBlockchain flag
@@ -492,10 +492,10 @@ async function checkBlockchainStatus() {
         }
       }
       
-      // Check contract details on Avalanche Fuji Testnet
+      // Check contract details on Ethereum Sepolia Testnet
       console.log('\nContract Details:');
-      console.log('Network: Avalanche Fuji Testnet');
-      console.log('Contract Address: 0x266B577380aE3De838A66DEf28fffD5e75c5816E');
+      console.log('Network: Ethereum Sepolia Testnet');
+      console.log('Contract Address: 0xDAA6c4D8fc7B4AAc7B6f7724939b6dB548dF1F02');
       
       try {
         // Check if we can get expiry information
@@ -520,7 +520,7 @@ async function checkBlockchainStatus() {
     
     // Check for wallet balance in the response
     if (blockchainResponse.balance) {
-      console.log('Wallet Balance:', blockchainResponse.balance, 'AVAX');
+      console.log('Wallet Balance:', blockchainResponse.balance, 'ETH');
     }
     
     // Log recent transactions if available
