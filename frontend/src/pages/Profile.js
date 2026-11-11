@@ -50,6 +50,10 @@ import ProfessionUploadForm from '../components/ProfessionUploadForm';
 import MFASettings from '../components/MFASettings';
 import BiometricVerification from '../components/BiometricVerification';
 
+const resolveGovId = (u) => u?.government_id || u?.governmentId || '';
+const resolveWallet = (u) => u?.wallet_address || u?.walletAddress || '';
+const resolveDid = (u) => u?.did || (resolveWallet(u) ? `did:trueid:${resolveWallet(u)}` : '');
+
 const Profile = () => {
   const { user, setUser } = useAuth();
   const { isLight } = useColorMode();
@@ -66,14 +70,20 @@ const Profile = () => {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const [profileData, setProfileData] = useState({
-    name: user?.name || user?.full_name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    governmentId: user?.government_id || '',
-    did: user?.wallet_address ? `did:trueid:${user.wallet_address}` : '',
-    verifiedBy: '',
-    lastSync: ''
+  const [profileData, setProfileData] = useState(() => {
+    const govId = resolveGovId(user);
+    const wallet = resolveWallet(user);
+    const did = resolveDid(user);
+    return {
+      name: user?.name || user?.full_name || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      governmentId: govId,
+      walletAddress: wallet,
+      did: did,
+      verifiedBy: '',
+      lastSync: ''
+    };
   });
 
   const fetchProfile = useCallback(async () => {
@@ -86,14 +96,22 @@ const Profile = () => {
       ]);
       const userData = response.status === 'fulfilled' ? (response.value?.data?.user || response.value?.data || {}) : {};
       const verData = verRes.status === 'fulfilled' ? (verRes.value?.data?.data || verRes.value?.data || {}) : {};
-      const { name, email, phone, government_id } = userData;
+      const mergedUser = { ...user, ...userData };
+      const effectiveGovId = resolveGovId(mergedUser);
+      const effectiveWallet = resolveWallet(mergedUser);
+      const effectiveDid = resolveDid(mergedUser);
+      const effectiveName = mergedUser.name || '';
+      const effectiveEmail = mergedUser.email || '';
+      const effectivePhone = mergedUser.phone || '';
 
       setProfileData(prev => ({
         ...prev,
-        name: name || user?.name || '',
-        email: email || user?.email || '',
-        phone: phone || user?.phone || '',
-        governmentId: government_id || user?.government_id || '',
+        name: effectiveName,
+        email: effectiveEmail,
+        phone: effectivePhone,
+        governmentId: effectiveGovId,
+        walletAddress: effectiveWallet,
+        did: effectiveDid,
         verifiedBy: verData.verifiedBy ? `Notary Admin (@${verData.verifiedBy})` : (userData.is_verified || user?.is_verified ? 'TrueID Identity Registry' : 'Pending Verification'),
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
@@ -107,9 +125,10 @@ const Profile = () => {
     }
   }, [user]);
 
+  const userId = user?.id;
   useEffect(() => {
     fetchProfile();
-  }, [fetchProfile]);
+  }, [userId, fetchProfile]);
 
   const handleChange = (e) => {
     setProfileData({

@@ -15,18 +15,35 @@ import {
   Checkbox,
   FormControlLabel,
   Fade,
+  Tooltip,
+  useTheme,
+  Chip
 } from '@mui/material';
-import { Visibility, VisibilityOff, ArrowForward, ArrowBack, CheckCircle, PersonAddOutlined } from '@mui/icons-material';
+import {
+  Visibility,
+  VisibilityOff,
+  ArrowForward,
+  ArrowBack,
+  CheckCircle,
+  ShieldRounded,
+  LightModeRounded,
+  DarkModeRounded,
+  LanRounded,
+  BadgeRounded,
+  AccountCircleRounded,
+  LockRounded
+} from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { useColorMode } from '../context/ThemeContext';
 
-const steps = ['Personal Info', 'Account Setup', 'Verification'];
+const steps = ['Personal Info', 'Account Setup', 'Security & Terms'];
 
 // Keyframes for background animation
 const float1 = `
   @keyframes float1 {
     0% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(30px, -50px) scale(1.1); }
-    66% { transform: translate(-20px, 20px) scale(0.9); }
+    33% { transform: translate(25px, -40px) scale(1.08); }
+    66% { transform: translate(-15px, 20px) scale(0.92); }
     100% { transform: translate(0, 0) scale(1); }
   }
 `;
@@ -34,23 +51,18 @@ const float1 = `
 const float2 = `
   @keyframes float2 {
     0% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(-30px, 50px) scale(1.2); }
-    66% { transform: translate(20px, -20px) scale(0.8); }
+    33% { transform: translate(-25px, 40px) scale(1.1); }
+    66% { transform: translate(15px, -20px) scale(0.9); }
     100% { transform: translate(0, 0) scale(1); }
-  }
-`;
-
-const pulseGlow = `
-  @keyframes pulseGlow {
-    0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
-    70% { box-shadow: 0 0 0 10px rgba(139, 92, 246, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
   }
 `;
 
 const Register = () => {
   const { register, isAuthenticated, loading, error } = useAuth();
+  const { isLight, toggleTheme } = useColorMode();
+  const theme = useTheme();
   const navigate = useNavigate();
+  
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -81,18 +93,18 @@ const Register = () => {
   const validateStep = () => {
     switch (activeStep) {
       case 0:
-        if (!formData.firstName || !formData.lastName) return 'Please enter your full name';
-        if (!formData.governmentId) return 'Government ID is required';
+        if (!formData.firstName?.trim() || !formData.lastName?.trim()) return 'Please enter your full legal name';
+        if (!formData.governmentId?.trim()) return 'National Citizen Identifier (Gov ID) is required';
         break;
       case 1:
-        if (!formData.username) return 'Username is required';
-        if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) return 'Valid email is required';
-        if (!formData.phone) return 'Phone number is required';
+        if (!formData.username?.trim()) return 'Username is required';
+        if (!formData.email?.trim() || !/\S+@\S+\.\S+/.test(formData.email)) return 'Valid email address is required';
+        if (!formData.phone?.trim()) return 'Phone number is required';
         break;
       case 2:
-        if (!formData.password || formData.password.length < 8) return 'Password must be at least 8 characters';
+        if (!formData.password || formData.password.length < 8) return 'Password must be at least 8 characters long';
         if (formData.password !== formData.confirmPassword) return 'Passwords do not match';
-        if (!formData.agreeTerms) return 'You must agree to the terms';
+        if (!formData.agreeTerms) return 'You must accept the terms of service';
         break;
       default:
         return null;
@@ -117,27 +129,51 @@ const Register = () => {
 
   const handleBack = () => setActiveStep((prev) => prev - 1);
 
+  // Common input styling to match theme perfectly
+  const inputStyle = {
+    mb: 2.5,
+    '& .MuiOutlinedInput-root': {
+      bgcolor: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)',
+      borderRadius: '12px',
+      color: theme.palette.text.primary,
+      '& fieldset': {
+        borderColor: isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)',
+      },
+      '&:hover fieldset': {
+        borderColor: isLight ? '#94a3b8' : 'rgba(255, 255, 255, 0.3)',
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: '#2563eb',
+      },
+    },
+    '& .MuiInputLabel-root': {
+      color: theme.palette.text.secondary,
+      '&.Mui-focused': { color: '#2563eb' }
+    }
+  };
+
   const renderStepContent = (step) => {
     switch (step) {
       case 0:
         return (
           <Fade in={true}>
             <Box>
-              <Typography variant="h6" fontWeight={600} gutterBottom color="text.primary">
-                Personal Information
+              <Typography variant="h6" sx={{ fontWeight: 800, color: theme.palette.text.primary, mb: 0.5, letterSpacing: '-0.01em' }}>
+                Legal Citizen Identity
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Enter your legal name and government ID for verification
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 3 }}>
+                Enter your legal name and national citizen identifier for cryptographic attestation
               </Typography>
-              <Box sx={{ display: 'flex', gap: 2, mb: 2.5 }}>
+              
+              <Box sx={{ display: 'flex', gap: 2, mb: 2.5, flexDirection: { xs: 'column', sm: 'row' } }}>
                 <TextField
                   fullWidth
                   name="firstName"
                   label="First Name"
                   value={formData.firstName}
                   onChange={handleChange}
-                  placeholder="John"
-                  InputProps={{ sx: { color: '#fff' } }}
+                  placeholder="e.g. Akshay"
+                  sx={inputStyle}
                 />
                 <TextField
                   fullWidth
@@ -145,94 +181,102 @@ const Register = () => {
                   label="Last Name"
                   value={formData.lastName}
                   onChange={handleChange}
-                  placeholder="Doe"
-                  InputProps={{ sx: { color: '#fff' } }}
+                  placeholder="e.g. Manbhaw"
+                  sx={inputStyle}
                 />
               </Box>
+
               <TextField
                 fullWidth
                 name="governmentId"
-                label="Government ID Number"
+                label="National Citizen Identifier (Gov ID)"
                 value={formData.governmentId}
                 onChange={handleChange}
-                placeholder="e.g., SSN, Passport, National ID"
-                InputProps={{ sx: { color: '#fff' } }}
-                sx={{ mb: 2.5 }}
+                placeholder="e.g. JIFPM9413P"
+                helperText="Used to generate your unique decentralized identifier (DID)"
+                sx={{
+                  ...inputStyle,
+                  '& .MuiFormHelperText-root': {
+                    color: theme.palette.text.secondary,
+                    fontSize: '0.74rem'
+                  }
+                }}
               />
             </Box>
           </Fade>
         );
+
       case 1:
         return (
           <Fade in={true}>
             <Box>
-              <Typography variant="h6" fontWeight={600} gutterBottom color="text.primary">
-                Account Details
+              <Typography variant="h6" sx={{ fontWeight: 800, color: theme.palette.text.primary, mb: 0.5, letterSpacing: '-0.01em' }}>
+                Account Setup
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Create your login credentials
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 3 }}>
+                Configure your decentralized wallet username and contact information
               </Typography>
+
               <TextField
                 fullWidth
                 name="username"
                 label="Username"
                 value={formData.username}
                 onChange={handleChange}
-                placeholder="Choose a unique username"
-                InputProps={{ sx: { color: '#fff' } }}
-                sx={{ mb: 2.5 }}
+                placeholder="e.g. NotAkshay"
+                sx={inputStyle}
               />
+
               <TextField
                 fullWidth
                 name="email"
-                label="Email Address"
                 type="email"
+                label="Email Address"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="your@email.com"
-                InputProps={{ sx: { color: '#fff' } }}
-                sx={{ mb: 2.5 }}
+                placeholder="e.g. akshay@trueid.org"
+                sx={inputStyle}
               />
+
               <TextField
                 fullWidth
                 name="phone"
                 label="Phone Number"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="+1 (555) 000-0000"
-                InputProps={{ sx: { color: '#fff' } }}
+                placeholder="e.g. +1 555 019 2834"
+                sx={inputStyle}
               />
             </Box>
           </Fade>
         );
+
       case 2:
         return (
           <Fade in={true}>
             <Box>
-              <Typography variant="h6" fontWeight={600} gutterBottom color="text.primary">
-                Security Setup
+              <Typography variant="h6" sx={{ fontWeight: 800, color: theme.palette.text.primary, mb: 0.5, letterSpacing: '-0.01em' }}>
+                Security & Verification
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Create a secure password for your account
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 3 }}>
+                Establish your cryptographic master key and agree to trust guidelines
               </Typography>
+
               <TextField
                 fullWidth
                 name="password"
-                label="Password"
                 type={showPassword ? 'text' : 'password'}
+                label="Master Password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Min 8 characters"
-                sx={{ mb: 2.5 }}
+                sx={inputStyle}
                 InputProps={{
-                  sx: { color: '#fff' },
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton 
-                        onClick={() => setShowPassword(!showPassword)} 
-                        edge="end" 
-                        size="small"
-                        sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#fff' } }}
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                        sx={{ color: theme.palette.text.secondary }}
                       >
                         {showPassword ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
@@ -240,40 +284,42 @@ const Register = () => {
                   ),
                 }}
               />
+
               <TextField
                 fullWidth
                 name="confirmPassword"
-                label="Confirm Password"
                 type={showPassword ? 'text' : 'password'}
+                label="Confirm Master Password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                placeholder="Re-enter password"
-                InputProps={{ sx: { color: '#fff' } }}
-                sx={{ mb: 2.5 }}
+                sx={inputStyle}
               />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    name="agreeTerms"
-                    checked={formData.agreeTerms}
-                    onChange={handleChange}
-                    size="small"
-                    sx={{ 
-                      color: 'rgba(255,255,255,0.3)',
-                      '&.Mui-checked': { color: '#6366f1' }
-                    }}
-                  />
-                }
-                label={
-                  <Typography variant="body2" color="text.secondary">
-                    I agree to the <Link sx={{ color: '#818cf8', cursor: 'pointer' }}>Terms of Service</Link> and{' '}
-                    <Link sx={{ color: '#818cf8', cursor: 'pointer' }}>Privacy Policy</Link>
-                  </Typography>
-                }
-              />
+
+              <Box sx={{ mt: 1, mb: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      name="agreeTerms"
+                      checked={formData.agreeTerms}
+                      onChange={handleChange}
+                      size="small"
+                      sx={{ 
+                        color: isLight ? '#94a3b8' : 'rgba(255, 255, 255, 0.3)',
+                        '&.Mui-checked': { color: '#2563eb' }
+                      }}
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontSize: '0.84rem' }}>
+                      I agree to the TrueID Identity Trust Framework and W3C DID Specification.
+                    </Typography>
+                  }
+                />
+              </Box>
             </Box>
           </Fade>
         );
+
       default:
         return null;
     }
@@ -284,167 +330,326 @@ const Register = () => {
       sx={{ 
         minHeight: '100vh', 
         display: 'flex', 
+        flexDirection: 'column',
         alignItems: 'center', 
         justifyContent: 'center',
-        background: '#0a0e17',
+        bgcolor: isLight ? '#f8fafc' : '#0a0e17',
+        color: theme.palette.text.primary,
         position: 'relative',
         overflow: 'hidden',
+        py: { xs: 4, md: 6 },
+        px: 2,
+        transition: 'background-color 0.3s ease, color 0.3s ease',
       }}
     >
       <style>{float1}</style>
       <style>{float2}</style>
-      <style>{pulseGlow}</style>
 
-      {/* Subtle Ambient Gradients */}
+      {/* Top Floating Controls: Brand & Theme Toggle */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 16,
+          left: { xs: 16, sm: 32 },
+          right: { xs: 16, sm: 32 },
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          zIndex: 10,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+          <Box
+            sx={{
+              width: 38,
+              height: 38,
+              borderRadius: 2,
+              bgcolor: '#2563eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)',
+            }}
+          >
+            <ShieldRounded sx={{ color: '#ffffff', fontSize: 22 }} />
+          </Box>
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.02em', color: theme.palette.text.primary }}>
+              TrueID
+            </Typography>
+            <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.68rem', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700 }}>
+              Decentralized Identity
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Theme Toggle Button */}
+        <Tooltip title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}>
+          <IconButton
+            onClick={toggleTheme}
+            size="small"
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.12)'}`,
+              bgcolor: isLight ? '#ffffff' : '#181a1c',
+              color: isLight ? '#1e293b' : '#f8fafc',
+              boxShadow: isLight ? '0 2px 8px rgba(15, 23, 42, 0.06)' : '0 2px 10px rgba(0, 0, 0, 0.4)',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                bgcolor: isLight ? '#f1f5f9' : '#22252a',
+                transform: 'scale(1.05)',
+              },
+            }}
+          >
+            {isLight ? (
+              <DarkModeRounded sx={{ fontSize: 20, color: '#475569' }} />
+            ) : (
+              <LightModeRounded sx={{ fontSize: 20, color: '#facc15' }} />
+            )}
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* Ambient Gradient Orbs */}
       <Box
         sx={{
           position: 'absolute',
           top: '-15%',
-          right: '-10%',
-          width: '55vw',
-          height: '55vw',
-          background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, rgba(10,14,23,0) 70%)',
+          left: '-10%',
+          width: { xs: '80vw', md: '50vw' },
+          height: { xs: '80vw', md: '50vw' },
+          background: isLight 
+            ? 'radial-gradient(circle, rgba(37,99,235,0.08) 0%, rgba(248,250,252,0) 70%)'
+            : 'radial-gradient(circle, rgba(99,102,241,0.14) 0%, rgba(10,14,23,0) 70%)',
           borderRadius: '50%',
-          animation: 'float1 22s infinite ease-in-out',
+          animation: 'float1 20s infinite ease-in-out',
           zIndex: 0,
+          pointerEvents: 'none',
         }}
       />
       <Box
         sx={{
           position: 'absolute',
-          bottom: '-20%',
-          left: '-10%',
-          width: '50vw',
-          height: '50vw',
-          background: 'radial-gradient(circle, rgba(16,185,129,0.08) 0%, rgba(10,14,23,0) 70%)',
+          bottom: '-15%',
+          right: '-10%',
+          width: { xs: '75vw', md: '45vw' },
+          height: { xs: '75vw', md: '45vw' },
+          background: isLight 
+            ? 'radial-gradient(circle, rgba(16,185,129,0.06) 0%, rgba(248,250,252,0) 70%)'
+            : 'radial-gradient(circle, rgba(16,185,129,0.09) 0%, rgba(10,14,23,0) 70%)',
           borderRadius: '50%',
-          animation: 'float2 28s infinite ease-in-out reverse',
+          animation: 'float2 25s infinite ease-in-out reverse',
           zIndex: 0,
+          pointerEvents: 'none',
         }}
       />
 
-      <Fade in={mounted} timeout={800}>
+      <Fade in={mounted} timeout={700}>
         <Box
           sx={{
             width: '100%',
-            maxWidth: 1020,
+            maxWidth: 1040,
             display: 'flex',
             flexDirection: { xs: 'column', md: 'row' },
-            mx: 2,
             position: 'relative',
             zIndex: 1,
-            backgroundColor: 'rgba(17, 24, 39, 0.8)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '20px',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.1)',
+            mt: { xs: 7, md: 4 },
+            bgcolor: isLight ? '#ffffff' : 'rgba(24, 26, 28, 0.92)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+            borderRadius: { xs: '18px', md: '24px' },
+            boxShadow: isLight 
+              ? '0 20px 45px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)' 
+              : '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 1px rgba(255, 255, 255, 0.1)',
             overflow: 'hidden',
+            transition: 'all 0.3s ease',
           }}
         >
-          {/* Left Side - Branding (Fintech Panel) */}
+          {/* Left Side - Step Progress & Identity System Details */}
           <Box
             sx={{
               flex: 1,
-              p: { xs: 4, md: 6 },
-              display: { xs: 'none', md: 'flex' },
+              p: { xs: 3.5, sm: 5, md: 6 },
+              display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
-              borderRight: '1px solid rgba(255,255,255,0.06)',
-              background: 'linear-gradient(180deg, rgba(99,102,241,0.04) 0%, rgba(16,185,129,0.03) 100%)',
+              justifyContent: 'space-between',
+              bgcolor: isLight ? '#f8fafc' : 'rgba(17, 18, 20, 0.75)',
+              borderRight: { md: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}` },
+              borderBottom: { xs: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`, md: 'none' },
             }}
           >
-            <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box 
+            <Box>
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                <Chip
+                  icon={<LanRounded sx={{ fontSize: '14px !important', color: '#2563eb !important' }} />}
+                  label="NEW CITIZEN REGISTRATION"
+                  size="small"
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: '0.68rem',
+                    letterSpacing: '0.06em',
+                    bgcolor: isLight ? 'rgba(37, 99, 235, 0.1)' : 'rgba(37, 99, 235, 0.2)',
+                    color: isLight ? '#1d4ed8' : '#60a5fa',
+                    border: `1px solid ${isLight ? 'rgba(37, 99, 235, 0.25)' : 'rgba(59, 130, 246, 0.3)'}`,
+                  }}
+                />
+              </Box>
+
+              <Typography 
+                variant="h4" 
                 sx={{ 
-                  p: 1.4, 
-                  borderRadius: '12px', 
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 16px rgba(99,102,241,0.4)',
+                  fontWeight: 900, 
+                  letterSpacing: '-0.03em', 
+                  color: theme.palette.text.primary,
+                  lineHeight: 1.2,
+                  mb: 1.5,
+                  fontSize: { xs: '1.6rem', md: '2rem' }
                 }}
               >
-                <PersonAddOutlined sx={{ color: '#fff', fontSize: 26 }} />
-              </Box>
-              <Box>
-                <Typography variant="h4" fontWeight={800} sx={{ 
-                  background: 'linear-gradient(135deg, #fff 0%, #cbd5e1 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  lineHeight: 1.1
-                }}>
-                  TrueID
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#818cf8', fontWeight: 700, letterSpacing: '0.1em' }}>
-                  FINTECH & WEB3 IDENTITY
-                </Typography>
+                Create Your Digital Citizen Pass
+              </Typography>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: theme.palette.text.secondary, 
+                  lineHeight: 1.6, 
+                  mb: 4.5,
+                  fontSize: '0.92rem'
+                }}
+              >
+                Join the verified Ethereum Sepolia decentralized registry in three quick steps.
+              </Typography>
+
+              {/* Step Progression Indicators */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {[
+                  {
+                    icon: <BadgeRounded sx={{ fontSize: 18 }} />,
+                    label: 'Personal Information',
+                    desc: 'Legal identity and national citizen identifier'
+                  },
+                  {
+                    icon: <AccountCircleRounded sx={{ fontSize: 18 }} />,
+                    label: 'Account Credentials',
+                    desc: 'Username, verified email, and contact info'
+                  },
+                  {
+                    icon: <LockRounded sx={{ fontSize: 18 }} />,
+                    label: 'Security & Verification',
+                    desc: 'Cryptographic master key & DID creation'
+                  }
+                ].map((item, index) => {
+                  const isDone = activeStep > index;
+                  const isCurrent = activeStep === index;
+                  return (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 2,
+                        p: 1.8,
+                        borderRadius: 2.5,
+                        bgcolor: isCurrent 
+                          ? (isLight ? '#ffffff' : 'rgba(37, 99, 235, 0.12)')
+                          : (isLight ? 'rgba(255, 255, 255, 0.6)' : 'transparent'),
+                        border: `1px solid ${
+                          isCurrent 
+                            ? '#2563eb' 
+                            : (isDone ? (isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)') : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.05)'))
+                        }`,
+                        boxShadow: isCurrent 
+                          ? (isLight ? '0 4px 14px rgba(37, 99, 235, 0.1)' : '0 4px 14px rgba(0, 0, 0, 0.3)')
+                          : 'none',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 2,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          bgcolor: isDone 
+                            ? '#22c55e' 
+                            : (isCurrent ? '#2563eb' : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)')),
+                          color: (isDone || isCurrent) ? '#ffffff' : theme.palette.text.secondary,
+                          fontWeight: 800,
+                          fontSize: '0.85rem',
+                          flexShrink: 0,
+                          mt: 0.2
+                        }}
+                      >
+                        {isDone ? <CheckCircle sx={{ fontSize: 18 }} /> : index + 1}
+                      </Box>
+                      <Box>
+                        <Typography 
+                          variant="subtitle2" 
+                          sx={{ 
+                            fontWeight: isCurrent ? 800 : 600, 
+                            color: isCurrent ? (isLight ? '#2563eb' : '#60a5fa') : theme.palette.text.primary,
+                            lineHeight: 1.2
+                          }}
+                        >
+                          {item.label}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.74rem' }}>
+                          {item.desc}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                })}
               </Box>
             </Box>
-            
-            <Typography variant="h5" fontWeight={600} gutterBottom color="text.primary">
-              Join the Network
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 6, lineHeight: 1.7 }}>
-              Get started with the world's most trusted digital identity platform. Secure, private, and blockchain-verified.
-            </Typography>
-            
-            {/* Steps indicator for left panel */}
-            <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {steps.map((label, index) => (
-                <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 2, opacity: activeStep === index ? 1 : 0.5 }}>
-                  <Box sx={{ 
-                    width: 32, height: 32, borderRadius: '50%', 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: activeStep >= index ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${activeStep >= index ? '#6366f1' : 'rgba(255,255,255,0.1)'}`,
-                    color: activeStep >= index ? '#818cf8' : '#94a3b8'
-                  }}>
-                    {activeStep > index ? <CheckCircle fontSize="small" sx={{ color: '#10b981' }} /> : index + 1}
-                  </Box>
-                  <Typography variant="body2" fontWeight={activeStep === index ? 600 : 500} color={activeStep >= index ? '#fff' : 'text.secondary'}>
-                    {label}
-                  </Typography>
-                </Box>
-              ))}
+
+            {/* Bottom Security Note */}
+            <Box 
+              sx={{ 
+                mt: 4, 
+                p: 2, 
+                borderRadius: 2, 
+                bgcolor: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)',
+                border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)'}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.2
+              }}
+            >
+              <ShieldRounded sx={{ color: '#2563eb', fontSize: 20 }} />
+              <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontSize: '0.74rem', fontWeight: 600 }}>
+                End-to-end encrypted • Biometrics never leave your local device unhashed
+              </Typography>
             </Box>
           </Box>
 
-          {/* Right Side - Registration Form */}
+          {/* Right Side - Step Form */}
           <Box
             sx={{
               flex: 1.2,
-              p: { xs: 4, md: 7 },
+              p: { xs: 3.5, sm: 5, md: 6 },
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
+              bgcolor: isLight ? '#ffffff' : 'transparent',
             }}
           >
-            {/* Mobile Branding */}
-            <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1.5, mb: 4 }}>
-              <PersonAddOutlined sx={{ color: '#6366f1', fontSize: 28 }} />
-              <Typography variant="h4" fontWeight={800} color="#fff">TrueID</Typography>
-            </Box>
-
-            <Typography variant="h4" fontWeight={700} color="text.primary" gutterBottom>
-              Create Account
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-              Complete the verification steps below to get started
-            </Typography>
-
-            {/* Stepper for mobile only, since desktop has it on the left */}
+            {/* Mobile Horizontal Stepper */}
             <Stepper 
               activeStep={activeStep} 
               sx={{ 
-                mb: 4, 
+                mb: 3, 
                 display: { xs: 'flex', md: 'none' },
-                '& .MuiStepLabel-label': { color: 'text.secondary' },
-                '& .MuiStepLabel-label.Mui-active': { color: '#818cf8' },
-                '& .MuiStepIcon-root': { color: 'rgba(255,255,255,0.1)' },
-                '& .MuiStepIcon-root.Mui-active': { color: '#6366f1' },
-                '& .MuiStepIcon-root.Mui-completed': { color: '#10b981' },
+                '& .MuiStepLabel-label': { color: theme.palette.text.secondary, fontSize: '0.75rem' },
+                '& .MuiStepLabel-label.Mui-active': { color: '#2563eb', fontWeight: 700 },
+                '& .MuiStepIcon-root': { color: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.1)' },
+                '& .MuiStepIcon-root.Mui-active': { color: '#2563eb' },
+                '& .MuiStepIcon-root.Mui-completed': { color: '#22c55e' },
               }}
             >
               {steps.map((label) => (
@@ -460,10 +665,10 @@ const Register = () => {
                 sx={{ 
                   mb: 3, 
                   borderRadius: 2,
-                  background: 'rgba(244, 63, 94, 0.1)',
-                  color: '#fda4af',
-                  border: '1px solid rgba(244, 63, 94, 0.25)',
-                  '& .MuiAlert-icon': { color: '#f43f5e' }
+                  bgcolor: isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.15)',
+                  color: isLight ? '#b91c1c' : '#fca5a5',
+                  border: `1px solid ${isLight ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.3)'}`,
+                  '& .MuiAlert-icon': { color: '#ef4444' }
                 }}
               >
                 {error || localError}
@@ -472,29 +677,39 @@ const Register = () => {
 
             {renderStepContent(activeStep)}
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+            {/* Step Controls: Back / Continue */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3, pt: 2, borderTop: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}` }}>
               <Button
                 disabled={activeStep === 0}
                 onClick={handleBack}
                 startIcon={<ArrowBack />}
-                sx={{ color: '#94a3b8', '&:hover': { background: 'rgba(255,255,255,0.05)' } }}
+                sx={{ 
+                  color: theme.palette.text.secondary, 
+                  textTransform: 'none', 
+                  fontWeight: 600,
+                  '&:hover': { bgcolor: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.05)' } 
+                }}
               >
                 Back
               </Button>
+
               <Button
                 variant="contained"
                 onClick={handleNext}
                 disabled={loading}
                 endIcon={activeStep === steps.length - 1 ? <CheckCircle /> : <ArrowForward />}
                 sx={{ 
-                  px: 4,
+                  px: 3.5,
                   py: 1.4,
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                  boxShadow: '0 2px 12px rgba(99, 102, 241, 0.35)',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  fontSize: '0.95rem',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
                   '&:hover': { 
-                    background: 'linear-gradient(135deg, #818cf8 0%, #6366f1 100%)',
-                    boxShadow: '0 4px 18px rgba(99, 102, 241, 0.5)'
+                    background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                    boxShadow: '0 6px 20px rgba(37, 99, 235, 0.45)',
                   }
                 }}
               >
@@ -502,10 +717,14 @@ const Register = () => {
               </Button>
             </Box>
 
-            <Box sx={{ mt: 5, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
+            <Box sx={{ mt: 4, textAlign: 'center' }}>
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                 Already have an account?{' '}
-                <Link component={RouterLink} to="/login" sx={{ color: '#818cf8', fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
+                <Link 
+                  component={RouterLink} 
+                  to="/login" 
+                  sx={{ color: '#2563eb', fontWeight: 700, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                >
                   Sign in
                 </Link>
               </Typography>

@@ -1052,3 +1052,177 @@ exports.verifyZeroKnowledgeProof = async (a, b, c, input) => {
   return await contract.verifyProof(a, b, c, input);
 };
 
+/**
+ * Revoke citizen identity and soulbound badge on chain
+ */
+exports.revokeCitizenOnChain = async (walletAddress, reason = 'Administrative revocation') => {
+  if (!walletAddress) return { success: false, reason: 'No wallet address' };
+  const results = { walletAddress, sbtRevoked: false, identityRevoked: false, txHashes: [] };
+
+  // 1. Revoke Soulbound Badge
+  try {
+    const sbtContract = exports.getSoulboundBadgeContract();
+    const badgeId = await sbtContract.userPrimaryBadge(walletAddress).catch(() => 0n);
+    if (Number(badgeId) > 0) {
+      const isValid = await sbtContract.isBadgeValid(badgeId).catch(() => false);
+      if (isValid) {
+        const tx = await sbtContract.revokeBadge(badgeId);
+        const receipt = await tx.wait(1);
+        results.sbtRevoked = true;
+        results.sbtTokenId = Number(badgeId);
+        results.txHashes.push(tx.hash || receipt.hash);
+      }
+    }
+  } catch (sbtError) {
+    console.warn(`[Blockchain] SBT revocation skipped/failed for ${walletAddress}:`, sbtError.message);
+  }
+
+  // 2. Revoke on IdentityManagement
+  try {
+    const { contract } = initBlockchain();
+    const hasReg = await contract.hasRegisteredIdentity(walletAddress).catch(() => false);
+    if (hasReg) {
+      const tx = await contract.revokeIdentity(walletAddress, reason, { gasLimit: 250000 });
+      const receipt = await tx.wait(1);
+      results.identityRevoked = true;
+      results.txHashes.push(tx.hash || receipt.hash);
+    }
+  } catch (idError) {
+    console.warn(`[Blockchain] Identity revocation skipped/failed for ${walletAddress}:`, idError.message);
+  }
+
+  results.success = results.sbtRevoked || results.identityRevoked;
+  return results;
+};
+
+/**
+ * Attest citizen on chain (mints Soulbound Badge and/or registers in IdentityManagement)
+ */
+exports.attestCitizenOnChain = async (walletAddress, biometricHash = '') => {
+  if (!walletAddress) return { success: false, reason: 'No wallet address' };
+  const results = { walletAddress, badgeMinted: false, identityVerified: false, txHashes: [] };
+
+  // 1. Check & Mint Soulbound Badge if not held
+  try {
+    const sbtContract = exports.getSoulboundBadgeContract();
+    const badgeId = await sbtContract.userPrimaryBadge(walletAddress).catch(() => 0n);
+    let hasValidBadge = false;
+
+    if (Number(badgeId) > 0) {
+      hasValidBadge = await sbtContract.isBadgeValid(badgeId).catch(() => false);
+    }
+
+    if (!hasValidBadge) {
+      const formattedBiometric = (biometricHash && biometricHash.length === 64) 
+        ? `0x${biometricHash}` 
+        : (biometricHash && biometricHash.startsWith('0x') && biometricHash.length === 66 ? biometricHash : '0x0000000000000000000000000000000000000000000000000000000000000000');
+      
+      const sbtRes = await exports.mintSoulboundBadgeOnChain({
+        recipientAddress: walletAddress,
+        badgeType: 'STANDARD_CITIZEN',
+        identityCommitment: formattedBiometric,
+        metadataURI: `https://trueid.authority.gov/badge/${walletAddress.toLowerCase()}`
+      });
+
+      results.badgeMinted = true;
+      results.sbtTxHash = sbtRes.txHash;
+      results.txHashes.push(sbtRes.txHash);
+    }
+  } catch (sbtError) {
+    console.warn(`[Blockchain] Soulbound badge minting skipped/failed for ${walletAddress}:`, sbtError.message);
+  }
+
+  // 2. Verify on IdentityManagement if identity exists
+  try {
+    const { contract } = initBlockchain();
+    const hasReg = await contract.hasRegisteredIdentity(walletAddress).catch(() => false);
+    if (hasReg) {
+      const isVerified = await contract.isIdentityVerified(walletAddress).catch(() => false);
+      if (!isVerified) {
+        const tx = await contract.verifyIdentity(walletAddress, { gasLimit: 250000 });
+        const receipt = await tx.wait(1);
+        results.identityVerified = true;
+        results.identityTxHash = tx.hash || receipt.hash;
+        results.txHashes.push(tx.hash || receipt.hash);
+      }
+    }
+  } catch (idError) {
+    console.warn(`[Blockchain] Identity verification on contract skipped/failed for ${walletAddress}:`, idError.message);
+  }
+
+  results.success = results.badgeMinted || results.identityVerified || results.txHashes.length > 0;
+  return results;
+};
+
+/**
+ * Get comprehensive on-chain state for a citizen wallet address
+ */
+exports.getOnChainIdentity = async (walletAddress) => {
+  if (!walletAddress) {
+    return {
+      isRegisteredOnChain: false,
+      isVerifiedOnChain: false,
+      soulboundTokenId: null,
+      isBadgeValid: false,
+      network: 'Ethereum Sepolia',
+      contractAddress: process.env.CONTRACT_ADDRESS
+    };
+  }
+
+  try {
+    const sbtContract = exports.getSoulboundBadgeContract();
+    const [badgeId, balance] = await Promise.all([
+      sbtContract.userPrimaryBadge(walletAddress).catch(() => 0n),
+      sbtContract.balanceOf(walletAddress).catch(() => 0n)
+    ]);
+
+    const numBadgeId = Number(badgeId);
+    let isBadgeValid = false;
+    if (numBadgeId > 0) {
+      isBadgeValid = await sbtContract.isBadgeValid(numBadgeId).catch(() => false);
+    }
+
+    let isIdentityRegistered = numBadgeId > 0 || Number(balance) > 0;
+    let isIdentityVerified = isBadgeValid;
+
+    // Also check IdentityManagement contract
+    try {
+      const { contract } = initBlockchain();
+      const hasReg = await contract.hasRegisteredIdentity(walletAddress).catch(() => false);
+      if (hasReg) {
+        isIdentityRegistered = true;
+        const verified = await contract.isIdentityVerified(walletAddress).catch(() => false);
+        if (verified) isIdentityVerified = true;
+      }
+    } catch (e) {
+      // Ignore fallback
+    }
+
+    return {
+      isRegisteredOnChain: isIdentityRegistered,
+      isVerifiedOnChain: isIdentityVerified,
+      soulboundTokenId: numBadgeId > 0 ? numBadgeId : null,
+      isBadgeValid,
+      contracts: {
+        identityRegistry: process.env.CONTRACT_ADDRESS || process.env.IDENTITY_REGISTRY_ADDRESS,
+        soulboundBadge: process.env.SOULBOUND_BADGE_ADDRESS,
+        didRegistry: process.env.DID_REGISTRY_ADDRESS,
+        credentialRegistry: process.env.CREDENTIAL_REGISTRY_ADDRESS
+      },
+      network: 'Ethereum Sepolia (Chain ID 11155111)',
+      explorerUrl: `https://sepolia.etherscan.io/address/${walletAddress}`
+    };
+  } catch (error) {
+    console.warn(`[Blockchain] Error inspecting on-chain identity for ${walletAddress}:`, error.message);
+    return {
+      isRegisteredOnChain: false,
+      isVerifiedOnChain: false,
+      soulboundTokenId: null,
+      isBadgeValid: false,
+      network: 'Ethereum Sepolia',
+      contractAddress: process.env.CONTRACT_ADDRESS
+    };
+  }
+};
+
+

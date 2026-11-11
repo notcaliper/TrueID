@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ApiService from '../services/adminApi.service';
-import BlockchainService from '../services/adminBlockchain.service';
+import { useColorMode } from '../../context/ThemeContext';
+import { getAdminThemeTokens, getInputStyle } from '../utils/adminTheme';
 import {
   Dialog,
   DialogTitle,
@@ -16,25 +17,30 @@ import {
   TextField,
   CircularProgress,
   Alert,
-  Divider,
   Grid,
-  Tooltip
+  Tooltip,
+  Divider
 } from '@mui/material';
 import {
   CloseRounded,
   VerifiedUserRounded,
   CancelRounded,
   FingerprintRounded,
-  HistoryRounded,
-  DescriptionRounded,
   ContentCopyRounded,
   OpenInNewRounded,
   SecurityRounded,
-  EditRounded,
-  CheckCircleOutlineRounded
+  BlockRounded,
+  LockResetRounded,
+  CheckCircleRounded,
+  AccountBalanceWalletRounded,
+  WorkspacePremiumRounded,
+  HistoryRounded
 } from '@mui/icons-material';
 
 const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
+  const { isLight } = useColorMode();
+  const t = getAdminThemeTokens(isLight);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -42,11 +48,10 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [newFacemeshHash, setNewFacemeshHash] = useState('');
   const [versionHistory, setVersionHistory] = useState([]);
-  const [isEdit, setIsEdit] = useState(user.isEdit || false);
-  const [blockchainLoading, setBlockchainLoading] = useState(false);
-  const [blockchainError, setBlockchainError] = useState(null);
-  const [blockchainSuccess, setBlockchainSuccess] = useState(null);
-  const [copiedHash, setCopiedHash] = useState(false);
+  const [professionalRecords, setProfessionalRecords] = useState([]);
+  const [userActivityLogs, setUserActivityLogs] = useState([]);
+  const [copiedField, setCopiedField] = useState(null);
+  const [actionReason, setActionReason] = useState('');
 
   useEffect(() => {
     fetchUserDetails();
@@ -86,21 +91,22 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
           u.facemesh_hash = u.biometricHash;
         }
 
+        u.on_chain = response.onChain || response.user?.on_chain || null;
         setUserData(u);
 
-        if (response.professionalRecords && Array.isArray(response.professionalRecords) && response.professionalRecords.length > 0) {
-          const normalizedRecords = response.professionalRecords.map(record => {
-            if (record.biometricHash && !record.facemesh_hash) {
-              record.facemesh_hash = record.biometricHash;
-            }
-            return record;
-          });
-          setVersionHistory(normalizedRecords);
-        } else if (biometricDataForHistory && biometricDataForHistory.facemesh_hash) {
+        if (response.professionalRecords && Array.isArray(response.professionalRecords)) {
+          setProfessionalRecords(response.professionalRecords);
+        }
+
+        if (response.recentActivity && Array.isArray(response.recentActivity)) {
+          setUserActivityLogs(response.recentActivity);
+        }
+
+        if (biometricDataForHistory && biometricDataForHistory.facemesh_hash) {
           const initialVersion = {
             id: 1,
             facemesh_hash: biometricDataForHistory.facemesh_hash,
-            updated_by: 'System Enclave',
+            updated_by: 'Authority Sensor Enclave',
             created_at: biometricDataForHistory.created_at,
             blockchain_tx_hash: biometricDataForHistory.blockchain_tx_hash || null,
             record_type: 'Initial Biometric Enrolment',
@@ -118,61 +124,86 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
   };
 
   const handleVerifyUser = async () => {
-    if (!userData || !userData.id) return;
     setLoading(true);
-    setBlockchainError(null);
-    setBlockchainSuccess(null);
-
+    setError(null);
+    setSuccess(null);
     try {
-      let txHash = null;
-      try {
-        if (!BlockchainService.initialized) {
-          await BlockchainService.initialize();
-        }
-        const blockchainResult = await BlockchainService.verifyIdentity(userData.id);
-        if (blockchainResult.success) {
-          setBlockchainSuccess('On-chain attestation confirmed.');
-          txHash = blockchainResult.txHash;
-        }
-      } catch (bcErr) {
-        console.warn('Blockchain verification warning:', bcErr);
+      const response = await ApiService.verifyUser(userData.id);
+      if (response && (response.user || response.success)) {
+        const updated = { ...userData, ...(response.user || {}), verification_status: 'VERIFIED', is_verified: true };
+        setUserData(updated);
+        setSuccess('Citizen identity verified and attestation status updated successfully.');
+        if (onUserUpdated) onUserUpdated(updated);
       }
-
-      await ApiService.verifyIdentity(userData.id);
-
-      const updatedUser = {
-        ...userData,
-        verification_status: 'VERIFIED',
-        updated_at: new Date().toISOString()
-      };
-      if (txHash) updatedUser.txHash = txHash;
-
-      setUserData(updatedUser);
-      if (onUserUpdated) onUserUpdated(updatedUser);
-
-      setSuccess('Identity attested and marked VERIFIED.');
     } catch (err) {
-      setError('Verification failed: ' + err.message);
+      console.error('Error verifying user:', err);
+      setError(err.response?.data?.message || 'Failed to verify citizen identity.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleRejectUser = async () => {
-    if (!userData || !userData.id) return;
     setLoading(true);
+    setError(null);
+    setSuccess(null);
     try {
-      await ApiService.rejectIdentity(userData.id, 'Identity documentation insufficient or facial geometry mismatch');
-      const updatedUser = {
-        ...userData,
-        verification_status: 'REJECTED',
-        updated_at: new Date().toISOString()
-      };
-      setUserData(updatedUser);
-      if (onUserUpdated) onUserUpdated(updatedUser);
-      setSuccess('Identity claim has been marked REJECTED.');
+      const response = await ApiService.rejectUser(userData.id, actionReason || 'Identity submission rejected by authority audit.');
+      if (response && (response.user || response.success)) {
+        const updated = { ...userData, ...(response.user || {}), verification_status: 'REJECTED', is_verified: false };
+        setUserData(updated);
+        setSuccess('Citizen identity has been marked as REJECTED.');
+        if (onUserUpdated) onUserUpdated(updated);
+      }
     } catch (err) {
-      setError('Failed to reject claim.');
+      console.error('Error rejecting user:', err);
+      setError(err.response?.data?.message || 'Failed to reject citizen identity.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleDeactivate = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    const willDeactivate = userData.is_active !== false;
+
+    try {
+      if (willDeactivate) {
+        await ApiService.deactivateUser(userData.id, actionReason || 'Account suspended by authority admin.');
+        const updated = { ...userData, is_active: false };
+        setUserData(updated);
+        setSuccess('Citizen account has been SUSPENDED. All active sessions invalidated.');
+        if (onUserUpdated) onUserUpdated(updated);
+      } else {
+        await ApiService.reactivateUser(userData.id);
+        const updated = { ...userData, is_active: true };
+        setUserData(updated);
+        setSuccess('Citizen account has been REACTIVATED successfully.');
+        if (onUserUpdated) onUserUpdated(updated);
+      }
+    } catch (err) {
+      console.error('Error changing account active state:', err);
+      setError(err.response?.data?.message || 'Failed to update account state.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetMfa = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await ApiService.resetUserMfa(userData.id);
+      const updated = { ...userData, mfa_enabled: false };
+      setUserData(updated);
+      setSuccess('User MFA credentials have been cleared. Citizen can now re-enroll authenticator.');
+      if (onUserUpdated) onUserUpdated(updated);
+    } catch (err) {
+      console.error('Error resetting MFA:', err);
+      setError(err.response?.data?.message || 'Failed to reset MFA.');
     } finally {
       setLoading(false);
     }
@@ -180,59 +211,34 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
 
   const handleUpdateFacemesh = async () => {
     if (!newFacemeshHash.trim()) {
-      setError('Facemesh hash cannot be empty');
+      setError('FaceMesh hash cannot be empty.');
       return;
     }
     setLoading(true);
-    setBlockchainLoading(true);
+    setError(null);
+    setSuccess(null);
     try {
-      let txHash = null;
-      if (userData.wallet_address) {
-        try {
-          if (!BlockchainService.initialized) await BlockchainService.initialize();
-          const bcRes = await BlockchainService.updateBiometricHash(userData.wallet_address, newFacemeshHash);
-          if (bcRes.success) txHash = bcRes.txHash;
-        } catch (bcErr) {
-          console.warn('Blockchain update warning:', bcErr);
-        }
+      const response = await ApiService.updateFacemesh(userData.id, newFacemeshHash.trim());
+      if (response && (response.user || response.success)) {
+        const updated = { ...userData, facemesh_hash: newFacemeshHash.trim() };
+        setUserData(updated);
+        setNewFacemeshHash('');
+        setSuccess('FaceMesh biometric vector updated successfully.');
+        if (onUserUpdated) onUserUpdated(updated);
       }
-
-      await ApiService.updateBiometricData(userData.id, newFacemeshHash);
-
-      const updatedUser = {
-        ...userData,
-        facemesh_hash: newFacemeshHash,
-        verification_status: 'PENDING',
-        updated_at: new Date().toISOString()
-      };
-      if (txHash) updatedUser.blockchain_tx_hash = txHash;
-
-      const newVersion = {
-        id: versionHistory.length + 1,
-        facemesh_hash: newFacemeshHash,
-        updated_by: 'Authority Admin',
-        created_at: new Date().toISOString(),
-        blockchain_tx_hash: txHash
-      };
-      setVersionHistory([newVersion, ...versionHistory]);
-      setUserData(updatedUser);
-      setNewFacemeshHash('');
-      setIsEdit(false);
-      if (onUserUpdated) onUserUpdated(updatedUser);
-      setSuccess('Biometric FaceMesh vector updated.');
     } catch (err) {
-      setError('Failed to update facemesh hash.');
+      console.error('Error updating FaceMesh hash:', err);
+      setError(err.response?.data?.message || 'Failed to update FaceMesh hash.');
     } finally {
       setLoading(false);
-      setBlockchainLoading(false);
     }
   };
 
-  const copyToClipboard = (text) => {
+  const copyToClipboard = (text, fieldName) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
-    setCopiedHash(true);
-    setTimeout(() => setCopiedHash(false), 2000);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   const formatDate = (dateString) => {
@@ -245,6 +251,8 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
     }
   };
 
+  const isSuspended = userData.is_active === false;
+
   return (
     <Dialog
       open={true}
@@ -253,34 +261,48 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
       fullWidth
       PaperProps={{
         sx: {
-          bgcolor: '#0d121d',
+          bgcolor: t.paper,
           backgroundImage: 'none',
           borderRadius: 3,
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 24px 48px rgba(0, 0, 0, 0.7)'
+          border: `1px solid ${t.border}`,
+          boxShadow: isLight ? '0 20px 25px -5px rgba(0, 0, 0, 0.1)' : '0 24px 48px rgba(0, 0, 0, 0.7)'
         }
       }}
     >
-      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1.5, borderBottom: `1px solid ${t.border}` }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <SecurityRounded sx={{ fontSize: 20 }} />
+          <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: t.primaryBg, color: t.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SecurityRounded sx={{ fontSize: 22 }} />
           </Box>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', fontSize: '1.05rem' }}>
-              Citizen Dossier: {userData.name || 'Citizen Profile'}
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#94a3b8', fontFamily: 'monospace' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: t.textPrimary, fontSize: '1.1rem' }}>
+                {userData.name || 'Citizen Profile'}
+              </Typography>
+              <Chip
+                label={isSuspended ? 'SUSPENDED' : 'ACTIVE'}
+                size="small"
+                sx={{
+                  bgcolor: isSuspended ? t.errorBg : t.successBg,
+                  color: isSuspended ? t.errorText : t.successText,
+                  border: `1px solid ${isSuspended ? t.errorBorder : t.successBorder}`,
+                  fontWeight: 700,
+                  fontSize: '0.65rem',
+                  height: 20
+                }}
+              />
+            </Box>
+            <Typography variant="caption" sx={{ color: t.textMuted, fontFamily: 'monospace' }}>
               Gov ID: {userData.government_id || 'N/A'} • DB Ref #{userData.id}
             </Typography>
           </Box>
         </Box>
-        <IconButton onClick={onClose} sx={{ color: '#94a3b8' }}>
+        <IconButton onClick={onClose} sx={{ color: t.textMuted, '&:hover': { color: t.textPrimary } }}>
           <CloseRounded />
         </IconButton>
       </DialogTitle>
 
-      <Box sx={{ px: 3, borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+      <Box sx={{ px: 3, borderBottom: `1px solid ${t.border}` }}>
         <Tabs
           value={activeTab}
           onChange={(e, val) => setActiveTab(val)}
@@ -291,179 +313,179 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
               textTransform: 'none',
               fontWeight: 600,
               fontSize: '0.85rem',
-              color: '#94a3b8',
-              '&.Mui-selected': { color: '#818cf8' }
+              color: t.textMuted,
+              '&.Mui-selected': { color: t.primary }
             },
-            '& .MuiTabs-indicator': { backgroundColor: '#6366f1' }
+            '& .MuiTabs-indicator': { backgroundColor: t.primary }
           }}
         >
-          <Tab label="Identity Metadata" />
+          <Tab label="Identity Dossier" />
           <Tab label="Biometric Enclave" />
-          <Tab label="Verification Decision" />
-          <Tab label="Audit History" />
+          <Tab label="DID & Blockchain" />
+          <Tab label="Credentials & Audit" />
+          <Tab label="Authority Actions" />
         </Tabs>
       </Box>
 
       <DialogContent sx={{ p: 3 }}>
         {error && (
-          <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+          <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2, bgcolor: t.errorBg, color: t.errorText, border: `1px solid ${t.errorBorder}` }}>
             {error}
           </Alert>
         )}
         {success && (
-          <Alert severity="success" sx={{ mb: 2.5, borderRadius: 2, bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+          <Alert severity="success" sx={{ mb: 2.5, borderRadius: 2, bgcolor: t.successBg, color: t.successText, border: `1px solid ${t.successBorder}` }}>
             {success}
           </Alert>
         )}
 
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress sx={{ color: '#6366f1' }} />
+            <CircularProgress sx={{ color: t.primary }} />
           </Box>
         )}
 
         {/* Tab 0: Metadata */}
         {activeTab === 0 && !loading && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Full Legal Name
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 700, color: '#f8fafc', mt: 0.5 }}>
-                    {userData.name || 'N/A'}
-                  </Typography>
-                </Box>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Email Address
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#f8fafc', mt: 0.5 }}>
-                    {userData.email || 'N/A'}
-                  </Typography>
-                </Box>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Government Unique ID
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontFamily: 'monospace', fontWeight: 700, color: '#38bdf8', mt: 0.5 }}>
-                    {userData.government_id || 'N/A'}
-                  </Typography>
-                </Box>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Current Attestation State
-                  </Typography>
-                  <Box sx={{ mt: 0.5 }}>
-                    <Chip
-                      label={userData.verification_status || 'PENDING'}
-                      size="small"
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: '0.72rem',
-                        bgcolor: userData.verification_status === 'VERIFIED' ? 'rgba(16, 185, 129, 0.15)' : userData.verification_status === 'REJECTED' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                        color: userData.verification_status === 'VERIFIED' ? '#34d399' : userData.verification_status === 'REJECTED' ? '#f87171' : '#fbbf24',
-                        border: `1px solid ${userData.verification_status === 'VERIFIED' ? 'rgba(16, 185, 129, 0.3)' : userData.verification_status === 'REJECTED' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
-                      }}
-                    />
-                  </Box>
-                </Box>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Enrollment Date
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#94a3b8', mt: 0.5 }}>
-                    {formatDate(userData.created_at)}
-                  </Typography>
-                </Box>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Last Audit Sync
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#94a3b8', mt: 0.5 }}>
-                    {formatDate(userData.updated_at)}
-                  </Typography>
-                </Box>
-              </Grid>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
+                  Full Legal Name
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: t.textPrimary, mt: 0.5 }}>
+                  {userData.name || 'N/A'}
+                </Typography>
+              </Box>
             </Grid>
-          </Box>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
+                  Official Email Address
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600, color: t.textPrimary, mt: 0.5 }}>
+                  {userData.email || 'N/A'}
+                </Typography>
+              </Box>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
+                  Government Serial ID
+                </Typography>
+                <Typography variant="body1" sx={{ fontFamily: 'monospace', fontWeight: 700, color: t.primary, mt: 0.5 }}>
+                  {userData.government_id || 'N/A'}
+                </Typography>
+              </Box>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
+                  Phone / Contact
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600, color: t.textPrimary, mt: 0.5 }}>
+                  {userData.phone || 'None registered'}
+                </Typography>
+              </Box>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
+                  Attestation State
+                </Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  <Chip
+                    label={userData.verification_status || 'PENDING'}
+                    size="small"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.72rem',
+                      bgcolor: userData.verification_status === 'VERIFIED' ? t.successBg : userData.verification_status === 'REJECTED' ? t.errorBg : t.warningBg,
+                      color: userData.verification_status === 'VERIFIED' ? t.successText : userData.verification_status === 'REJECTED' ? t.errorText : t.warningText,
+                      border: `1px solid ${userData.verification_status === 'VERIFIED' ? t.successBorder : userData.verification_status === 'REJECTED' ? t.errorBorder : t.warningBorder}`
+                    }}
+                  />
+                </Box>
+              </Box>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
+                  Two-Factor Authentication (MFA)
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: userData.mfa_enabled ? t.successText : t.textMuted, mt: 0.5 }}>
+                  {userData.mfa_enabled ? 'Active (Authenticator TOTP)' : 'Not Enabled'}
+                </Typography>
+              </Box>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
+                  Registration Timestamp
+                </Typography>
+                <Typography variant="body2" sx={{ color: t.textSecondary, mt: 0.5 }}>
+                  {formatDate(userData.created_at)}
+                </Typography>
+              </Box>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
+                  Last Attestation Modification
+                </Typography>
+                <Typography variant="body2" sx={{ color: t.textSecondary, mt: 0.5 }}>
+                  {formatDate(userData.updated_at)}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
         )}
 
         {/* Tab 1: Biometrics */}
         {activeTab === 1 && !loading && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
+            <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: t.primaryBg, border: `1px solid ${t.primaryBorder}` }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <FingerprintRounded sx={{ color: '#818cf8', fontSize: 20 }} />
-                  <Typography variant="caption" sx={{ color: '#818cf8', fontWeight: 700, letterSpacing: '0.06em' }}>
-                    ACTIVE FACEMESH 68-NODE SHA-256 HASH
+                  <FingerprintRounded sx={{ color: t.primary, fontSize: 20 }} />
+                  <Typography variant="caption" sx={{ color: t.primary, fontWeight: 700, letterSpacing: '0.06em' }}>
+                    ACTIVE FACEMESH 68-NODE SHA-256 VECTOR
                   </Typography>
                 </Box>
-                <Tooltip title={copiedHash ? 'Copied!' : 'Copy Hash'}>
-                  <IconButton size="small" onClick={() => copyToClipboard(userData.facemesh_hash)} sx={{ color: copiedHash ? '#10b981' : '#94a3b8' }}>
+                <Tooltip title={copiedField === 'facemesh' ? 'Copied!' : 'Copy Hash'}>
+                  <IconButton size="small" onClick={() => copyToClipboard(userData.facemesh_hash, 'facemesh')} sx={{ color: copiedField === 'facemesh' ? t.success : t.textMuted }}>
                     <ContentCopyRounded sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
               </Box>
-              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#f8fafc', wordBreak: 'break-all', fontSize: '0.85rem' }}>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: t.textPrimary, wordBreak: 'break-all', fontSize: '0.85rem' }}>
                 {userData.facemesh_hash || 'No biometric vector registered for this citizen.'}
               </Typography>
             </Box>
 
-            {userData.blockchain_tx_hash && (
-              <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Anchor Transaction Receipt
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
-                  <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#818cf8', wordBreak: 'break-all' }}>
-                    {userData.blockchain_tx_hash}
-                  </Typography>
-                  <Tooltip title="View on Sepolia Etherscan">
-                    <IconButton size="small" onClick={() => window.open(`https://sepolia.etherscan.io/tx/${userData.blockchain_tx_hash}`, '_blank')} sx={{ color: '#6366f1' }}>
-                      <OpenInNewRounded sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Box>
-            )}
-
-            {/* Edit / Force Update Vector */}
-            <Box sx={{ mt: 1, p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc', mb: 1 }}>
-                Override Biometric FaceMesh Vector
+            {/* Override Vector */}
+            <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: t.textPrimary, mb: 1 }}>
+                Update / Override Biometric Vector
               </Typography>
               <TextField
                 fullWidth
                 size="small"
-                placeholder="Enter 64-hex SHA-256 hash or paste verified sensor payload"
+                placeholder="Enter 64-hex SHA-256 hash or verified FaceMesh landmark payload"
                 value={newFacemeshHash}
                 onChange={(e) => setNewFacemeshHash(e.target.value)}
                 InputProps={{
                   sx: {
-                    bgcolor: 'rgba(13, 18, 29, 0.8)',
+                    ...getInputStyle(isLight),
                     fontFamily: 'monospace',
-                    fontSize: '0.8rem',
-                    color: '#f8fafc',
-                    borderRadius: 1.5,
-                    '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
+                    fontSize: '0.8rem'
                   }
                 }}
               />
@@ -471,49 +493,246 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
                 variant="outlined"
                 size="small"
                 onClick={handleUpdateFacemesh}
-                disabled={!newFacemeshHash.trim() || blockchainLoading}
+                disabled={!newFacemeshHash.trim()}
                 sx={{
                   mt: 1.5,
-                  borderColor: 'rgba(99, 102, 241, 0.3)',
-                  color: '#a5b4fc',
+                  borderColor: t.primaryBorder,
+                  color: t.primary,
                   textTransform: 'none',
-                  fontWeight: 600
+                  fontWeight: 600,
+                  bgcolor: t.primaryBg,
+                  '&:hover': { bgcolor: t.primary, color: '#ffffff' }
                 }}
               >
-                {blockchainLoading ? 'Attesting on Chain...' : 'Commit New Biometric Vector'}
+                Commit New Biometric Vector
               </Button>
             </Box>
           </Box>
         )}
 
-        {/* Tab 2: Verification Decision */}
+        {/* Tab 2: DID & Blockchain */}
         {activeTab === 2 && !loading && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <Box sx={{ p: 3, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', mb: 1 }}>
-                Authority Attestation Decision
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            {/* Live Smart Contract Verification Status */}
+            <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: userData.on_chain?.isVerifiedOnChain ? t.successBg : t.surfaceSubtle, border: `1px solid ${userData.on_chain?.isVerifiedOnChain ? t.successBorder : t.border}` }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <VerifiedUserRounded sx={{ fontSize: 20, color: userData.on_chain?.isVerifiedOnChain ? t.success : t.textMuted }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: t.textPrimary }}>
+                    Smart Contract Attestation Status
+                  </Typography>
+                </Box>
+                <Chip
+                  label={userData.on_chain?.isVerifiedOnChain ? 'ON-CHAIN VERIFIED • SEPOLIA' : (userData.on_chain?.isRegisteredOnChain ? 'REGISTERED ON-CHAIN' : 'NOT YET SYNCED ON-CHAIN')}
+                  size="small"
+                  sx={{
+                    bgcolor: userData.on_chain?.isVerifiedOnChain ? t.success : (isLight ? '#f1f5f9' : '#1e293b'),
+                    color: userData.on_chain?.isVerifiedOnChain ? '#ffffff' : t.textMuted,
+                    fontWeight: 700,
+                    fontSize: '0.72rem'
+                  }}
+                />
+              </Box>
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>
+                    Soulbound Token (SBT) Badge
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: t.textPrimary, mt: 0.5 }}>
+                    {userData.on_chain?.soulboundTokenId ? (
+                      <span style={{ color: t.primary }}>Token #{userData.on_chain.soulboundTokenId} (EIP-5192 Soulbound)</span>
+                    ) : (
+                      <span style={{ color: t.textMuted }}>No Soulbound Token Minted</span>
+                    )}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>
+                    Token Transferability
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: userData.on_chain?.isBadgeValid ? t.success : t.textMuted, mt: 0.5 }}>
+                    {userData.on_chain?.isBadgeValid ? 'LOCKED & BOUND TO WALLET' : 'UNLOCKED / INACTIVE'}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>
+                  Decentralized Identifier (DID)
+                </Typography>
+                <Tooltip title={copiedField === 'did' ? 'Copied!' : 'Copy DID'}>
+                  <IconButton size="small" onClick={() => copyToClipboard(userData.did || `did:trueid:${userData.wallet_address?.toLowerCase()}`, 'did')} sx={{ color: copiedField === 'did' ? t.success : t.textMuted }}>
+                    <ContentCopyRounded sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: t.primary, fontWeight: 700, wordBreak: 'break-all' }}>
+                {userData.did || `did:trueid:${userData.wallet_address?.toLowerCase() || '0x'}`}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#94a3b8', mb: 3 }}>
-                Executing this decision issues a cryptographically signed credential from your authority node. Approving will broadcast an on-chain verification attestation.
+            </Box>
+
+            <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>
+                  Ethereum Sepolia Authority Wallet Address
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Tooltip title={copiedField === 'wallet' ? 'Copied!' : 'Copy Address'}>
+                    <IconButton size="small" onClick={() => copyToClipboard(userData.wallet_address, 'wallet')} sx={{ color: copiedField === 'wallet' ? t.success : t.textMuted }}>
+                      <ContentCopyRounded sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                  {userData.wallet_address && (
+                    <Tooltip title="View on Sepolia Etherscan">
+                      <IconButton size="small" onClick={() => window.open(`https://sepolia.etherscan.io/address/${userData.wallet_address}`, '_blank')} sx={{ color: t.primary }}>
+                        <OpenInNewRounded sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Box>
+              </Box>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: t.textPrimary, wordBreak: 'break-all' }}>
+                {userData.wallet_address || 'No wallet address provisioned'}
+              </Typography>
+            </Box>
+
+            {userData.blockchain_tx_hash && (
+              <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>
+                    Attestation Transaction Hash
+                  </Typography>
+                  <Tooltip title="View Transaction on Sepolia Etherscan">
+                    <IconButton size="small" onClick={() => window.open(`https://sepolia.etherscan.io/tx/${userData.blockchain_tx_hash}`, '_blank')} sx={{ color: t.primary }}>
+                      <OpenInNewRounded sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: t.primary, wordBreak: 'break-all' }}>
+                  {userData.blockchain_tx_hash}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Smart Contract Deployments Info */}
+            <Box sx={{ p: 2, borderRadius: 2, bgcolor: isLight ? '#f8fafc' : '#0b1120', border: `1px solid ${t.border}` }}>
+              <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase', display: 'block', mb: 1 }}>
+                Authority Smart Contract Ecosystem (Sepolia)
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" sx={{ color: t.textSecondary, fontWeight: 600 }}>TrueIDSoulboundBadge (ERC-5192):</Typography>
+                  <Typography variant="caption" sx={{ fontFamily: 'monospace', color: t.primary }}>
+                    <a href="https://sepolia.etherscan.io/address/0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+                      0x6f4d...e9Bf ↗
+                    </a>
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" sx={{ color: t.textSecondary, fontWeight: 600 }}>Identity Registry Contract:</Typography>
+                  <Typography variant="caption" sx={{ fontFamily: 'monospace', color: t.primary }}>
+                    <a href="https://sepolia.etherscan.io/address/0xDAA6c4D8fc7B4AAc7B6f7724939b6dB548dF1F02" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+                      0xDAA6...1F02 ↗
+                    </a>
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" sx={{ color: t.textSecondary, fontWeight: 600 }}>TrueIDDIDRegistry (ERC-1056):</Typography>
+                  <Typography variant="caption" sx={{ fontFamily: 'monospace', color: t.primary }}>
+                    <a href="https://sepolia.etherscan.io/address/0x6877d0edD489fdCa49Cb9086684E6868e1153985" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+                      0x6877...3985 ↗
+                    </a>
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+        )}
+
+        {/* Tab 3: Credentials & Audit */}
+        {activeTab === 3 && !loading && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: t.textPrimary, mb: 1.5 }}>
+                Professional Records ({professionalRecords.length})
+              </Typography>
+              {professionalRecords.length === 0 ? (
+                <Typography variant="body2" sx={{ color: t.textMuted }}>No professional records registered.</Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {professionalRecords.map((r, i) => (
+                    <Box key={r.id || i} sx={{ p: 1.5, borderRadius: 1.5, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: t.textPrimary }}>{r.title}</Typography>
+                      <Typography variant="caption" sx={{ color: t.primary, fontWeight: 600 }}>{r.organization || r.institution} • {r.record_type || 'Credential'}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
+
+            <Divider sx={{ borderColor: t.border }} />
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: t.textPrimary, mb: 1.5 }}>
+                Recent Security Audit Logs ({userActivityLogs.length})
+              </Typography>
+              {userActivityLogs.length === 0 ? (
+                <Typography variant="body2" sx={{ color: t.textMuted }}>No audit records found.</Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {userActivityLogs.slice(0, 5).map((log, i) => (
+                    <Box key={log.id || i} sx={{ p: 1.5, borderRadius: 1.5, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: t.primary, display: 'block' }}>{log.action}</Typography>
+                        <Typography variant="caption" sx={{ color: t.textMuted }}>{log.details?.message || log.entity_type}</Typography>
+                      </Box>
+                      <Typography variant="caption" sx={{ color: t.textMuted }}>{formatDate(log.created_at)}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          </Box>
+        )}
+
+        {/* Tab 4: Authority Actions */}
+        {activeTab === 4 && !loading && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: t.textPrimary, mb: 1 }}>
+                Attestation & Identity Decisions
+              </Typography>
+              <Typography variant="body2" sx={{ color: t.textMuted, mb: 2 }}>
+                Issue cryptographic verification tokens or flag fraudulent claims.
               </Typography>
 
-              <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Audit notes or justification reason (optional)"
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+                InputProps={{ sx: { ...getInputStyle(isLight), mb: 2 } }}
+              />
+
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
                 <Button
                   variant="contained"
                   startIcon={<VerifiedUserRounded />}
                   onClick={handleVerifyUser}
                   disabled={loading || userData.verification_status === 'VERIFIED'}
                   sx={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    bgcolor: t.success,
                     color: '#ffffff',
                     fontWeight: 700,
                     textTransform: 'none',
-                    px: 3,
-                    py: 1,
-                    borderRadius: 2
+                    '&:hover': { bgcolor: '#059669' }
                   }}
                 >
-                  Approve & Issue Soulbound Token
+                  Approve & Issue Attestation
                 </Button>
 
                 <Button
@@ -522,67 +741,64 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
                   onClick={handleRejectUser}
                   disabled={loading || userData.verification_status === 'REJECTED'}
                   sx={{
-                    borderColor: 'rgba(239, 68, 68, 0.4)',
-                    color: '#f87171',
+                    borderColor: t.errorBorder,
+                    color: t.errorText,
+                    bgcolor: t.errorBg,
                     fontWeight: 700,
                     textTransform: 'none',
-                    px: 3,
-                    py: 1,
-                    borderRadius: 2,
-                    '&:hover': {
-                      bgcolor: 'rgba(239, 68, 68, 0.1)',
-                      borderColor: '#ef4444'
-                    }
+                    '&:hover': { bgcolor: t.error, color: '#fff' }
                   }}
                 >
-                  Reject & Flag Submission
+                  Reject Submission
+                </Button>
+              </Box>
+            </Box>
+
+            <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: t.textPrimary, mb: 1 }}>
+                Account Security & Administrative Controls
+              </Typography>
+
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={isSuspended ? <CheckCircleRounded /> : <BlockRounded />}
+                  onClick={handleToggleDeactivate}
+                  disabled={loading}
+                  sx={{
+                    borderColor: isSuspended ? t.successBorder : t.errorBorder,
+                    color: isSuspended ? t.successText : t.errorText,
+                    bgcolor: isSuspended ? t.successBg : t.errorBg,
+                    fontWeight: 700,
+                    textTransform: 'none'
+                  }}
+                >
+                  {isSuspended ? 'Reactivate Account' : 'Suspend Account'}
+                </Button>
+
+                <Button
+                  variant="outlined"
+                  startIcon={<LockResetRounded />}
+                  onClick={handleResetMfa}
+                  disabled={loading || !userData.mfa_enabled}
+                  sx={{
+                    borderColor: t.warningBorder,
+                    color: t.warningText,
+                    bgcolor: t.warningBg,
+                    fontWeight: 700,
+                    textTransform: 'none'
+                  }}
+                >
+                  Reset MFA Lockout
                 </Button>
               </Box>
             </Box>
           </Box>
         )}
-
-        {/* Tab 3: Audit History */}
-        {activeTab === 3 && !loading && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {versionHistory.length === 0 ? (
-              <Box sx={{ textAlign: 'center', py: 4, color: '#64748b' }}>
-                <Typography variant="body2">No prior biometric updates found.</Typography>
-              </Box>
-            ) : (
-              versionHistory.map((v, i) => (
-                <Box
-                  key={v.id || i}
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    bgcolor: 'rgba(15, 23, 42, 0.6)',
-                    border: '1px solid rgba(255, 255, 255, 0.06)'
-                  }}
-                >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc' }}>
-                      {v.record_type || 'Biometric State Modification'}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748b' }}>
-                      {formatDate(v.created_at)}
-                    </Typography>
-                  </Box>
-                  <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#94a3b8', display: 'block', wordBreak: 'break-all' }}>
-                    Hash: {v.facemesh_hash || 'N/A'}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#64748b', mt: 0.5, display: 'block' }}>
-                    Authorized by: {v.updated_by || 'System'}
-                  </Typography>
-                </Box>
-              ))
-            )}
-          </Box>
-        )}
       </DialogContent>
 
-      <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-        <Button onClick={onClose} sx={{ color: '#94a3b8', textTransform: 'none', fontWeight: 600 }}>
+      <DialogActions sx={{ p: 2.5, borderTop: `1px solid ${t.border}` }}>
+        <Button onClick={onClose} sx={{ color: t.textSecondary, textTransform: 'none', fontWeight: 600 }}>
           Close Dossier
         </Button>
       </DialogActions>

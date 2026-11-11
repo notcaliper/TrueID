@@ -59,7 +59,9 @@ const Layout = () => {
   const [copied, setCopied] = useState(false);
   const [searchVal, setSearchVal] = useState('');
 
-  const citizenAddress = user?.wallet_address || '';
+  const citizenAddress = user?.wallet_address || user?.walletAddress || '';
+  const citizenGovId = user?.government_id || user?.governmentId || '';
+  const citizenDid = user?.did || (citizenAddress ? `did:trueid:${citizenAddress}` : '');
 
   const isTabActive = (path) => {
     if (path === '/') return location.pathname === '/' || location.pathname === '/dashboard';

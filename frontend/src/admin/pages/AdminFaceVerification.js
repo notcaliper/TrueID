@@ -1,34 +1,28 @@
 import React, { useState } from 'react';
 import ApiService from '../services/adminApi.service';
 import BiometricVerificationAdmin from '../components/BiometricVerificationAdmin';
+import { useColorMode } from '../../context/ThemeContext';
+import { getAdminThemeTokens, getCardStyle, getBannerStyle } from '../utils/adminTheme';
 import {
   Box,
   Typography,
   Card,
-  CardContent,
   Button,
   Grid,
   Chip,
-  Alert,
-  Divider,
-  CircularProgress,
-  IconButton,
-  Tooltip
+  Alert
 } from '@mui/material';
 import {
   FingerprintRounded,
   CameraAltRounded,
-  VerifiedUserRounded,
   CheckCircleRounded,
-  CancelRounded,
-  RefreshRounded,
-  OpenInNewRounded,
-  ShieldRounded,
-  FolderSharedRounded,
-  WorkspacePremiumRounded
+  RefreshRounded
 } from '@mui/icons-material';
 
 const AdminFaceVerification = () => {
+  const { isLight } = useColorMode();
+  const t = getAdminThemeTokens(isLight);
+
   const [scanning, setScanning] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
   const [professionalRecords, setProfessionalRecords] = useState([]);
@@ -49,7 +43,6 @@ const AdminFaceVerification = () => {
       setProfessionalRecords(records);
     } catch (err) {
       console.error('Error fetching professional records:', err);
-      // Non-fatal
     }
   };
 
@@ -65,61 +58,42 @@ const AdminFaceVerification = () => {
     setError(null);
   };
 
-  const formatDate = (date) => {
-    if (!date) return 'N/A';
-    try {
-      const d = new Date(date);
-      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return 'N/A';
-    }
-  };
-
   return (
     <Box sx={{ maxWidth: 1100, mx: 'auto' }}>
       {/* Header Banner */}
-      <Card
-        sx={{
-          mb: 4,
-          borderRadius: 3,
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(13, 18, 29, 0.95) 100%)',
-          border: '1px solid rgba(99, 102, 241, 0.25)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-          p: { xs: 2.5, md: 3.5 }
-        }}
-      >
+      <Card sx={getBannerStyle(isLight)}>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Chip
-                icon={<FingerprintRounded sx={{ fontSize: '14px !important', color: '#818cf8 !important' }} />}
+                icon={<FingerprintRounded sx={{ fontSize: '14px !important', color: `${t.primary} !important` }} />}
                 label="OPTICAL FACEMESH SENSOR"
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(99, 102, 241, 0.15)',
-                  color: '#818cf8',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  bgcolor: t.primaryBg,
+                  color: t.primary,
+                  border: `1px solid ${t.primaryBorder}`,
                   fontWeight: 700,
                   fontSize: '0.68rem',
-                  letterSpacing: '0.08em'
+                  letterSpacing: '0.06em'
                 }}
               />
               <Chip
                 label="68-LANDMARK RECOGNITION"
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(16, 185, 129, 0.15)',
-                  color: '#34d399',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  bgcolor: t.successBg,
+                  color: t.successText,
+                  border: `1px solid ${t.successBorder}`,
                   fontWeight: 700,
                   fontSize: '0.68rem'
                 }}
               />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', mb: 0.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: t.textPrimary, letterSpacing: '-0.02em', mb: 0.5 }}>
               Biometric Face Verification
             </Typography>
-            <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 640 }}>
+            <Typography variant="body2" sx={{ color: t.textMuted, maxWidth: 640 }}>
               Live biometric optical checkpoint for border control and government credential attestation.
             </Typography>
           </Box>
@@ -127,7 +101,7 @@ const AdminFaceVerification = () => {
       </Card>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2, bgcolor: t.errorBg, color: t.errorText, border: `1px solid ${t.errorBorder}` }}>
           {error}
         </Alert>
       )}
@@ -135,22 +109,18 @@ const AdminFaceVerification = () => {
       {/* State 1: Idle Camera Launcher */}
       {!scanning && !verificationResult && (
         <Card
-          sx={{
-            borderRadius: 3,
-            bgcolor: 'rgba(13, 18, 29, 0.75)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            backdropFilter: 'blur(14px)',
+          sx={getCardStyle(isLight, {
             p: { xs: 3, md: 5 },
             textAlign: 'center'
-          }}
+          })}
         >
           <Box
             sx={{
               width: 80,
               height: 80,
               borderRadius: '50%',
-              bgcolor: 'rgba(99, 102, 241, 0.12)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
+              bgcolor: t.primaryBg,
+              border: `1px solid ${t.primaryBorder}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -158,13 +128,13 @@ const AdminFaceVerification = () => {
               mb: 3
             }}
           >
-            <CameraAltRounded sx={{ fontSize: 40, color: '#818cf8' }} />
+            <CameraAltRounded sx={{ fontSize: 40, color: t.primary }} />
           </Box>
 
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#f8fafc', mb: 1 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: t.textPrimary, mb: 1 }}>
             Optical Facial Sensor Inactive
           </Typography>
-          <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 480, mx: 'auto', mb: 4, lineHeight: 1.6 }}>
+          <Typography variant="body2" sx={{ color: t.textMuted, maxWidth: 480, mx: 'auto', mb: 4, lineHeight: 1.6 }}>
             Initialize local hardware video feed to scan citizen geometry and automatically match against the registered decentralized biometric directory.
           </Typography>
 
@@ -173,18 +143,18 @@ const AdminFaceVerification = () => {
             startIcon={<CameraAltRounded />}
             onClick={handleStartScan}
             sx={{
-              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+              bgcolor: t.primary,
               color: '#ffffff',
               fontWeight: 700,
               fontSize: '1rem',
               px: 4,
               py: 1.5,
               borderRadius: 2.5,
-              boxShadow: '0 4px 20px rgba(99, 102, 241, 0.4)',
+              boxShadow: isLight ? '0 4px 14px rgba(37, 99, 235, 0.3)' : '0 4px 20px rgba(59, 130, 246, 0.4)',
               textTransform: 'none',
               '&:hover': {
-                background: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)',
-                boxShadow: '0 6px 24px rgba(99, 102, 241, 0.5)'
+                bgcolor: t.primaryDark,
+                boxShadow: isLight ? '0 6px 18px rgba(37, 99, 235, 0.4)' : '0 6px 24px rgba(59, 130, 246, 0.5)'
               }
             }}
           >
@@ -196,12 +166,10 @@ const AdminFaceVerification = () => {
       {/* State 2: Camera Feed Active */}
       {scanning && (
         <Card
-          sx={{
-            borderRadius: 3,
-            bgcolor: 'rgba(13, 18, 29, 0.85)',
-            border: '1px solid rgba(99, 102, 241, 0.3)',
+          sx={getCardStyle(isLight, {
+            border: `1px solid ${t.primary}`,
             p: 3
-          }}
+          })}
         >
           <BiometricVerificationAdmin
             onVerificationComplete={handleVerificationComplete}
@@ -215,23 +183,22 @@ const AdminFaceVerification = () => {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {/* Matched Header Card */}
           <Card
-            sx={{
-              borderRadius: 3,
-              bgcolor: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
+            sx={getCardStyle(isLight, {
+              bgcolor: t.successBg,
+              border: `1px solid ${t.successBorder}`,
               p: 3
-            }}
+            })}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box sx={{ width: 48, height: 48, borderRadius: 2.5, bgcolor: 'rgba(16, 185, 129, 0.2)', border: '1px solid #10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <CheckCircleRounded sx={{ color: '#10b981', fontSize: 28 }} />
+                <Box sx={{ width: 48, height: 48, borderRadius: 2.5, bgcolor: isLight ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.25)', border: `1px solid ${t.success}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CheckCircleRounded sx={{ color: t.success, fontSize: 28 }} />
                 </Box>
                 <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 800, color: '#f8fafc' }}>
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: t.textPrimary }}>
                     Citizen Identity Authenticated
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#34d399', fontWeight: 600 }}>
+                  <Typography variant="caption" sx={{ color: t.successText, fontWeight: 700 }}>
                     FaceMesh biometric vectors matched with 99.4% confidence score
                   </Typography>
                 </Box>
@@ -242,11 +209,15 @@ const AdminFaceVerification = () => {
                 startIcon={<RefreshRounded />}
                 onClick={handleReset}
                 sx={{
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                  color: '#cbd5e1',
+                  borderColor: t.border,
+                  color: t.textPrimary,
                   borderRadius: 2,
                   textTransform: 'none',
-                  fontWeight: 600
+                  fontWeight: 600,
+                  '&:hover': {
+                    borderColor: t.primary,
+                    bgcolor: t.primaryBg
+                  }
                 }}
               >
                 Scan Next Citizen
@@ -257,44 +228,35 @@ const AdminFaceVerification = () => {
           {/* Dossier Card */}
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 6 }}>
-              <Card
-                sx={{
-                  borderRadius: 3,
-                  bgcolor: 'rgba(13, 18, 29, 0.75)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  backdropFilter: 'blur(14px)',
-                  p: 3,
-                  height: '100%'
-                }}
-              >
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', mb: 2 }}>
+              <Card sx={getCardStyle(isLight, { p: 3, height: '100%' })}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: t.textPrimary, mb: 2 }}>
                   Matched Dossier Details
                 </Typography>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                    <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
                       Citizen Legal Name
                     </Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 700, color: '#f8fafc', mt: 0.5 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 700, color: t.textPrimary, mt: 0.5 }}>
                       {verificationResult.name}
                     </Typography>
                   </Box>
 
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                    <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
                       Government ID
                     </Typography>
-                    <Typography variant="body1" sx={{ fontFamily: 'monospace', fontWeight: 700, color: '#38bdf8', mt: 0.5 }}>
+                    <Typography variant="body1" sx={{ fontFamily: 'monospace', fontWeight: 700, color: t.primary, mt: 0.5 }}>
                       {verificationResult.government_id}
                     </Typography>
                   </Box>
 
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                    <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
                       Email / Communications
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#f8fafc', mt: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: t.textSecondary, mt: 0.5 }}>
                       {verificationResult.email}
                     </Typography>
                   </Box>
@@ -304,33 +266,24 @@ const AdminFaceVerification = () => {
 
             {/* Linked Credentials Card */}
             <Grid size={{ xs: 12, md: 6 }}>
-              <Card
-                sx={{
-                  borderRadius: 3,
-                  bgcolor: 'rgba(13, 18, 29, 0.75)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  backdropFilter: 'blur(14px)',
-                  p: 3,
-                  height: '100%'
-                }}
-              >
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', mb: 2 }}>
+              <Card sx={getCardStyle(isLight, { p: 3, height: '100%' })}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: t.textPrimary, mb: 2 }}>
                   Verified Professional Records ({professionalRecords.length})
                 </Typography>
 
                 {professionalRecords.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 4, color: '#64748b' }}>
+                  <Box sx={{ textAlign: 'center', py: 4, color: t.textMuted }}>
                     <Typography variant="body2">No registered academic or professional records found.</Typography>
                   </Box>
                 ) : (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                     {professionalRecords.map((r, i) => (
-                      <Box key={r.id || i} sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#f8fafc' }}>
+                      <Box key={r.id || i} sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: t.textPrimary }}>
                           {r.title}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: '#38bdf8' }}>
-                          {r.institution} • {r.record_type || r.type}
+                        <Typography variant="caption" sx={{ color: t.primary, fontWeight: 600 }}>
+                          {r.institution || r.organization} • {r.record_type || r.type}
                         </Typography>
                       </Box>
                     ))}

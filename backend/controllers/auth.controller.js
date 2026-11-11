@@ -298,6 +298,9 @@ exports.registerUser = async (req, res) => {
     // Commit transaction
     await db.query('COMMIT');
     
+    const regWallet = user.wallet_address || '';
+    const regDid = user.did || (regWallet ? `did:trueid:${regWallet}` : '');
+
     // Return success response
     res.status(201).json({
       message: 'Registration successful',
@@ -305,11 +308,16 @@ exports.registerUser = async (req, res) => {
         id: user.id,
         username: user.username,
         name: user.name,
+        government_id: user.government_id,
         governmentId: user.government_id,
         email: user.email,
         phone: user.phone,
-        walletAddress: user.wallet_address,
+        wallet_address: regWallet,
+        walletAddress: regWallet,
+        did: regDid,
+        is_verified: user.is_verified,
         isVerified: user.is_verified,
+        verification_status: user.verification_status,
         verificationStatus: user.verification_status
       },
       tokens
@@ -440,15 +448,25 @@ exports.loginUser = async (req, res) => {
     );
 
     // Return user data and token
+    const userWallet = user.wallet_address || '';
+    const userDid = user.did || (userWallet ? `did:trueid:${userWallet}` : '');
+    
     res.status(200).json({
       message: 'Login successful',
       user: {
         id: user.id,
+        username: user.username,
         name: user.name,
+        government_id: user.government_id,
         governmentId: user.government_id,
         email: user.email,
         phone: user.phone,
+        wallet_address: userWallet,
+        walletAddress: userWallet,
+        did: userDid,
+        is_verified: user.is_verified,
         isVerified: user.is_verified,
+        verification_status: user.verification_status,
         verificationStatus: user.verification_status
       },
       tokens
@@ -496,7 +514,9 @@ exports.refreshUserToken = async (req, res) => {
 
     // Get user
     const userResult = await db.query(
-      'SELECT id, government_id, name FROM users WHERE id = $1',
+      `SELECT id, username, name, government_id, email, phone, wallet_address, did, 
+              is_verified, verification_status 
+       FROM users WHERE id = $1`,
       [decoded.id]
     );
 
@@ -505,6 +525,8 @@ exports.refreshUserToken = async (req, res) => {
     }
 
     const user = userResult.rows[0];
+    const refreshWallet = user.wallet_address || '';
+    const refreshDid = user.did || (refreshWallet ? `did:trueid:${refreshWallet}` : '');
 
     // Generate new tokens
     const tokens = generateUserToken(user);
@@ -519,7 +541,23 @@ exports.refreshUserToken = async (req, res) => {
 
     res.status(200).json({
       message: 'Token refreshed successfully',
-      tokens
+      tokens,
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        government_id: user.government_id,
+        governmentId: user.government_id,
+        email: user.email,
+        phone: user.phone,
+        wallet_address: refreshWallet,
+        walletAddress: refreshWallet,
+        did: refreshDid,
+        is_verified: user.is_verified,
+        isVerified: user.is_verified,
+        verification_status: user.verification_status,
+        verificationStatus: user.verification_status
+      }
     });
   } catch (error) {
     if (error.name === 'TokenExpiredError') {

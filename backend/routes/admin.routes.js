@@ -29,6 +29,27 @@ router.post('/refresh-token', adminController.refreshAdminToken);
 router.get('/users', authenticateAdmin, adminController.getAllUsers);
 
 /**
+ * @route POST /api/admin/users/batch-action
+ * @desc Batch verify, reject, deactivate, or reactivate multiple users
+ * @access Admin
+ */
+router.post('/users/batch-action', authenticateAdmin, adminController.batchUserAction);
+
+/**
+ * @route POST /api/admin/users/onboard
+ * @desc Direct citizen onboarding by authority admin
+ * @access Admin
+ */
+router.post('/users/onboard', authenticateAdmin, adminController.onboardUser);
+
+/**
+ * @route PUT /api/admin/users/:id/reset-mfa
+ * @desc Reset MFA for user locked out of authenticator
+ * @access Admin
+ */
+router.put('/users/:id/reset-mfa', authenticateAdmin, adminController.resetUserMfa);
+
+/**
  * @route GET /api/admin/users/:id
  * @desc Get user by ID
  * @access Admin

@@ -1,103 +1,102 @@
 /**
- * Decentralized Biometric Identity System (DBIS)
+ * TrueID Decentralized Biometric Identity System (DBIS)
  * Main server file for the backend API
  */
 
 const express = require('express');
 const morgan = require('morgan');
 const helmet = require('helmet');
-const dbService = require('./services/db.service');
-const config = require('./config/config');
 const path = require('path');
 const fs = require('fs');
-const cors = require('cors');
+const dbService = require('./services/db.service');
+const config = require('./config/config');
 
 // Create Express app
 const app = express();
-// Explicitly set port to 5000
-const PORT = 5000; // Using port 5000 as specified
+const PORT = config.PORT || 5000;
 
-// Middleware
-app.use(helmet()); // Security headers
+// Security & Parsing
+app.use(helmet());
+app.use(express.json());
 
-// Custom CORS headers
+// CORS configuration
 app.use((req, res, next) => {
-  // Set CORS headers for frontend requests
-  const allowedOrigins = ['http://localhost:3000', 'http://localhost:8000'];
+  const allowedOrigins = ['http://localhost:3000', 'http://localhost:8000', 'http://127.0.0.1:3000'];
   const origin = req.headers.origin;
   
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
+  if (allowedOrigins.includes(origin) || !origin) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
   }
   
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   
-  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
   next();
 });
 
-// Custom logging middleware to reduce verbosity
-app.use(morgan('combined', {
-  skip: function (req, res) {
-    // Skip logging for frequent GET requests to users endpoint
-    return req.method === 'GET' && req.path.includes('/api/admin/users');
-  }
+// Custom Clean & Informative HTTP Request Logger
+morgan.token('colored-method', (req) => {
+  const colors = {
+    GET: '\x1b[32mGET\x1b[0m',
+    POST: '\x1b[34mPOST\x1b[0m',
+    PUT: '\x1b[33mPUT\x1b[0m',
+    DELETE: '\x1b[31mDELETE\x1b[0m',
+    OPTIONS: '\x1b[90mOPTIONS\x1b[0m'
+  };
+  return colors[req.method] || req.method;
+});
+
+morgan.token('colored-status', (req, res) => {
+  const status = res.statusCode;
+  if (status >= 500) return `\x1b[41;37m ${status} \x1b[0m`;
+  if (status >= 400) return `\x1b[31m${status}\x1b[0m`;
+  if (status >= 300) return `\x1b[36m${status}\x1b[0m`;
+  if (status >= 200) return `\x1b[32m${status}\x1b[0m`;
+  return String(status);
+});
+
+morgan.token('clean-time', () => {
+  return new Date().toLocaleTimeString('en-US', { hour12: false });
+});
+
+app.use(morgan('\x1b[90m[:clean-time]\x1b[0m :colored-method :url :colored-status \x1b[90m(:response-time ms)\x1b[0m', {
+  skip: (req) => req.path === '/api/health' || req.method === 'OPTIONS'
 }));
 
-app.use(morgan('dev')); // Request logging
-app.use(express.json()); // Parse JSON request body
-
-// Database service is already initialized and will handle connections automatically
-
-// Listen for database connection events
-dbService.on('connected', () => {
-  console.log('Database service connected successfully');
-});
-
-dbService.on('error', (err) => {
-  console.error('Database service error:', err);
-});
-
-// Log database connection status
-console.log('Database service initialized with connection pooling and circuit breaker');
-console.log(`Using database host: ${config.DB_HOST}`);
-
-// Set up automatic reconnection attempts in case of failure
+// Automatic database health check (quiet, checks every 60s)
 setInterval(() => {
-  if (!dbService.isConnected) {
-    console.log('Attempting to reconnect to database...');
+  if (!dbService.getConnectionStatus()) {
+    console.warn('\x1b[33m⚠ [DB]\x1b[0m Connection dropped. Attempting automatic reconnection...');
     dbService.testConnection();
   }
-}, 60000); // Check every minute
+}, 60000);
 
-// Create a simple logger
+// Structured logger
 const logger = {
-  info: (message, ...args) => console.log(`[INFO] ${message}`, ...args),
-  error: (message, ...args) => console.error(`[ERROR] ${message}`, ...args),
-  warn: (message, ...args) => console.warn(`[WARN] ${message}`, ...args),
-  debug: (message, ...args) => console.debug(`[DEBUG] ${message}`, ...args)
+  info: (msg, ...args) => console.log(`\x1b[36mℹ [INFO]\x1b[0m ${msg}`, ...args),
+  success: (msg, ...args) => console.log(`\x1b[32m✔ [SUCCESS]\x1b[0m ${msg}`, ...args),
+  warn: (msg, ...args) => console.warn(`\x1b[33m⚠ [WARN]\x1b[0m ${msg}`, ...args),
+  error: (msg, ...args) => console.error(`\x1b[31m✖ [ERROR]\x1b[0m ${msg}`, ...args)
 };
 
-// Make db service and logger available to routes
 app.locals.db = dbService;
 app.locals.logger = logger;
 
-// Add database connection check middleware
+// Database readiness check middleware
 app.use(async (req, res, next) => {
-  if (!dbService.getConnectionStatus()) {
+  if (!dbService.getConnectionStatus() && req.path.startsWith('/api') && req.path !== '/api/health') {
     return res.status(503).json({ 
       message: 'Database connection not ready. Please try again in a moment.',
-      retryAfter: 5
+      retryAfter: 3
     });
   }
   next();
 });
 
-// Import routes
+// Route Mounts
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
@@ -110,8 +109,7 @@ const mfaRoutes = require('./routes/mfa.routes');
 const sessionRoutes = require('./routes/session.routes');
 const gdprRoutes = require('./routes/gdpr.routes');
 
-// Use routes
-app.use('/api/user', authRoutes); // Changed from '/api/auth' to '/api/user' to match frontend expectations
+app.use('/api/user', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/blockchain', blockchainRoutes);
@@ -123,11 +121,9 @@ app.use('/api/mfa', mfaRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/gdpr', gdprRoutes);
 
-// Create uploads directory if it doesn't exist
+// Storage directory
 const uploadDir = path.join(__dirname, 'uploads/documents');
 fs.mkdirSync(uploadDir, { recursive: true });
-
-// Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check endpoint
@@ -135,7 +131,7 @@ app.get('/api/health', (req, res) => {
   const dbStatus = dbService.getConnectionStatus() ? 'connected' : 'disconnected';
   res.status(200).json({
     status: 'ok',
-    timestamp: new Date(),
+    timestamp: new Date().toISOString(),
     database: dbStatus,
     uptime: process.uptime()
   });
@@ -144,41 +140,43 @@ app.get('/api/health', (req, res) => {
 // Root route
 app.get('/', (req, res) => {
   res.json({ 
-    message: 'Welcome to the Decentralized Biometric Identity System API',
-    version: '1.0.0'
+    message: 'TrueID Decentralized Identity System API',
+    network: 'Ethereum Sepolia (Chain ID 11155111)',
+    version: '1.2.0'
   });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  logger.error(`Unhandled error at ${req.method} ${req.url}:`, err.message);
   res.status(500).json({
     error: 'Internal Server Error',
     message: config.NODE_ENV === 'development' ? err.message : 'Something went wrong'
   });
 });
 
-// Start server only after database is connected
+// Start server
 const startServer = async () => {
-  // Wait for database connection
   if (!dbService.getConnectionStatus()) {
-    console.log('Waiting for database connection...');
     await new Promise((resolve) => {
       dbService.once('connected', resolve);
     });
   }
   
-  // Start the server
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Database connected successfully to ${config.DB_HOST}`);
+    console.log('\n\x1b[36m╔═══════════════════════════════════════════════════════════╗\x1b[0m');
+    console.log('\x1b[36m║\x1b[0m       \x1b[1;37mTrueID Identity System — Backend API Server\x1b[0m         \x1b[36m║\x1b[0m');
+    console.log('\x1b[36m║\x1b[0m                                                           \x1b[36m║\x1b[0m');
+    console.log(`\x1b[36m║\x1b[0m   Status:    \x1b[32m● ONLINE\x1b[0m (\x1b[1mhttp://localhost:${PORT}\x1b[0m)                  \x1b[36m║\x1b[0m`);
+    console.log(`\x1b[36m║\x1b[0m   Database:  \x1b[32m● CONNECTED\x1b[0m (\x1b[90m${config.DB_HOST}:${config.DB_PORT}\x1b[0m)            \x1b[36m║\x1b[0m`);
+    console.log('\x1b[36m║\x1b[0m   Network:   \x1b[35mEthereum Sepolia (Chain ID 11155111)\x1b[0m        \x1b[36m║\x1b[0m');
+    console.log('\x1b[36m╚═══════════════════════════════════════════════════════════╝\x1b[0m\n');
   });
 };
 
-// Start the server
 startServer().catch(err => {
-  console.error('Failed to start server:', err);
+  console.error('\x1b[31m✖ Failed to start server:\x1b[0m', err);
   process.exit(1);
 });
 
-module.exports = app; // For testing purposes
+module.exports = app;

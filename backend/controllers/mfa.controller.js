@@ -219,7 +219,7 @@ exports.verifyMFALogin = async (req, res) => {
     const sessionResult = await db.query(
       `SELECT ms.*, u.mfa_secret, u.mfa_backup_codes, u.id as user_id, 
               u.username, u.name, u.government_id, u.email, u.phone,
-              u.is_verified, u.verification_status, u.wallet_address
+              u.is_verified, u.verification_status, u.wallet_address, u.did
        FROM mfa_sessions ms
        JOIN users u ON ms.user_id = u.id
        WHERE ms.temp_token = $1 AND ms.expires_at > NOW() AND ms.used_at IS NULL`,
@@ -351,16 +351,26 @@ exports.verifyMFALogin = async (req, res) => {
       ]
     );
 
+    const mfaWallet = session.wallet_address || '';
+    const mfaDid = session.did || (mfaWallet ? `did:trueid:${mfaWallet}` : '');
+
     res.status(200).json({
       success: true,
       message: 'Login successful',
       user: {
         id: session.user_id,
+        username: session.username,
         name: session.name,
+        government_id: session.government_id,
         governmentId: session.government_id,
         email: session.email,
         phone: session.phone,
+        wallet_address: mfaWallet,
+        walletAddress: mfaWallet,
+        did: mfaDid,
+        is_verified: session.is_verified,
         isVerified: session.is_verified,
+        verification_status: session.verification_status,
         verificationStatus: session.verification_status
       },
       tokens: {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -9,22 +9,25 @@ import {
   Divider,
   Link,
   InputAdornment,
-  IconButton
+  IconButton,
+  useTheme
 } from '@mui/material';
 import {
   Security,
   ArrowBack,
-  Refresh,
   HelpOutline,
   Visibility,
   VisibilityOff
 } from '@mui/icons-material';
+import { useColorMode } from '../context/ThemeContext';
 
 /**
  * MFA Verification Component
  * Used during login when MFA is enabled
  */
 const MFAVerification = ({ onVerify, onCancel, error, loading }) => {
+  const theme = useTheme();
+  const { isLight } = useColorMode();
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [showRecoveryCode, setShowRecoveryCode] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
@@ -113,35 +116,41 @@ const MFAVerification = ({ onVerify, onCancel, error, loading }) => {
         width: '100%',
         maxWidth: 450,
         mx: 'auto',
-        p: 4,
+        p: { xs: 2, sm: 3 },
       }}
     >
       <Paper
         elevation={0}
         sx={{
-          p: 4,
+          p: { xs: 3, sm: 4 },
           borderRadius: 4,
-          background: 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(59,130,246,0.1) 100%)',
-          border: '1px solid rgba(139,92,246,0.2)',
+          background: isLight
+            ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(99, 102, 241, 0.08) 100%)'
+            : 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%)',
+          border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+          boxShadow: isLight
+            ? '0 10px 25px rgba(15, 23, 42, 0.05)'
+            : '0 20px 40px rgba(0, 0, 0, 0.5)',
         }}
       >
         <Box sx={{ textAlign: 'center', mb: 3 }}>
           <Box
             sx={{
-              width: 64,
-              height: 64,
+              width: 60,
+              height: 60,
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
+              background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               mx: 'auto',
               mb: 2,
+              boxShadow: '0 8px 20px rgba(37, 99, 235, 0.35)',
             }}
           >
-            <Security sx={{ color: '#fff', fontSize: 32 }} />
+            <Security sx={{ color: '#fff', fontSize: 30 }} />
           </Box>
-          <Typography variant="h5" fontWeight={700} color="#fff" gutterBottom>
+          <Typography variant="h5" fontWeight={800} color="text.primary" gutterBottom>
             Two-Factor Authentication
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -158,9 +167,9 @@ const MFAVerification = ({ onVerify, onCancel, error, loading }) => {
             sx={{ 
               mb: 3, 
               borderRadius: 2,
-              background: 'rgba(239, 68, 68, 0.1)',
-              color: '#fca5a5',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
+              background: isLight ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.15)',
+              color: isLight ? '#b91c1c' : '#fca5a5',
+              border: `1px solid ${isLight ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.3)'}`,
             }}
           >
             {error || localError}
@@ -178,12 +187,13 @@ const MFAVerification = ({ onVerify, onCancel, error, loading }) => {
             sx={{
               mb: 3,
               '& .MuiOutlinedInput-root': {
-                color: '#fff',
-                '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-                '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.4)' },
-                '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
+                bgcolor: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.04)',
+                color: theme.palette.text.primary,
+                borderRadius: 2,
+                '& fieldset': { borderColor: isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)' },
+                '&:hover fieldset': { borderColor: isLight ? '#94a3b8' : 'rgba(255, 255, 255, 0.3)' },
+                '&.Mui-focused fieldset': { borderColor: '#2563eb' },
               },
-              '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.6)' },
             }}
             InputProps={{
               endAdornment: (
@@ -191,7 +201,7 @@ const MFAVerification = ({ onVerify, onCancel, error, loading }) => {
                   <IconButton
                     onClick={() => setShowRecoveryCode(!showRecoveryCode)}
                     edge="end"
-                    sx={{ color: 'rgba(255,255,255,0.5)' }}
+                    sx={{ color: 'text.secondary' }}
                   >
                     {showRecoveryCode ? <Visibility /> : <VisibilityOff />}
                   </IconButton>
@@ -200,7 +210,7 @@ const MFAVerification = ({ onVerify, onCancel, error, loading }) => {
             }}
           />
         ) : (
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.2, mb: 3 }}>
             {code.map((digit, index) => (
               <TextField
                 key={index}
@@ -213,21 +223,21 @@ const MFAVerification = ({ onVerify, onCancel, error, loading }) => {
                   maxLength: 1,
                   style: {
                     textAlign: 'center',
-                    fontSize: '1.5rem',
-                    fontWeight: 600,
-                    padding: '8px',
-                    color: '#fff',
+                    fontSize: '1.4rem',
+                    fontWeight: 700,
+                    padding: '10px 4px',
+                    color: isLight ? '#0f172a' : '#ffffff',
                   },
                 }}
                 disabled={loading}
                 sx={{
-                  width: 50,
+                  width: { xs: 42, sm: 50 },
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
-                    background: 'rgba(255,255,255,0.05)',
-                    '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-                    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.4)' },
-                    '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
+                    bgcolor: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.04)',
+                    '& fieldset': { borderColor: isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)' },
+                    '&:hover fieldset': { borderColor: isLight ? '#94a3b8' : 'rgba(255, 255, 255, 0.3)' },
+                    '&.Mui-focused fieldset': { borderColor: '#2563eb' },
                   },
                 }}
               />
@@ -243,16 +253,21 @@ const MFAVerification = ({ onVerify, onCancel, error, loading }) => {
           sx={{
             py: 1.5,
             borderRadius: 2,
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
-            fontWeight: 600,
-            '&:hover': { background: 'linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%)' },
-            '&:disabled': { background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' },
+            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+            fontWeight: 700,
+            textTransform: 'none',
+            fontSize: '0.95rem',
+            boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+              boxShadow: '0 6px 18px rgba(37, 99, 235, 0.45)',
+            },
           }}
         >
-          {loading ? 'Verifying...' : 'Verify'}
+          {loading ? 'Verifying...' : 'Verify Identity'}
         </Button>
 
-        <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.1)' }} />
+        <Divider sx={{ my: 3, borderColor: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)' }} />
 
         <Box sx={{ textAlign: 'center' }}>
           <Link
@@ -260,8 +275,9 @@ const MFAVerification = ({ onVerify, onCancel, error, loading }) => {
             type="button"
             onClick={toggleMode}
             sx={{
-              color: '#a78bfa',
+              color: '#2563eb',
               fontSize: '0.875rem',
+              fontWeight: 600,
               textDecoration: 'none',
               '&:hover': { textDecoration: 'underline' },
             }}
@@ -278,14 +294,16 @@ const MFAVerification = ({ onVerify, onCancel, error, loading }) => {
             startIcon={<ArrowBack />}
             onClick={onCancel}
             disabled={loading}
-            sx={{ color: '#94a3b8', '&:hover': { background: 'rgba(255,255,255,0.05)' } }}
+            size="small"
+            sx={{ color: 'text.secondary', textTransform: 'none', fontWeight: 600 }}
           >
             Back to Login
           </Button>
           <Button
             startIcon={<HelpOutline />}
-            onClick={() => alert('Contact support if you lost access to your authenticator app and recovery codes.')}
-            sx={{ color: '#94a3b8', '&:hover': { background: 'rgba(255,255,255,0.05)' } }}
+            onClick={() => alert('Contact your identity administrator if you have lost your recovery key.')}
+            size="small"
+            sx={{ color: 'text.secondary', textTransform: 'none', fontWeight: 600 }}
           >
             Need Help?
           </Button>

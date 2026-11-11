@@ -62,16 +62,23 @@ exports.getUserProfile = async (req, res) => {
     
     const professionalRecordsCount = parseInt(recordsResult.rows[0].count);
     
+    const userWallet = user.wallet_address || '';
+    const userDid = user.did || (userWallet ? `did:trueid:${userWallet}` : '');
+
     res.status(200).json({
       user: {
         id: user.id,
         name: user.name,
+        government_id: user.government_id,
         governmentId: user.government_id,
         email: user.email,
         phone: user.phone,
-        walletAddress: user.wallet_address,
-        did: user.did,
+        wallet_address: userWallet,
+        walletAddress: userWallet,
+        did: userDid,
+        is_verified: user.is_verified,
         isVerified: user.is_verified,
+        verification_status: user.verification_status,
         verificationStatus: user.verification_status,
         createdAt: user.created_at,
         updatedAt: user.updated_at
