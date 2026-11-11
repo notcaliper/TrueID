@@ -8,8 +8,6 @@ import {
   Button,
   IconButton,
   Chip,
-  Container,
-  Paper,
   Tooltip,
   Drawer,
   List,
@@ -28,11 +26,13 @@ import {
   ArrowBackRounded,
   LogoutRounded,
   AdminPanelSettingsRounded,
-  MenuRounded
+  MenuRounded,
+  LightModeRounded,
+  DarkModeRounded
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useColorMode } from '../../context/ThemeContext';
-import { LightModeRounded, DarkModeRounded } from '@mui/icons-material';
+import { getAdminThemeTokens } from '../utils/adminTheme';
 
 const navItems = [
   { label: 'Overview', path: '/admin', icon: <DashboardRounded fontSize="small" /> },
@@ -44,8 +44,9 @@ const navItems = [
 ];
 
 const AdminLayout = () => {
-  const { user, logout } = useAuth();
-  const { mode, toggleTheme, isLight } = useColorMode();
+  const { logout } = useAuth();
+  const { toggleTheme, isLight } = useColorMode();
+  const t = getAdminThemeTokens(isLight);
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -63,15 +64,16 @@ const AdminLayout = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: isLight ? '#f8fafc' : '#111214', color: isLight ? '#0f172a' : '#f8fafc', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ minHeight: '100vh', backgroundColor: t.bg, color: t.textPrimary, display: 'flex', flexDirection: 'column' }}>
       {/* Top Authority Header */}
       <AppBar 
         position="sticky" 
         elevation={0}
         sx={{
-          backgroundColor: isLight ? '#ffffff' : '#181a1c',
-          borderBottom: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
-          color: isLight ? '#0f172a' : '#ffffff',
+          backgroundColor: t.paper,
+          borderBottom: `1px solid ${t.border}`,
+          color: t.textPrimary,
+          backgroundImage: 'none',
           zIndex: (theme) => theme.zIndex.drawer + 1
         }}
       >
@@ -93,23 +95,25 @@ const AdminLayout = () => {
             >
               <Box
                 sx={{
-                  width: 36,
-                  height: 36,
+                  width: 38,
+                  height: 38,
                   borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+                  background: isLight 
+                    ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' 
+                    : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)'
+                  boxShadow: isLight ? '0 4px 12px rgba(37, 99, 235, 0.25)' : '0 0 15px rgba(59, 130, 246, 0.4)'
                 }}
               >
                 <AdminPanelSettingsRounded sx={{ color: '#fff', fontSize: 22 }} />
               </Box>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1, fontSize: '1.05rem' }}>
-                  TrueID <span style={{ color: '#818cf8', fontWeight: 500 }}>GovPortal</span>
+                <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1, fontSize: '1.05rem', color: t.textPrimary }}>
+                  TrueID <span style={{ color: t.primary, fontWeight: 700 }}>GovPortal</span>
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: 1 }}>
+                <Typography variant="caption" sx={{ color: t.textMuted, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: 1 }}>
                   Authority Node • Ethereum Sepolia
                 </Typography>
               </Box>
@@ -120,9 +124,9 @@ const AdminLayout = () => {
               size="small"
               sx={{
                 display: { xs: 'none', sm: 'inline-flex' },
-                backgroundColor: 'rgba(99, 102, 241, 0.15)',
-                color: '#a5b4fc',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
+                backgroundColor: t.primaryBg,
+                color: t.primary,
+                border: `1px solid ${t.primaryBorder}`,
                 fontWeight: 700,
                 fontSize: '0.65rem',
                 letterSpacing: 0.5,
@@ -141,9 +145,12 @@ const AdminLayout = () => {
                   width: 36,
                   height: 36,
                   borderRadius: '8px',
-                  border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.15)'}`,
+                  border: `1px solid ${t.border}`,
                   backgroundColor: isLight ? '#f1f5f9' : 'transparent',
-                  color: isLight ? '#0f172a' : '#f8fafc'
+                  color: t.textPrimary,
+                  '&:hover': {
+                    backgroundColor: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'
+                  }
                 }}
               >
                 {isLight ? <DarkModeRounded sx={{ fontSize: 18 }} /> : <LightModeRounded sx={{ fontSize: 18 }} />}
@@ -156,8 +163,8 @@ const AdminLayout = () => {
               variant="outlined"
               size="small"
               sx={{
-                borderColor: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.15)',
-                color: isLight ? '#334155' : '#cbd5e1',
+                borderColor: t.border,
+                color: t.textSecondary,
                 textTransform: 'none',
                 fontWeight: 600,
                 fontSize: '0.8rem',
@@ -165,9 +172,9 @@ const AdminLayout = () => {
                 py: 0.6,
                 px: 1.5,
                 '&:hover': {
-                  borderColor: '#2563eb',
-                  backgroundColor: isLight ? '#f8fafc' : 'rgba(99, 102, 241, 0.08)',
-                  color: isLight ? '#2563eb' : '#fff'
+                  borderColor: t.primary,
+                  backgroundColor: t.primaryBg,
+                  color: t.primary
                 }
               }}
             >
@@ -179,14 +186,14 @@ const AdminLayout = () => {
                 onClick={handleLogout}
                 size="small"
                 sx={{
-                  color: '#94a3b8',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  color: t.textMuted,
+                  border: `1px solid ${t.border}`,
                   borderRadius: '8px',
                   p: 0.8,
                   '&:hover': {
-                    color: '#ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                    borderColor: 'rgba(239, 68, 68, 0.3)'
+                    color: t.error,
+                    backgroundColor: t.errorBg,
+                    borderColor: t.errorBorder
                   }
                 }}
               >
@@ -202,7 +209,7 @@ const AdminLayout = () => {
             display: { xs: 'none', md: 'flex' },
             px: 4, 
             gap: 1, 
-            borderTop: '1px solid rgba(255, 255, 255, 0.04)',
+            borderTop: `1px solid ${t.border}`,
             overflowX: 'auto'
           }}
         >
@@ -215,8 +222,8 @@ const AdminLayout = () => {
                 to={item.path}
                 startIcon={item.icon}
                 sx={{
-                  color: active ? '#818cf8' : '#94a3b8',
-                  borderBottom: active ? '2px solid #6366f1' : '2px solid transparent',
+                  color: active ? t.primary : t.textMuted,
+                  borderBottom: active ? `2px solid ${t.primary}` : '2px solid transparent',
                   borderRadius: 0,
                   py: 1.2,
                   px: 2,
@@ -224,10 +231,10 @@ const AdminLayout = () => {
                   fontSize: '0.85rem',
                   fontWeight: active ? 700 : 500,
                   letterSpacing: -0.1,
-                  backgroundColor: active ? 'rgba(99, 102, 241, 0.06)' : 'transparent',
+                  backgroundColor: active ? t.primaryBg : 'transparent',
                   '&:hover': {
-                    color: '#fff',
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)'
+                    color: active ? t.primary : t.textPrimary,
+                    backgroundColor: active ? t.primaryBg : t.surfaceHover
                   }
                 }}
               >
@@ -248,13 +255,13 @@ const AdminLayout = () => {
           '& .MuiDrawer-paper': {
             boxSizing: 'border-box',
             width: 260,
-            backgroundColor: '#0a0e17',
-            borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+            backgroundColor: t.paper,
+            borderRight: `1px solid ${t.border}`,
             p: 2
           }
         }}
       >
-        <Typography variant="subtitle2" sx={{ color: '#64748b', mb: 2, px: 1, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: 1 }}>
+        <Typography variant="subtitle2" sx={{ color: t.textMuted, mb: 2, px: 1, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: 1 }}>
           Authority Navigation
         </Typography>
         <List sx={{ p: 0 }}>
@@ -269,11 +276,11 @@ const AdminLayout = () => {
                   }}
                   sx={{
                     borderRadius: '8px',
-                    backgroundColor: active ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                    color: active ? '#818cf8' : '#cbd5e1'
+                    backgroundColor: active ? t.primaryBg : 'transparent',
+                    color: active ? t.primary : t.textSecondary
                   }}
                 >
-                  <ListItemIcon sx={{ color: active ? '#818cf8' : '#94a3b8', minWidth: 36 }}>
+                  <ListItemIcon sx={{ color: active ? t.primary : t.textMuted, minWidth: 36 }}>
                     {item.icon}
                   </ListItemIcon>
                   <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: active ? 700 : 500 }} />

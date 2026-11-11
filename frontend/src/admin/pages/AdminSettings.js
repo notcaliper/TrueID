@@ -1,34 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../services/adminApi.service';
+import { useColorMode } from '../../context/ThemeContext';
+import { getAdminThemeTokens, getCardStyle, getBannerStyle, getInputStyle } from '../utils/adminTheme';
 import {
   Box,
   Typography,
   Card,
-  CardContent,
   Button,
   Grid,
   Chip,
   TextField,
   Switch,
-  FormControlLabel,
   Alert,
-  CircularProgress,
-  Divider
+  CircularProgress
 } from '@mui/material';
 import {
   SettingsRounded,
-  SecurityRounded,
   NotificationsRounded,
   AdminPanelSettingsRounded,
   SaveRounded,
-  CheckCircleRounded,
   KeyRounded,
   LanRounded
 } from '@mui/icons-material';
 
 const AdminSettings = () => {
   const { user } = useAuth();
+  const { isLight } = useColorMode();
+  const t = getAdminThemeTokens(isLight);
+
   const currentUser = user || { name: 'Authority Admin', email: 'admin@trueid.org', role: 'SUPER_ADMIN' };
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -141,49 +141,40 @@ const AdminSettings = () => {
   return (
     <Box sx={{ maxWidth: 1100, mx: 'auto' }}>
       {/* Header Banner */}
-      <Card
-        sx={{
-          mb: 4,
-          borderRadius: 3,
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(13, 18, 29, 0.95) 100%)',
-          border: '1px solid rgba(99, 102, 241, 0.25)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-          p: { xs: 2.5, md: 3.5 }
-        }}
-      >
+      <Card sx={getBannerStyle(isLight)}>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Chip
-                icon={<SettingsRounded sx={{ fontSize: '14px !important', color: '#818cf8 !important' }} />}
+                icon={<SettingsRounded sx={{ fontSize: '14px !important', color: `${t.primary} !important` }} />}
                 label="GOVERNMENT NODE SETTINGS"
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(99, 102, 241, 0.15)',
-                  color: '#818cf8',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  bgcolor: t.primaryBg,
+                  color: t.primary,
+                  border: `1px solid ${t.primaryBorder}`,
                   fontWeight: 700,
                   fontSize: '0.68rem',
-                  letterSpacing: '0.08em'
+                  letterSpacing: '0.06em'
                 }}
               />
               <Chip
-                icon={<LanRounded sx={{ fontSize: '14px !important', color: '#34d399 !important' }} />}
+                icon={<LanRounded sx={{ fontSize: '14px !important', color: `${t.success} !important` }} />}
                 label="SEPOLIA TESTNET"
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(16, 185, 129, 0.15)',
-                  color: '#34d399',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  bgcolor: t.successBg,
+                  color: t.successText,
+                  border: `1px solid ${t.successBorder}`,
                   fontWeight: 700,
                   fontSize: '0.68rem'
                 }}
               />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', mb: 0.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: t.textPrimary, letterSpacing: '-0.02em', mb: 0.5 }}>
               Authority Configuration
             </Typography>
-            <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 640 }}>
+            <Typography variant="body2" sx={{ color: t.textMuted, maxWidth: 640 }}>
               Node operator cryptographic access keys, notification webhooks, and administrative credentials.
             </Typography>
           </Box>
@@ -191,13 +182,13 @@ const AdminSettings = () => {
       </Card>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2, bgcolor: t.errorBg, color: t.errorText, border: `1px solid ${t.errorBorder}` }}>
           {error}
         </Alert>
       )}
 
       {success && (
-        <Alert severity="success" sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+        <Alert severity="success" sx={{ mb: 3, borderRadius: 2, bgcolor: t.successBg, color: t.successText, border: `1px solid ${t.successBorder}` }}>
           Configuration updated and signed successfully.
         </Alert>
       )}
@@ -206,25 +197,16 @@ const AdminSettings = () => {
         <Grid container spacing={3}>
           {/* Operator Profile Card */}
           <Grid size={{ xs: 12, md: 6 }}>
-            <Card
-              sx={{
-                borderRadius: 3,
-                bgcolor: 'rgba(13, 18, 29, 0.75)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                backdropFilter: 'blur(14px)',
-                p: 3,
-                height: '100%'
-              }}
-            >
+            <Card sx={getCardStyle(isLight, { p: 3, height: '100%' })}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.12)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: t.primaryBg, color: t.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <AdminPanelSettingsRounded sx={{ fontSize: 22 }} />
                 </Box>
                 <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: t.textPrimary, fontSize: '1rem' }}>
                     Operator Identity
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                  <Typography variant="caption" sx={{ color: t.textMuted }}>
                     Officer profile in verified registry
                   </Typography>
                 </Box>
@@ -232,7 +214,7 @@ const AdminSettings = () => {
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                 <Box>
-                  <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
+                  <Typography variant="caption" sx={{ color: t.textSecondary, fontWeight: 600, mb: 0.5, display: 'block' }}>
                     Authority Name
                   </Typography>
                   <TextField
@@ -241,19 +223,12 @@ const AdminSettings = () => {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    InputProps={{
-                      sx: {
-                        bgcolor: 'rgba(15, 23, 42, 0.7)',
-                        borderRadius: 2,
-                        color: '#f8fafc',
-                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
-                      }
-                    }}
+                    InputProps={{ sx: getInputStyle(isLight) }}
                   />
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
+                  <Typography variant="caption" sx={{ color: t.textSecondary, fontWeight: 600, mb: 0.5, display: 'block' }}>
                     Official Email
                   </Typography>
                   <TextField
@@ -263,25 +238,18 @@ const AdminSettings = () => {
                     type="email"
                     value={formData.email}
                     onChange={handleChange}
-                    InputProps={{
-                      sx: {
-                        bgcolor: 'rgba(15, 23, 42, 0.7)',
-                        borderRadius: 2,
-                        color: '#f8fafc',
-                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
-                      }
-                    }}
+                    InputProps={{ sx: getInputStyle(isLight) }}
                   />
                 </Box>
 
-                <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
-                  <Typography variant="caption" sx={{ color: '#818cf8', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.primaryBg, border: `1px solid ${t.primaryBorder}` }}>
+                  <Typography variant="caption" sx={{ color: t.primary, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                     Authority Node Role
                   </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#f8fafc', mt: 0.5 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: t.textPrimary, mt: 0.5 }}>
                     GOVERNMENT_AUTHORITY_ROOT (SUPER_ADMIN)
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                  <Typography variant="caption" sx={{ color: t.textMuted }}>
                     Authorized to issue Soulbound tokens on Sepolia testnet
                   </Typography>
                 </Box>
@@ -291,25 +259,16 @@ const AdminSettings = () => {
 
           {/* Security & Password Card */}
           <Grid size={{ xs: 12, md: 6 }}>
-            <Card
-              sx={{
-                borderRadius: 3,
-                bgcolor: 'rgba(13, 18, 29, 0.75)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                backdropFilter: 'blur(14px)',
-                p: 3,
-                height: '100%'
-              }}
-            >
+            <Card sx={getCardStyle(isLight, { p: 3, height: '100%' })}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'rgba(16, 185, 129, 0.12)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: t.successBg, color: t.success, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <KeyRounded sx={{ fontSize: 22 }} />
                 </Box>
                 <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: t.textPrimary, fontSize: '1rem' }}>
                     Security & Credentials
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                  <Typography variant="caption" sx={{ color: t.textMuted }}>
                     Update administrative master password
                   </Typography>
                 </Box>
@@ -317,7 +276,7 @@ const AdminSettings = () => {
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Box>
-                  <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
+                  <Typography variant="caption" sx={{ color: t.textSecondary, fontWeight: 600, mb: 0.5, display: 'block' }}>
                     Current Password
                   </Typography>
                   <TextField
@@ -328,19 +287,12 @@ const AdminSettings = () => {
                     placeholder="••••••••••••"
                     value={formData.currentPassword}
                     onChange={handleChange}
-                    InputProps={{
-                      sx: {
-                        bgcolor: 'rgba(15, 23, 42, 0.7)',
-                        borderRadius: 2,
-                        color: '#f8fafc',
-                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
-                      }
-                    }}
+                    InputProps={{ sx: getInputStyle(isLight) }}
                   />
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
+                  <Typography variant="caption" sx={{ color: t.textSecondary, fontWeight: 600, mb: 0.5, display: 'block' }}>
                     New Master Password
                   </Typography>
                   <TextField
@@ -351,19 +303,12 @@ const AdminSettings = () => {
                     placeholder="Min 8 characters"
                     value={formData.newPassword}
                     onChange={handleChange}
-                    InputProps={{
-                      sx: {
-                        bgcolor: 'rgba(15, 23, 42, 0.7)',
-                        borderRadius: 2,
-                        color: '#f8fafc',
-                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
-                      }
-                    }}
+                    InputProps={{ sx: getInputStyle(isLight) }}
                   />
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" sx={{ color: '#cbd5e1', fontWeight: 600, mb: 0.5, display: 'block' }}>
+                  <Typography variant="caption" sx={{ color: t.textSecondary, fontWeight: 600, mb: 0.5, display: 'block' }}>
                     Confirm New Password
                   </Typography>
                   <TextField
@@ -374,14 +319,7 @@ const AdminSettings = () => {
                     placeholder="Re-enter new password"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    InputProps={{
-                      sx: {
-                        bgcolor: 'rgba(15, 23, 42, 0.7)',
-                        borderRadius: 2,
-                        color: '#f8fafc',
-                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
-                      }
-                    }}
+                    InputProps={{ sx: getInputStyle(isLight) }}
                   />
                 </Box>
               </Box>
@@ -390,24 +328,16 @@ const AdminSettings = () => {
 
           {/* Webhook & Notification Card */}
           <Grid size={12}>
-            <Card
-              sx={{
-                borderRadius: 3,
-                bgcolor: 'rgba(13, 18, 29, 0.75)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                backdropFilter: 'blur(14px)',
-                p: 3
-              }}
-            >
+            <Card sx={getCardStyle(isLight, { p: 3 })}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: t.warningBg, color: t.warning, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <NotificationsRounded sx={{ fontSize: 22 }} />
                 </Box>
                 <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', fontSize: '1rem' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: t.textPrimary, fontSize: '1rem' }}>
                     System Event Notifications
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                  <Typography variant="caption" sx={{ color: t.textMuted }}>
                     Real-time alerts for identity state modifications
                   </Typography>
                 </Box>
@@ -415,12 +345,12 @@ const AdminSettings = () => {
 
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#f8fafc' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: t.textPrimary }}>
                         Verification Approvals
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#64748b' }}>
+                      <Typography variant="caption" sx={{ color: t.textMuted }}>
                         Alert when identity tokens are minted
                       </Typography>
                     </Box>
@@ -428,18 +358,18 @@ const AdminSettings = () => {
                       name="notifyVerification"
                       checked={formData.notifyVerification}
                       onChange={handleChange}
-                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#6366f1' } }}
+                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: t.primary } }}
                     />
                   </Box>
                 </Grid>
 
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#f8fafc' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: t.textPrimary }}>
                         Fraud & Rejection Flags
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#64748b' }}>
+                      <Typography variant="caption" sx={{ color: t.textMuted }}>
                         High priority alert on suspicious submissions
                       </Typography>
                     </Box>
@@ -447,7 +377,7 @@ const AdminSettings = () => {
                       name="notifyRejection"
                       checked={formData.notifyRejection}
                       onChange={handleChange}
-                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#6366f1' } }}
+                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: t.primary } }}
                     />
                   </Box>
                 </Grid>
@@ -464,7 +394,7 @@ const AdminSettings = () => {
                 startIcon={loading ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : <SaveRounded />}
                 disabled={loading}
                 sx={{
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  bgcolor: t.primary,
                   color: '#ffffff',
                   fontWeight: 700,
                   px: 4,
@@ -472,7 +402,10 @@ const AdminSettings = () => {
                   borderRadius: 2,
                   textTransform: 'none',
                   fontSize: '0.95rem',
-                  boxShadow: '0 4px 18px rgba(99, 102, 241, 0.4)'
+                  boxShadow: isLight ? '0 4px 14px rgba(37, 99, 235, 0.3)' : '0 4px 18px rgba(59, 130, 246, 0.4)',
+                  '&:hover': {
+                    bgcolor: t.primaryDark
+                  }
                 }}
               >
                 {loading ? 'Saving Settings...' : 'Save Configuration'}

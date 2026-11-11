@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ApiService from '../services/adminApi.service';
 import { useAuth } from '../../context/AuthContext';
+import { useColorMode } from '../../context/ThemeContext';
+import { getAdminThemeTokens, getCardStyle, getBannerStyle } from '../utils/adminTheme';
 import {
   Box,
   Typography,
@@ -12,8 +14,6 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  Divider,
-  Avatar,
   IconButton,
   Tooltip
 } from '@mui/material';
@@ -30,14 +30,14 @@ import {
   WorkspacePremiumRounded,
   HistoryRounded,
   SettingsRounded,
-  OpenInNewRounded,
-  TrendingUpRounded,
-  CheckCircleRounded
+  OpenInNewRounded
 } from '@mui/icons-material';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isLight } = useColorMode();
+  const t = getAdminThemeTokens(isLight);
   const currentUser = user || { username: 'admin', role: 'SUPER_ADMIN' };
 
   const [stats, setStats] = useState({
@@ -123,93 +123,84 @@ const AdminDashboard = () => {
   };
 
   const getActionColor = (action) => {
-    if (!action) return { color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.2)' };
+    if (!action) return { color: t.textMuted, bg: t.surfaceHover, border: t.border };
     const act = action.toUpperCase();
     if (act.includes('VERIF') || act.includes('SUCCESS')) {
-      return { color: '#34d399', bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.25)' };
+      return { color: t.successText, bg: t.successBg, border: t.successBorder };
     }
     if (act.includes('REJECT') || act.includes('FAIL')) {
-      return { color: '#f87171', bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.25)' };
+      return { color: t.errorText, bg: t.errorBg, border: t.errorBorder };
     }
     if (act.includes('UPDATE') || act.includes('BIOMETRIC')) {
-      return { color: '#818cf8', bg: 'rgba(99, 102, 241, 0.12)', border: 'rgba(99, 102, 241, 0.25)' };
+      return { color: t.primary, bg: t.primaryBg, border: t.primaryBorder };
     }
-    return { color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.25)' };
+    return { color: t.warningText, bg: t.warningBg, border: t.warningBorder };
   };
 
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
       {/* Top Banner */}
-      <Card
-        sx={{
-          mb: 4,
-          borderRadius: 3,
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(13, 18, 29, 0.95) 100%)',
-          border: '1px solid rgba(99, 102, 241, 0.25)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-          p: { xs: 2.5, md: 3.5 }
-        }}
-      >
+      <Card sx={getBannerStyle(isLight)}>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Chip
-                icon={<SecurityRounded sx={{ fontSize: '14px !important', color: '#818cf8 !important' }} />}
+                icon={<SecurityRounded sx={{ fontSize: '14px !important', color: `${t.primary} !important` }} />}
                 label="GOVERNMENT NODE #01"
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(99, 102, 241, 0.15)',
-                  color: '#818cf8',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  bgcolor: t.primaryBg,
+                  color: t.primary,
+                  border: `1px solid ${t.primaryBorder}`,
                   fontWeight: 700,
                   fontSize: '0.68rem',
-                  letterSpacing: '0.08em'
+                  letterSpacing: '0.06em'
                 }}
               />
               <Chip
                 label="CONSENSUS ACTIVE"
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(16, 185, 129, 0.15)',
-                  color: '#34d399',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  bgcolor: t.successBg,
+                  color: t.successText,
+                  border: `1px solid ${t.successBorder}`,
                   fontWeight: 700,
                   fontSize: '0.68rem',
-                  letterSpacing: '0.08em'
+                  letterSpacing: '0.06em'
                 }}
               />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', mb: 0.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: t.textPrimary, letterSpacing: '-0.02em', mb: 0.5 }}>
               Authority Operations Command
             </Typography>
-            <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 640 }}>
-              Live biometric enrollment surveillance, soulbound attestation metrics, and tamper-proof audit trails.
+            <Typography variant="body2" sx={{ color: t.textMuted, maxWidth: 640 }}>
+              Live biometric enrollment surveillance, attestation metrics, and tamper-proof audit trails.
             </Typography>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {stats.lastUpdated && (
-              <Typography variant="caption" sx={{ color: '#64748b' }}>
+              <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 500 }}>
                 Synced: {formatDate(stats.lastUpdated)}
               </Typography>
             )}
             <Button
               variant="outlined"
-              startIcon={refreshing ? <CircularProgress size={16} sx={{ color: '#818cf8' }} /> : <RefreshRounded />}
+              startIcon={refreshing ? <CircularProgress size={16} sx={{ color: t.primary }} /> : <RefreshRounded />}
               onClick={() => fetchDashboardData(false)}
               disabled={loading || refreshing}
               sx={{
-                borderColor: 'rgba(99, 102, 241, 0.3)',
-                color: '#a5b4fc',
+                borderColor: t.primaryBorder,
+                color: t.primary,
                 fontWeight: 600,
                 px: 2.5,
                 py: 1,
                 borderRadius: 2,
                 textTransform: 'none',
-                bgcolor: 'rgba(99, 102, 241, 0.05)',
+                bgcolor: t.primaryBg,
                 '&:hover': {
-                  bgcolor: 'rgba(99, 102, 241, 0.12)',
-                  borderColor: '#6366f1'
+                  bgcolor: isLight ? 'rgba(37, 99, 235, 0.14)' : 'rgba(59, 130, 246, 0.2)',
+                  borderColor: t.primary
                 }
               }}
             >
@@ -220,7 +211,7 @@ const AdminDashboard = () => {
       </Card>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2, bgcolor: t.errorBg, color: t.errorText, border: `1px solid ${t.errorBorder}` }}>
           {error}
         </Alert>
       )}
@@ -230,28 +221,23 @@ const AdminDashboard = () => {
         {/* Total Users */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
-            sx={{
-              borderRadius: 3,
-              bgcolor: 'rgba(13, 18, 29, 0.75)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              backdropFilter: 'blur(14px)',
+            sx={getCardStyle(isLight, {
               p: 2.5,
-              transition: 'all 0.2s',
-              '&:hover': { borderColor: 'rgba(99, 102, 241, 0.4)', transform: 'translateY(-2px)' }
-            }}
+              '&:hover': { borderColor: t.primary, transform: 'translateY(-2px)' }
+            })}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-              <Typography variant="caption" sx={{ color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+              <Typography variant="caption" sx={{ color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                 Total Enrolled
               </Typography>
-              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.12)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: t.primaryBg, color: t.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <PeopleAltRounded sx={{ fontSize: 20 }} />
               </Box>
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', mb: 0.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: t.textPrimary, mb: 0.5 }}>
               {stats.totalUsers}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>
+            <Typography variant="caption" sx={{ color: t.textMuted }}>
               Identities registered in directory
             </Typography>
           </Card>
@@ -260,28 +246,23 @@ const AdminDashboard = () => {
         {/* Verified Users */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
-            sx={{
-              borderRadius: 3,
-              bgcolor: 'rgba(13, 18, 29, 0.75)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              backdropFilter: 'blur(14px)',
+            sx={getCardStyle(isLight, {
               p: 2.5,
-              transition: 'all 0.2s',
-              '&:hover': { borderColor: 'rgba(16, 185, 129, 0.4)', transform: 'translateY(-2px)' }
-            }}
+              '&:hover': { borderColor: t.success, transform: 'translateY(-2px)' }
+            })}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-              <Typography variant="caption" sx={{ color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+              <Typography variant="caption" sx={{ color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                 Verified DIDs
               </Typography>
-              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: 'rgba(16, 185, 129, 0.12)', color: '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: t.successBg, color: t.success, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <VerifiedUserRounded sx={{ fontSize: 20 }} />
               </Box>
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#10b981', mb: 0.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: t.successText, mb: 0.5 }}>
               {stats.verifiedUsers}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>
+            <Typography variant="caption" sx={{ color: t.textMuted }}>
               Full consensus & biometric approval
             </Typography>
           </Card>
@@ -290,28 +271,23 @@ const AdminDashboard = () => {
         {/* Pending Verification */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
-            sx={{
-              borderRadius: 3,
-              bgcolor: 'rgba(13, 18, 29, 0.75)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              backdropFilter: 'blur(14px)',
+            sx={getCardStyle(isLight, {
               p: 2.5,
-              transition: 'all 0.2s',
-              '&:hover': { borderColor: 'rgba(245, 158, 11, 0.4)', transform: 'translateY(-2px)' }
-            }}
+              '&:hover': { borderColor: t.warning, transform: 'translateY(-2px)' }
+            })}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-              <Typography variant="caption" sx={{ color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+              <Typography variant="caption" sx={{ color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                 Pending Review
               </Typography>
-              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: t.warningBg, color: t.warning, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <HourglassEmptyRounded sx={{ fontSize: 20 }} />
               </Box>
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f59e0b', mb: 0.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: t.warningText, mb: 0.5 }}>
               {stats.pendingUsers}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>
+            <Typography variant="caption" sx={{ color: t.textMuted }}>
               Awaiting FaceMesh / document audit
             </Typography>
           </Card>
@@ -320,28 +296,23 @@ const AdminDashboard = () => {
         {/* Rejected Claims */}
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card
-            sx={{
-              borderRadius: 3,
-              bgcolor: 'rgba(13, 18, 29, 0.75)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              backdropFilter: 'blur(14px)',
+            sx={getCardStyle(isLight, {
               p: 2.5,
-              transition: 'all 0.2s',
-              '&:hover': { borderColor: 'rgba(239, 68, 68, 0.4)', transform: 'translateY(-2px)' }
-            }}
+              '&:hover': { borderColor: t.error, transform: 'translateY(-2px)' }
+            })}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-              <Typography variant="caption" sx={{ color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+              <Typography variant="caption" sx={{ color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                 Rejected Claims
               </Typography>
-              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: 'rgba(239, 68, 68, 0.12)', color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: t.errorBg, color: t.error, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <CancelRounded sx={{ fontSize: 20 }} />
               </Box>
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#ef4444', mb: 0.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: t.errorText, mb: 0.5 }}>
               {stats.rejectedUsers}
             </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b' }}>
+            <Typography variant="caption" sx={{ color: t.textMuted }}>
               Fraud flagged or invalid proof
             </Typography>
           </Card>
@@ -352,25 +323,18 @@ const AdminDashboard = () => {
       <Grid container spacing={3}>
         {/* Left Column: Recent Authority Activities */}
         <Grid size={{ xs: 12, md: 8 }}>
-          <Card
-            sx={{
-              borderRadius: 3,
-              bgcolor: 'rgba(13, 18, 29, 0.75)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              backdropFilter: 'blur(14px)'
-            }}
-          >
+          <Card sx={getCardStyle(isLight)}>
             <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.12)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Box sx={{ width: 38, height: 38, borderRadius: 2, bgcolor: t.primaryBg, color: t.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <HistoryRounded sx={{ fontSize: 22 }} />
                   </Box>
                   <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', fontSize: '1.05rem' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: t.textPrimary, fontSize: '1.05rem' }}>
                       Authority Audit Stream
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    <Typography variant="caption" sx={{ color: t.textMuted }}>
                       Chronological log of identity actions & biometric attestation events
                     </Typography>
                   </Box>
@@ -379,7 +343,7 @@ const AdminDashboard = () => {
                   size="small"
                   endIcon={<ArrowForwardRounded />}
                   onClick={() => navigate('/admin/activity-logs')}
-                  sx={{ color: '#a5b4fc', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem' }}
+                  sx={{ color: t.primary, textTransform: 'none', fontWeight: 600, fontSize: '0.8rem' }}
                 >
                   Full Log
                 </Button>
@@ -387,10 +351,10 @@ const AdminDashboard = () => {
 
               {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress size={32} sx={{ color: '#6366f1' }} />
+                  <CircularProgress size={32} sx={{ color: t.primary }} />
                 </Box>
               ) : stats.recentActivities.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 6, color: '#64748b' }}>
+                <Box sx={{ textAlign: 'center', py: 6, color: t.textMuted }}>
                   <Typography variant="body2">No recent audit actions recorded.</Typography>
                 </Box>
               ) : (
@@ -403,8 +367,8 @@ const AdminDashboard = () => {
                         sx={{
                           p: 2,
                           borderRadius: 2,
-                          bgcolor: 'rgba(15, 23, 42, 0.5)',
-                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          bgcolor: t.surfaceSubtle,
+                          border: `1px solid ${t.border}`,
                           display: 'flex',
                           flexDirection: { xs: 'column', sm: 'row' },
                           justifyContent: 'space-between',
@@ -412,8 +376,8 @@ const AdminDashboard = () => {
                           gap: 1.5,
                           transition: 'all 0.15s ease',
                           '&:hover': {
-                            bgcolor: 'rgba(15, 23, 42, 0.8)',
-                            borderColor: 'rgba(255, 255, 255, 0.1)'
+                            bgcolor: t.surfaceHover,
+                            borderColor: t.primaryBorder
                           }
                         }}
                       >
@@ -431,10 +395,10 @@ const AdminDashboard = () => {
                             }}
                           />
                           <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#f8fafc' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: t.textPrimary }}>
                               {activity.userName}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: '#64748b', fontFamily: 'monospace' }}>
+                            <Typography variant="caption" sx={{ color: t.textMuted, fontFamily: 'monospace' }}>
                               ID: {activity.userId}
                             </Typography>
                           </Box>
@@ -442,10 +406,10 @@ const AdminDashboard = () => {
 
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-                            <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block' }}>
+                            <Typography variant="caption" sx={{ color: t.textSecondary, display: 'block' }}>
                               by {activity.adminName}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: '#64748b' }}>
+                            <Typography variant="caption" sx={{ color: t.textMuted }}>
                               {formatDate(activity.timestamp)}
                             </Typography>
                           </Box>
@@ -455,7 +419,7 @@ const AdminDashboard = () => {
                               <IconButton
                                 size="small"
                                 onClick={() => window.open(`https://sepolia.etherscan.io/tx/${activity.txHash}`, '_blank')}
-                                sx={{ color: '#6366f1' }}
+                                sx={{ color: t.primary }}
                               >
                                 <OpenInNewRounded sx={{ fontSize: 16 }} />
                               </IconButton>
@@ -473,38 +437,32 @@ const AdminDashboard = () => {
 
         {/* Right Column: Authority Console Shortcuts */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Quick Action Card 1: Records */}
             <Card
               onClick={() => navigate('/admin/records')}
-              sx={{
-                borderRadius: 3,
-                bgcolor: 'rgba(13, 18, 29, 0.75)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                backdropFilter: 'blur(14px)',
+              sx={getCardStyle(isLight, {
                 cursor: 'pointer',
-                transition: 'all 0.2s',
                 '&:hover': {
-                  borderColor: 'rgba(99, 102, 241, 0.4)',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
+                  borderColor: t.primary,
+                  transform: 'translateY(-2px)'
                 }
-              }}
+              })}
             >
-              <CardContent sx={{ p: 2.5 }}>
+              <CardContent sx={{ p: 2.2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.25)', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: t.primaryBg, border: `1px solid ${t.primaryBorder}`, color: t.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <FolderSharedRounded sx={{ fontSize: 24 }} />
                   </Box>
                   <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}>
                       Identity Directory
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    <Typography variant="caption" sx={{ color: t.textMuted }}>
                       Inspect, verify, or reject user claims
                     </Typography>
                   </Box>
-                  <ArrowForwardRounded sx={{ color: '#64748b', fontSize: 18 }} />
+                  <ArrowForwardRounded sx={{ color: t.textMuted, fontSize: 18 }} />
                 </Box>
               </CardContent>
             </Card>
@@ -512,34 +470,28 @@ const AdminDashboard = () => {
             {/* Quick Action Card 2: FaceMesh Biometrics */}
             <Card
               onClick={() => navigate('/admin/face-verification')}
-              sx={{
-                borderRadius: 3,
-                bgcolor: 'rgba(13, 18, 29, 0.75)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                backdropFilter: 'blur(14px)',
+              sx={getCardStyle(isLight, {
                 cursor: 'pointer',
-                transition: 'all 0.2s',
                 '&:hover': {
-                  borderColor: 'rgba(16, 185, 129, 0.4)',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
+                  borderColor: t.success,
+                  transform: 'translateY(-2px)'
                 }
-              }}
+              })}
             >
-              <CardContent sx={{ p: 2.5 }}>
+              <CardContent sx={{ p: 2.2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)', color: '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: t.successBg, border: `1px solid ${t.successBorder}`, color: t.success, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <FingerprintRounded sx={{ fontSize: 24 }} />
                   </Box>
                   <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}>
                       FaceMesh Biometrics
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    <Typography variant="caption" sx={{ color: t.textMuted }}>
                       Live camera face matching scanner
                     </Typography>
                   </Box>
-                  <ArrowForwardRounded sx={{ color: '#64748b', fontSize: 18 }} />
+                  <ArrowForwardRounded sx={{ color: t.textMuted, fontSize: 18 }} />
                 </Box>
               </CardContent>
             </Card>
@@ -547,34 +499,28 @@ const AdminDashboard = () => {
             {/* Quick Action Card 3: Professional Credentials */}
             <Card
               onClick={() => navigate('/admin/professional-records')}
-              sx={{
-                borderRadius: 3,
-                bgcolor: 'rgba(13, 18, 29, 0.75)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                backdropFilter: 'blur(14px)',
+              sx={getCardStyle(isLight, {
                 cursor: 'pointer',
-                transition: 'all 0.2s',
                 '&:hover': {
-                  borderColor: 'rgba(245, 158, 11, 0.4)',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
+                  borderColor: t.warning,
+                  transform: 'translateY(-2px)'
                 }
-              }}
+              })}
             >
-              <CardContent sx={{ p: 2.5 }}>
+              <CardContent sx={{ p: 2.2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: t.warningBg, border: `1px solid ${t.warningBorder}`, color: t.warning, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <WorkspacePremiumRounded sx={{ fontSize: 24 }} />
                   </Box>
                   <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}>
                       Professional Records
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    <Typography variant="caption" sx={{ color: t.textMuted }}>
                       Audit employment & university degrees
                     </Typography>
                   </Box>
-                  <ArrowForwardRounded sx={{ color: '#64748b', fontSize: 18 }} />
+                  <ArrowForwardRounded sx={{ color: t.textMuted, fontSize: 18 }} />
                 </Box>
               </CardContent>
             </Card>
@@ -582,34 +528,28 @@ const AdminDashboard = () => {
             {/* Quick Action Card 4: Security Settings */}
             <Card
               onClick={() => navigate('/admin/settings')}
-              sx={{
-                borderRadius: 3,
-                bgcolor: 'rgba(13, 18, 29, 0.75)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                backdropFilter: 'blur(14px)',
+              sx={getCardStyle(isLight, {
                 cursor: 'pointer',
-                transition: 'all 0.2s',
                 '&:hover': {
-                  borderColor: 'rgba(99, 102, 241, 0.4)',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
+                  borderColor: t.primary,
+                  transform: 'translateY(-2px)'
                 }
-              }}
+              })}
             >
-              <CardContent sx={{ p: 2.5 }}>
+              <CardContent sx={{ p: 2.2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.25)', color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: t.primaryBg, border: `1px solid ${t.primaryBorder}`, color: t.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <SettingsRounded sx={{ fontSize: 24 }} />
                   </Box>
                   <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#f8fafc', lineHeight: 1.2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}>
                       Node Configuration
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                    <Typography variant="caption" sx={{ color: t.textMuted }}>
                       Security keys & notification webhooks
                     </Typography>
                   </Box>
-                  <ArrowForwardRounded sx={{ color: '#64748b', fontSize: 18 }} />
+                  <ArrowForwardRounded sx={{ color: t.textMuted, fontSize: 18 }} />
                 </Box>
               </CardContent>
             </Card>

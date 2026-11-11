@@ -1,6 +1,22 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { authAPI } from '../services/api.service';
+import { authAPI, userAPI } from '../services/api.service';
+
+// Helper to guarantee consistent snake_case & camelCase attributes across the app
+const normalizeUser = (u) => {
+  if (!u) return null;
+  const govId = u.government_id || u.governmentId || '';
+  const wallet = u.wallet_address || u.walletAddress || '';
+  const did = u.did || (wallet ? `did:trueid:${wallet}` : '');
+  return {
+    ...u,
+    government_id: govId,
+    governmentId: govId,
+    wallet_address: wallet,
+    walletAddress: wallet,
+    did: did
+  };
+};
 
 // Create the authentication context
 const AuthContext = createContext();
@@ -41,8 +57,11 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('accessToken', newAccessToken);
             localStorage.setItem('refreshToken', newRefreshToken);
             
-            if (storedUser) {
-              setUser(JSON.parse(storedUser));
+            const candidateUser = response.data.user || (storedUser ? JSON.parse(storedUser) : null);
+            if (candidateUser) {
+              const normalized = normalizeUser(candidateUser);
+              setUser(normalized);
+              localStorage.setItem('user', JSON.stringify(normalized));
             }
           } catch (refreshError) {
             // Refresh token is invalid, clear storage
@@ -53,7 +72,20 @@ export const AuthProvider = ({ children }) => {
         } else {
           // Token is still valid
           if (storedUser) {
-            setUser(JSON.parse(storedUser));
+            const initialUser = normalizeUser(JSON.parse(storedUser));
+            setUser(initialUser);
+          }
+          
+          // Refresh user profile from authoritative database to ensure DID & Gov ID are populated
+          try {
+            const profileRes = await userAPI.getProfile();
+            if (profileRes?.data?.user) {
+              const freshUser = normalizeUser(profileRes.data.user);
+              setUser(freshUser);
+              localStorage.setItem('user', JSON.stringify(freshUser));
+            }
+          } catch (profErr) {
+            // Silent fallback to stored user if offline
           }
         }
       } catch (err) {
@@ -85,13 +117,14 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.register(payload);
       const { user: newUser, tokens } = response.data;
       
+      const normalized = normalizeUser(newUser);
       // Store tokens and user data
       localStorage.setItem('accessToken', tokens.accessToken);
       localStorage.setItem('refreshToken', tokens.refreshToken);
-      localStorage.setItem('user', JSON.stringify(newUser));
+      localStorage.setItem('user', JSON.stringify(normalized));
       
-      setUser(newUser);
-      return { success: true, user: newUser };
+      setUser(normalized);
+      return { success: true, user: normalized };
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Registration failed. Please try again.';
       setError(errorMessage);
@@ -123,15 +156,16 @@ export const AuthProvider = ({ children }) => {
       
       const { user: loggedInUser, tokens } = response.data;
       
+      const normalized = normalizeUser(loggedInUser);
       // Store tokens and user data
       localStorage.setItem('accessToken', tokens.accessToken);
       localStorage.setItem('refreshToken', tokens.refreshToken);
-      localStorage.setItem('user', JSON.stringify(loggedInUser));
+      localStorage.setItem('user', JSON.stringify(normalized));
       
-      setUser(loggedInUser);
+      setUser(normalized);
       setMfaPending(false);
       setTempToken(null);
-      return { success: true, user: loggedInUser };
+      return { success: true, user: normalized };
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Login failed. Please check your credentials.';
       setError(errorMessage);
@@ -154,15 +188,16 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.verifyMFALogin(tempToken, mfaToken);
       const { user: loggedInUser, tokens } = response.data;
       
+      const normalized = normalizeUser(loggedInUser);
       // Store tokens and user data
       localStorage.setItem('accessToken', tokens.accessToken);
       localStorage.setItem('refreshToken', tokens.refreshToken);
-      localStorage.setItem('user', JSON.stringify(loggedInUser));
+      localStorage.setItem('user', JSON.stringify(normalized));
       
-      setUser(loggedInUser);
+      setUser(normalized);
       setMfaPending(false);
       setTempToken(null);
-      return { success: true, user: loggedInUser };
+      return { success: true, user: normalized };
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'MFA verification failed.';
       setError(errorMessage);

@@ -8,7 +8,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   TextField,
   Button,
   IconButton,
@@ -19,16 +18,11 @@ import {
   Typography,
   Chip,
   CircularProgress,
-  FormControl,
-  Select,
-  MenuItem,
-  InputLabel,
   Alert,
   Snackbar,
   Grid,
   Card,
   CardContent,
-  Divider,
   TablePagination,
   Link,
   Tooltip,
@@ -47,8 +41,6 @@ import {
   Error as ErrorIcon,
   CloudUpload as CloudUploadIcon,
   Download as DownloadIcon,
-  Preview as PreviewIcon,
-  Info as InfoIcon,
   Fingerprint as FingerprintIcon,
   Link as LinkIcon,
   Close as CloseIcon,
@@ -57,8 +49,13 @@ import {
 import { LoadingButton } from '@mui/lab';
 import ApiService from '../services/adminApi.service';
 import { debounce } from 'lodash';
+import { useColorMode } from '../../context/ThemeContext';
+import { getAdminThemeTokens, getCardStyle, getBannerStyle, getInputStyle } from '../utils/adminTheme';
 
 const AdminProfessionalRecords = () => {
+  const { isLight } = useColorMode();
+  const t = getAdminThemeTokens(isLight);
+
   // Helper for date formatting
   const formatDate = (date) => {
     if (!date) return 'N/A';
@@ -74,16 +71,10 @@ const AdminProfessionalRecords = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [openModal, setOpenModal] = useState(false);
-  const [refreshInterval, setRefreshInterval] = useState(60000);
-  const [autoRefresh, setAutoRefresh] = useState(false);
   const [blockchainLoading, setBlockchainLoading] = useState(false);
-  const [uploadFile, setUploadFile] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [linkedDocuments, setLinkedDocuments] = useState([]);
-  const [documentPreview, setDocumentPreview] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState('');
   const [verificationNotes, setVerificationNotes] = useState('');
   const [adminNotes, setAdminNotes] = useState('');
@@ -109,7 +100,7 @@ const AdminProfessionalRecords = () => {
         {...other}
       >
         {value === index && (
-          <Box sx={{ p: 3 }}>
+          <Box sx={{ p: 2.5 }}>
             {children}
           </Box>
         )}
@@ -141,16 +132,10 @@ const AdminProfessionalRecords = () => {
       }, {});
 
     try {
-      // Convert the data to a string
       const jsonString = JSON.stringify(sortedData);
-      // Convert string to Uint8Array
       const encoder = new TextEncoder();
       const data = encoder.encode(jsonString);
-      
-      // Calculate SHA-256 hash using Web Crypto API
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      
-      // Convert buffer to hex string
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
       
@@ -160,8 +145,8 @@ const AdminProfessionalRecords = () => {
       });
 
       return hashHex;
-    } catch (error) {
-      console.error('Error calculating hash:', error);
+    } catch (err) {
+      console.error('Error calculating hash:', err);
       return null;
     }
   };
@@ -173,21 +158,16 @@ const AdminProfessionalRecords = () => {
       try {
         const response = await ApiService.getAllProfessionalRecords(pageNum + 1, limit, searchTerm);
         if (response && response.records) {
-          const withUsers = await Promise.all(response.records.map(async (rec) => {
-            if (!rec.user && (rec.userId || rec.user_id)) {
-              try {
-                const user = await ApiService.getUserById(rec.userId || rec.user_id);
-                return { ...rec, user };
-              } catch (err) {
-                console.error('Failed to fetch user:', err);
-                return rec;
-              }
+          const withUsers = response.records.map((rec) => ({
+            ...rec,
+            user: rec.user || {
+              name: rec.user_name || 'N/A',
+              email: rec.user_email || 'N/A',
+              government_id: rec.user_government_id || rec.government_id || 'N/A'
             }
-            return rec;
           }));
           setRecords(withUsers);
           setTotalRecords(response.total || withUsers.length);
-          setTotalPages(response.totalPages || Math.ceil(response.records.length / rowsPerPage));
         }
       } catch (err) {
         setError('Failed to fetch records: ' + err.message);
@@ -203,38 +183,6 @@ const AdminProfessionalRecords = () => {
     debouncedFetch(searchQuery, page, rowsPerPage);
     return () => debouncedFetch.cancel();
   }, [searchQuery, page, rowsPerPage, debouncedFetch]);
-  
-  // Auto-refresh effect
-  useEffect(() => {
-    let interval;
-    if (autoRefresh) {
-      interval = setInterval(() => {
-        debouncedFetch(searchQuery, page, rowsPerPage);
-      }, refreshInterval);
-    }
-    return () => interval && clearInterval(interval);
-  }, [autoRefresh, refreshInterval, searchQuery, page, rowsPerPage, debouncedFetch]);
-
-  // Preview document handler
-  const handlePreviewDocument = async (doc) => {
-    try {
-      const response = await ApiService.getDocument(doc.id);
-      if (response.document) {
-        const { mimeType, fileUrl, isPreviewable } = response.document;
-        
-        if (!isPreviewable) {
-          setError('This document type cannot be previewed. You can download it instead.');
-          return;
-        }
-        
-        setPreviewDocType(mimeType);
-        setPreviewDocUrl(`${process.env.REACT_APP_API_URL}${fileUrl}`);
-      }
-    } catch (error) {
-      console.error('Error fetching document:', error);
-      setError('Failed to load document preview');
-    }
-  };
 
   // Fetch linked documents for a professional record
   const fetchLinkedDocuments = useCallback(async (recordId) => {
@@ -254,8 +202,8 @@ const AdminProfessionalRecords = () => {
       await fetchLinkedDocuments(record.id);
       await calculateRecordHash(record);
       setTabValue(0);
-    } catch (error) {
-      console.error('Error viewing record:', error);
+    } catch (err) {
+      console.error('Error viewing record:', err);
       setError('Failed to load record details');
     }
   }, [fetchLinkedDocuments]);
@@ -267,51 +215,6 @@ const AdminProfessionalRecords = () => {
     setSelectedRecord(null);
     setHashDetails(null);
   }, []);
-
-  // Handle file upload
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      setError('File size exceeds 10MB limit');
-      return;
-    }
-    
-    const formData = new FormData();
-    formData.append('document', file);
-    formData.append('professionalRecordId', selectedRecord.id);
-
-    try {
-      setUploadProgress(0);
-      const response = await ApiService.uploadDocument(formData, (progress) => {
-        setUploadProgress(progress);
-      });
-      setSuccess('Document uploaded successfully');
-      fetchLinkedDocuments(selectedRecord.id);
-      setUploadFile(null);
-      setUploadProgress(0);
-    } catch (err) {
-      setError(`Failed to upload document: ${err.message}`);
-    }
-  };
-
-  // Handle document verification
-  const handleVerifyDocument = async (documentId) => {
-    try {
-      await ApiService.verifyDocument(documentId, {
-        status: verificationStatus,
-        notes: verificationNotes
-      });
-      setSuccess('Document verified successfully');
-      fetchLinkedDocuments(selectedRecord.id);
-      setVerificationStatus('');
-      setVerificationNotes('');
-    } catch (err) {
-      setError(`Failed to verify document: ${err.message}`);
-    }
-  };
 
   // Handle blockchain verification
   const handleBlockchainVerify = async (recordId) => {
@@ -353,180 +256,90 @@ const AdminProfessionalRecords = () => {
 
   // Render status chip
   const StatusChip = ({ status }) => {
-    const getColor = () => {
-      switch (status?.toUpperCase()) {
-        case 'VERIFIED':
-          return 'success';
-        case 'REJECTED':
-          return 'error';
-        case 'PENDING':
-          return 'warning';
-        default:
-          return 'default';
-      }
-    };
-
+    const s = (status || 'PENDING').toUpperCase();
+    if (s === 'VERIFIED') {
+      return (
+        <Chip
+          label="VERIFIED"
+          size="small"
+          icon={<CheckCircleIcon sx={{ fontSize: '14px !important', color: `${t.success} !important` }} />}
+          sx={{
+            bgcolor: t.successBg,
+            color: t.successText,
+            border: `1px solid ${t.successBorder}`,
+            fontWeight: 700,
+            fontSize: '0.68rem'
+          }}
+        />
+      );
+    }
+    if (s === 'REJECTED') {
+      return (
+        <Chip
+          label="REJECTED"
+          size="small"
+          icon={<ErrorIcon sx={{ fontSize: '14px !important', color: `${t.error} !important` }} />}
+          sx={{
+            bgcolor: t.errorBg,
+            color: t.errorText,
+            border: `1px solid ${t.errorBorder}`,
+            fontWeight: 700,
+            fontSize: '0.68rem'
+          }}
+        />
+      );
+    }
     return (
       <Chip
-        label={status || 'PENDING'}
-        color={getColor()}
-        icon={status === 'VERIFIED' ? <CheckCircleIcon /> : status === 'REJECTED' ? <ErrorIcon /> : null}
-      />
-    );
-  };
-
-  // Document Preview Modal
-  const DocumentPreviewModal = ({ open, onClose }) => {
-    if (!open) return null;
-
-    const handleDownload = () => {
-      if (previewDocUrl) {
-        window.open(previewDocUrl, '_blank');
-      }
-    };
-
-    return (
-      <Dialog
-        open={open}
-        onClose={onClose}
-        maxWidth="lg"
-        fullWidth
-        PaperProps={{
-          style: {
-            height: '80vh',
-            maxHeight: '80vh',
-          },
+        label="PENDING"
+        size="small"
+        sx={{
+          bgcolor: t.warningBg,
+          color: t.warningText,
+          border: `1px solid ${t.warningBorder}`,
+          fontWeight: 700,
+          fontSize: '0.68rem'
         }}
-      >
-        <DialogTitle>
-          Document Preview
-          <Box sx={{ position: 'absolute', right: 8, top: 8, display: 'flex', gap: 1 }}>
-            <IconButton
-              aria-label="download"
-              onClick={handleDownload}
-              sx={{ color: 'primary.main' }}
-            >
-              <DownloadIcon />
-            </IconButton>
-            <IconButton
-              aria-label="close"
-              onClick={onClose}
-            >
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {previewDocType?.startsWith('image/') ? (
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                height: 'calc(80vh - 100px)',
-              }}
-            >
-              <img
-                src={previewDocUrl}
-                alt="Document Preview"
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '100%',
-                  objectFit: 'contain',
-                }}
-                onError={() => setError('Failed to load image')}
-              />
-            </Box>
-          ) : previewDocType === 'application/pdf' ? (
-            <Box
-              sx={{
-                height: 'calc(80vh - 100px)',
-                '& iframe': {
-                  border: 'none',
-                  width: '100%',
-                  height: '100%',
-                }
-              }}
-            >
-              <iframe
-                src={previewDocUrl}
-                title="PDF Preview"
-                onError={() => setError('Failed to load PDF')}
-              />
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: 'calc(80vh - 100px)',
-                gap: 2,
-              }}
-            >
-              <Typography variant="body1" color="text.secondary" align="center">
-                Preview not available for this file type.
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<DownloadIcon />}
-                onClick={handleDownload}
-              >
-                Download File
-              </Button>
-            </Box>
-          )}
-        </DialogContent>
-      </Dialog>
+      />
     );
   };
 
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
       {/* Top Banner */}
-      <Card
-        sx={{
-          mb: 4,
-          borderRadius: 3,
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(13, 18, 29, 0.95) 100%)',
-          border: '1px solid rgba(99, 102, 241, 0.25)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-          p: { xs: 2.5, md: 3.5 }
-        }}
-      >
+      <Card sx={getBannerStyle(isLight)}>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Chip
-                icon={<WorkspacePremiumRounded sx={{ fontSize: '14px !important', color: '#818cf8 !important' }} />}
+                icon={<WorkspacePremiumRounded sx={{ fontSize: '14px !important', color: `${t.primary} !important` }} />}
                 label="ACADEMIC & PROFESSIONAL VERIFICATION"
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(99, 102, 241, 0.15)',
-                  color: '#818cf8',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  bgcolor: t.primaryBg,
+                  color: t.primary,
+                  border: `1px solid ${t.primaryBorder}`,
                   fontWeight: 700,
                   fontSize: '0.68rem',
-                  letterSpacing: '0.08em'
+                  letterSpacing: '0.06em'
                 }}
               />
               <Chip
                 label={`${totalRecords} CREDENTIALS`}
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(255, 255, 255, 0.05)',
-                  color: '#cbd5e1',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  bgcolor: t.surfaceHover,
+                  color: t.textSecondary,
+                  border: `1px solid ${t.border}`,
                   fontWeight: 700,
                   fontSize: '0.68rem'
                 }}
               />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em', mb: 0.5 }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: t.textPrimary, letterSpacing: '-0.02em', mb: 0.5 }}>
               Professional Records Registry
             </Typography>
-            <Typography variant="body2" sx={{ color: '#94a3b8', maxWidth: 640 }}>
+            <Typography variant="body2" sx={{ color: t.textMuted, maxWidth: 640 }}>
               Audit academic diplomas, corporate employment proofs, and cryptographic certificate hashes.
             </Typography>
           </Box>
@@ -536,17 +349,17 @@ const AdminProfessionalRecords = () => {
             onClick={() => debouncedFetch(searchQuery, page, rowsPerPage)}
             variant="outlined"
             sx={{
-              borderColor: 'rgba(99, 102, 241, 0.3)',
-              color: '#a5b4fc',
+              borderColor: t.primaryBorder,
+              color: t.primary,
               fontWeight: 600,
               px: 2.5,
               py: 1,
               borderRadius: 2,
               textTransform: 'none',
-              bgcolor: 'rgba(99, 102, 241, 0.05)',
+              bgcolor: t.primaryBg,
               '&:hover': {
-                bgcolor: 'rgba(99, 102, 241, 0.12)',
-                borderColor: '#6366f1'
+                bgcolor: isLight ? 'rgba(37, 99, 235, 0.14)' : 'rgba(59, 130, 246, 0.2)',
+                borderColor: t.primary
               }
             }}
           >
@@ -555,17 +368,8 @@ const AdminProfessionalRecords = () => {
         </Box>
       </Card>
       
-      {/* Search and Controls */}
-      <Card
-        sx={{
-          mb: 3,
-          borderRadius: 3,
-          bgcolor: 'rgba(13, 18, 29, 0.75)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          backdropFilter: 'blur(14px)',
-          p: 2.5
-        }}
-      >
+      {/* Search Bar */}
+      <Card sx={getCardStyle(isLight, { mb: 3, p: 2.5 })}>
         <TextField
           placeholder="Search by title, organization, or citizen name..."
           variant="outlined"
@@ -575,52 +379,39 @@ const AdminProfessionalRecords = () => {
           fullWidth
           InputProps={{
             startAdornment: (
-              <SearchIcon sx={{ color: '#64748b', mr: 1 }} />
+              <SearchIcon sx={{ color: t.textMuted, mr: 1 }} />
             ),
-            sx: {
-              bgcolor: 'rgba(15, 23, 42, 0.7)',
-              borderRadius: 2,
-              color: '#f8fafc',
-              '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' }
-            }
+            sx: getInputStyle(isLight)
           }}
         />
       </Card>
       
       {/* Records Table */}
-      <Card
-        sx={{
-          borderRadius: 3,
-          bgcolor: 'rgba(13, 18, 29, 0.75)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          backdropFilter: 'blur(14px)',
-          overflow: 'hidden'
-        }}
-      >
+      <Card sx={getCardStyle(isLight, { overflow: 'hidden' })}>
         <TableContainer>
           <Table>
-            <TableHead sx={{ bgcolor: 'rgba(15, 23, 42, 0.8)' }}>
+            <TableHead sx={{ bgcolor: isLight ? '#f8fafc' : '#141518' }}>
               <TableRow>
-                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Citizen</TableCell>
-                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Title</TableCell>
-                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Organization</TableCell>
-                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Date Range</TableCell>
-                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Status</TableCell>
-                <TableCell sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Hash Status</TableCell>
-                <TableCell align="right" sx={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>Actions</TableCell>
+                <TableCell sx={{ color: t.textMuted, fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${t.border}` }}>Citizen</TableCell>
+                <TableCell sx={{ color: t.textMuted, fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${t.border}` }}>Title</TableCell>
+                <TableCell sx={{ color: t.textMuted, fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${t.border}` }}>Organization</TableCell>
+                <TableCell sx={{ color: t.textMuted, fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${t.border}` }}>Date Range</TableCell>
+                <TableCell sx={{ color: t.textMuted, fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${t.border}` }}>Status</TableCell>
+                <TableCell sx={{ color: t.textMuted, fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${t.border}` }}>Hash Status</TableCell>
+                <TableCell align="right" sx={{ color: t.textMuted, fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${t.border}` }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 6, borderBottom: 'none' }}>
-                    <CircularProgress size={32} sx={{ color: '#6366f1' }} />
+                    <CircularProgress size={32} sx={{ color: t.primary }} />
                   </TableCell>
                 </TableRow>
               ) : records.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 6, borderBottom: 'none' }}>
-                    <Typography variant="body1" sx={{ color: '#cbd5e1', fontWeight: 600 }}>
+                    <Typography variant="body1" sx={{ color: t.textSecondary, fontWeight: 600 }}>
                       No verified records registered yet.
                     </Typography>
                   </TableCell>
@@ -631,55 +422,59 @@ const AdminProfessionalRecords = () => {
                     key={record.id}
                     hover
                     sx={{
-                      '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.04) !important' },
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.04)'
+                      '&:hover': { bgcolor: isLight ? '#f8fafc !important' : 'rgba(255, 255, 255, 0.03) !important' },
+                      borderBottom: `1px solid ${t.border}`
                     }}
                   >
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#f8fafc' }}>{record.user?.name || 'N/A'}</Typography>
-                      <Typography variant="caption" sx={{ color: '#64748b', fontFamily: 'monospace' }}>
+                    <TableCell sx={{ borderBottom: `1px solid ${t.border}` }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: t.textPrimary }}>{record.user?.name || 'N/A'}</Typography>
+                      <Typography variant="caption" sx={{ color: t.textMuted, fontFamily: 'monospace' }}>
                         {record.user?.government_id}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ color: '#f8fafc', fontWeight: 600, borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>{record.title}</TableCell>
-                    <TableCell sx={{ color: '#38bdf8', borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>{record.organization || record.institution}</TableCell>
-                    <TableCell sx={{ color: '#94a3b8', fontSize: '0.8rem', borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <TableCell sx={{ color: t.textPrimary, fontWeight: 600, borderBottom: `1px solid ${t.border}` }}>{record.title}</TableCell>
+                    <TableCell sx={{ color: t.primary, fontWeight: 600, borderBottom: `1px solid ${t.border}` }}>{record.organization || record.institution}</TableCell>
+                    <TableCell sx={{ color: t.textMuted, fontSize: '0.8rem', borderBottom: `1px solid ${t.border}` }}>
                       {formatDate(record.start_date || record.startDate)} —{' '}
                       {record.end_date || record.endDate ? formatDate(record.end_date || record.endDate) : 'Present'}
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <TableCell sx={{ borderBottom: `1px solid ${t.border}` }}>
                       <StatusChip status={record.verification_status || record.verificationStatus} />
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <TableCell sx={{ borderBottom: `1px solid ${t.border}` }}>
                       <Tooltip title={record.data_hash || 'No hash available'}>
                         <Chip
-                          icon={<FingerprintIcon sx={{ fontSize: '14px !important' }} />}
+                          icon={<FingerprintIcon sx={{ fontSize: '14px !important', color: record.data_hash ? `${t.success} !important` : `${t.textMuted} !important` }} />}
                           label={record.data_hash ? 'Hashed' : 'Not Hashed'}
                           size="small"
                           sx={{
-                            bgcolor: record.data_hash ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.05)',
-                            color: record.data_hash ? '#34d399' : '#94a3b8',
-                            border: `1px solid ${record.data_hash ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                            bgcolor: record.data_hash ? t.successBg : t.surfaceSubtle,
+                            color: record.data_hash ? t.successText : t.textMuted,
+                            border: `1px solid ${record.data_hash ? t.successBorder : t.border}`,
                             fontWeight: 700,
                             fontSize: '0.68rem'
                           }}
                         />
                       </Tooltip>
                     </TableCell>
-                    <TableCell align="right" sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <TableCell align="right" sx={{ borderBottom: `1px solid ${t.border}` }}>
                       <Button
                         size="small"
                         startIcon={<VisibilityIcon />}
                         onClick={() => handleViewRecord(record)}
                         sx={{
-                          color: '#a5b4fc',
-                          bgcolor: 'rgba(99, 102, 241, 0.1)',
-                          border: '1px solid rgba(99, 102, 241, 0.25)',
+                          color: t.primary,
+                          bgcolor: t.primaryBg,
+                          border: `1px solid ${t.primaryBorder}`,
                           borderRadius: 1.5,
                           textTransform: 'none',
                           fontSize: '0.78rem',
                           fontWeight: 600,
-                          px: 1.5
+                          px: 1.5,
+                          '&:hover': {
+                            bgcolor: t.primary,
+                            color: '#ffffff'
+                          }
                         }}
                       >
                         Inspect
@@ -702,9 +497,11 @@ const AdminProfessionalRecords = () => {
             setPage(0);
           }}
           sx={{
-            color: '#94a3b8',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-            '& .MuiSelect-icon': { color: '#94a3b8' }
+            color: t.textMuted,
+            borderTop: `1px solid ${t.border}`,
+            '& .MuiSelect-icon': { color: t.textMuted },
+            '& .MuiTablePagination-select': { color: t.textPrimary },
+            '& .MuiIconButton-root': { color: t.textSecondary }
           }}
         />
       </Card>
@@ -717,28 +514,42 @@ const AdminProfessionalRecords = () => {
         fullWidth
         PaperProps={{
           sx: {
-            bgcolor: '#0d121d',
+            bgcolor: t.paper,
             backgroundImage: 'none',
             borderRadius: 3,
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            boxShadow: '0 24px 48px rgba(0, 0, 0, 0.7)'
+            border: `1px solid ${t.border}`,
+            boxShadow: isLight ? '0 20px 25px -5px rgba(0, 0, 0, 0.1)' : '0 24px 48px rgba(0, 0, 0, 0.7)'
           }
         }}
       >
         {selectedRecord && (
           <>
-            <DialogTitle>
-              Professional Record Details
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1.5, borderBottom: `1px solid ${t.border}` }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: t.textPrimary }}>
+                Professional Record Details
+              </Typography>
               <IconButton
                 onClick={handleCloseModal}
-                sx={{ position: 'absolute', right: 8, top: 8 }}
+                sx={{ color: t.textMuted, '&:hover': { color: t.textPrimary } }}
               >
-                &times;
+                <CloseIcon />
               </IconButton>
             </DialogTitle>
-            <DialogContent dividers>
-              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={tabValue} onChange={handleTabChange}>
+            <DialogContent dividers sx={{ borderColor: t.border, p: 0 }}>
+              <Box sx={{ borderBottom: `1px solid ${t.border}`, px: 2 }}>
+                <Tabs 
+                  value={tabValue} 
+                  onChange={handleTabChange}
+                  sx={{
+                    '& .MuiTab-root': {
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      color: t.textMuted,
+                      '&.Mui-selected': { color: t.primary }
+                    },
+                    '& .MuiTabs-indicator': { backgroundColor: t.primary }
+                  }}
+                >
                   <Tab label="Details" />
                   <Tab label="Hash Information" />
                   <Tab label="Documents" />
@@ -747,25 +558,25 @@ const AdminProfessionalRecords = () => {
               </Box>
               
               <TabPanel value={tabValue} index={0}>
-                <Grid container spacing={3}>
+                <Grid container spacing={2.5}>
                   <Grid item xs={12}>
-                    <Card>
+                    <Card sx={getCardStyle(isLight, { bgcolor: t.surfaceSubtle })}>
                       <CardContent>
-                        <Typography variant="h6">User Information</Typography>
-                        <Typography>Name: {selectedRecord.user?.name}</Typography>
-                        <Typography>Government ID: {selectedRecord.user?.government_id}</Typography>
-                        <Typography>Email: {selectedRecord.user?.email}</Typography>
+                        <Typography variant="subtitle2" sx={{ color: t.textMuted, mb: 1, textTransform: 'uppercase' }}>User Information</Typography>
+                        <Typography sx={{ color: t.textPrimary, fontWeight: 600 }}>Name: {selectedRecord.user?.name}</Typography>
+                        <Typography sx={{ color: t.primary, fontFamily: 'monospace' }}>Government ID: {selectedRecord.user?.government_id}</Typography>
+                        <Typography sx={{ color: t.textSecondary }}>Email: {selectedRecord.user?.email}</Typography>
                       </CardContent>
                     </Card>
                   </Grid>
                   <Grid item xs={12}>
-                    <Card>
+                    <Card sx={getCardStyle(isLight, { bgcolor: t.surfaceSubtle })}>
                       <CardContent>
-                        <Typography variant="h6">Record Details</Typography>
-                        <Typography>Title: {selectedRecord.title}</Typography>
-                        <Typography>Organization: {selectedRecord.organization || selectedRecord.institution}</Typography>
-                        <Typography>Description: {selectedRecord.description}</Typography>
-                        <Typography>Period: {formatDate(selectedRecord.start_date)} - {selectedRecord.end_date ? formatDate(selectedRecord.end_date) : 'Present'}</Typography>
+                        <Typography variant="subtitle2" sx={{ color: t.textMuted, mb: 1, textTransform: 'uppercase' }}>Record Details</Typography>
+                        <Typography variant="h6" sx={{ color: t.textPrimary, fontWeight: 700 }}>{selectedRecord.title}</Typography>
+                        <Typography sx={{ color: t.primary, fontWeight: 600 }}>Organization: {selectedRecord.organization || selectedRecord.institution}</Typography>
+                        <Typography sx={{ color: t.textSecondary, mt: 1 }}>{selectedRecord.description}</Typography>
+                        <Typography sx={{ color: t.textMuted, mt: 1, fontSize: '0.85rem' }}>Period: {formatDate(selectedRecord.start_date)} - {selectedRecord.end_date ? formatDate(selectedRecord.end_date) : 'Present'}</Typography>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -773,18 +584,22 @@ const AdminProfessionalRecords = () => {
               </TabPanel>
 
               <TabPanel value={tabValue} index={1}>
-                <Card>
+                <Card sx={getCardStyle(isLight, { bgcolor: t.surfaceSubtle })}>
                   <CardContent>
-                    <Typography variant="h6">Hash Information</Typography>
+                    <Typography variant="h6" sx={{ color: t.textPrimary, fontWeight: 700 }}>Hash Information</Typography>
                     <Box sx={{ mt: 2 }}>
-                      <Typography variant="subtitle1">Current Data Hash</Typography>
+                      <Typography variant="subtitle2" sx={{ color: t.textMuted }}>Current Data Hash</Typography>
                       <Typography
                         sx={{
-                          bgcolor: 'grey.100',
+                          bgcolor: t.paper,
+                          border: `1px solid ${t.border}`,
+                          color: t.primary,
                           p: 2,
-                          borderRadius: 1,
+                          borderRadius: 1.5,
                           fontFamily: 'monospace',
-                          wordBreak: 'break-all'
+                          fontSize: '0.85rem',
+                          wordBreak: 'break-all',
+                          mt: 0.5
                         }}
                       >
                         {selectedRecord.data_hash || 'Not available'}
@@ -794,14 +609,18 @@ const AdminProfessionalRecords = () => {
                     {hashDetails && (
                       <>
                         <Box sx={{ mt: 3 }}>
-                          <Typography variant="subtitle1">Calculated Hash</Typography>
+                          <Typography variant="subtitle2" sx={{ color: t.textMuted }}>Calculated SHA-256 Hash</Typography>
                           <Typography
                             sx={{
-                              bgcolor: 'grey.100',
+                              bgcolor: t.paper,
+                              border: `1px solid ${t.border}`,
+                              color: t.successText,
                               p: 2,
-                              borderRadius: 1,
+                              borderRadius: 1.5,
                               fontFamily: 'monospace',
-                              wordBreak: 'break-all'
+                              fontSize: '0.85rem',
+                              wordBreak: 'break-all',
+                              mt: 0.5
                             }}
                           >
                             {hashDetails.hash}
@@ -809,13 +628,18 @@ const AdminProfessionalRecords = () => {
                         </Box>
 
                         <Box sx={{ mt: 3 }}>
-                          <Typography variant="subtitle1">Source Data for Hash</Typography>
+                          <Typography variant="subtitle2" sx={{ color: t.textMuted }}>Source Data for Hash</Typography>
                           <pre
                             style={{
-                              backgroundColor: '#f5f5f5',
-                              padding: '16px',
-                              borderRadius: '4px',
-                              overflow: 'auto'
+                              backgroundColor: isLight ? '#f1f5f9' : '#111214',
+                              color: t.textPrimary,
+                              border: `1px solid ${t.border}`,
+                              padding: '14px',
+                              borderRadius: '8px',
+                              overflow: 'auto',
+                              fontSize: '0.8rem',
+                              fontFamily: 'monospace',
+                              marginTop: '4px'
                             }}
                           >
                             {JSON.stringify(hashDetails.sourceData, null, 2)}
@@ -826,15 +650,15 @@ const AdminProfessionalRecords = () => {
 
                     {selectedRecord.blockchain_tx_hash && (
                       <Box sx={{ mt: 3 }}>
-                        <Typography variant="subtitle1">Blockchain Transaction</Typography>
+                        <Typography variant="subtitle2" sx={{ color: t.textMuted }}>Blockchain Transaction</Typography>
                         <Link
                           href={`https://sepolia.etherscan.io/tx/${selectedRecord.blockchain_tx_hash}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1, color: t.primary, mt: 0.5, fontWeight: 600 }}
                         >
                           <LinkIcon />
-                          View on Explorer
+                          View on Sepolia Etherscan
                         </Link>
                       </Box>
                     )}
@@ -843,32 +667,32 @@ const AdminProfessionalRecords = () => {
               </TabPanel>
 
               <TabPanel value={tabValue} index={2}>
-                <Typography variant="h6" gutterBottom>Linked Documents</Typography>
+                <Typography variant="h6" sx={{ color: t.textPrimary, fontWeight: 700, mb: 2 }}>Linked Documents</Typography>
                 {linkedDocuments.length > 0 ? (
                   <List>
                     {linkedDocuments.map((doc) => (
-                      <ListItem key={doc.id}>
+                      <ListItem key={doc.id} sx={{ bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}`, borderRadius: 2, mb: 1 }}>
                         <ListItemText
-                          primary={doc.original_name}
+                          primary={<Typography sx={{ color: t.textPrimary, fontWeight: 600 }}>{doc.original_name}</Typography>}
                           secondary={
-                            <>
-                              <Typography variant="body2">
+                            <Box sx={{ mt: 0.5 }}>
+                              <Typography variant="body2" sx={{ color: t.textSecondary }}>
                                 Status: <StatusChip status={doc.verification_status} />
                               </Typography>
-                              <Typography variant="body2">
+                              <Typography variant="caption" sx={{ color: t.textMuted, fontFamily: 'monospace', display: 'block', mt: 0.5 }}>
                                 Hash: {doc.file_hash || 'Not available'}
                               </Typography>
                               {doc.blockchain_tx_hash && (
-                                <Typography variant="body2">
-                                  Blockchain TX: {doc.blockchain_tx_hash}
+                                <Typography variant="caption" sx={{ color: t.primary, fontFamily: 'monospace', display: 'block' }}>
+                                  TX: {doc.blockchain_tx_hash}
                                 </Typography>
                               )}
-                            </>
+                            </Box>
                           }
                         />
                         <ListItemSecondaryAction>
                           <Tooltip title="Download">
-                            <IconButton edge="end" href={doc.file_url} download>
+                            <IconButton edge="end" href={doc.file_url} download sx={{ color: t.primary }}>
                               <DownloadIcon />
                             </IconButton>
                           </Tooltip>
@@ -877,88 +701,92 @@ const AdminProfessionalRecords = () => {
                     ))}
                   </List>
                 ) : (
-                  <Typography>No documents found</Typography>
+                  <Box sx={{ textAlign: 'center', py: 4, color: t.textMuted }}>
+                    <Typography>No attached documents found.</Typography>
+                  </Box>
                 )}
               </TabPanel>
 
               <TabPanel value={tabValue} index={3}>
-                <Grid container spacing={3}>
-                  <Grid item xs={12}>
-                    <Card>
-                      <CardContent>
-                        <Typography variant="h6">Verification Status</Typography>
-                        <Box sx={{ mt: 2 }}>
-                          <StatusChip status={selectedRecord.verification_status} />
+                <Card sx={getCardStyle(isLight, { bgcolor: t.surfaceSubtle })}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ color: t.textPrimary, fontWeight: 700 }}>Verification Action</Typography>
+                    <Box sx={{ mt: 1.5 }}>
+                      <StatusChip status={selectedRecord.verification_status} />
+                    </Box>
+                    
+                    {selectedRecord.verification_status !== 'VERIFIED' && (
+                      <Box sx={{ mt: 3 }}>
+                        <TextField
+                          fullWidth
+                          multiline
+                          rows={3}
+                          label="Admin Audit Notes"
+                          value={adminNotes}
+                          onChange={(e) => setAdminNotes(e.target.value)}
+                          variant="outlined"
+                          InputProps={{ sx: getInputStyle(isLight) }}
+                        />
+                        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                          <LoadingButton
+                            variant="contained"
+                            loading={actionLoading}
+                            onClick={() => handleAdminVerify(selectedRecord.id, 'VERIFIED')}
+                            startIcon={<CheckCircleIcon />}
+                            sx={{
+                              bgcolor: t.success,
+                              color: '#fff',
+                              '&:hover': { bgcolor: '#059669' }
+                            }}
+                          >
+                            Verify Record
+                          </LoadingButton>
+                          <LoadingButton
+                            variant="contained"
+                            loading={actionLoading}
+                            onClick={() => handleAdminVerify(selectedRecord.id, 'REJECTED')}
+                            startIcon={<ErrorIcon />}
+                            sx={{
+                              bgcolor: t.error,
+                              color: '#fff',
+                              '&:hover': { bgcolor: '#b91c1c' }
+                            }}
+                          >
+                            Reject Record
+                          </LoadingButton>
                         </Box>
-                        
-                        {selectedRecord.verification_status !== 'VERIFIED' && (
-                          <Box sx={{ mt: 3 }}>
-                            <TextField
-                              fullWidth
-                              multiline
-                              rows={4}
-                              label="Admin Notes"
-                              value={adminNotes}
-                              onChange={(e) => setAdminNotes(e.target.value)}
-                              variant="outlined"
-                            />
-                            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                              <LoadingButton
-                                variant="contained"
-                                color="success"
-                                loading={actionLoading}
-                                onClick={() => handleAdminVerify(selectedRecord.id, 'VERIFIED')}
-                                startIcon={<CheckCircleIcon />}
-                              >
-                                Verify
-                              </LoadingButton>
-                              <LoadingButton
-                                variant="contained"
-                                color="error"
-                                loading={actionLoading}
-                                onClick={() => handleAdminVerify(selectedRecord.id, 'REJECTED')}
-                                startIcon={<ErrorIcon />}
-                              >
-                                Reject
-                              </LoadingButton>
-                            </Box>
-                          </Box>
-                        )}
+                      </Box>
+                    )}
 
-                        {selectedRecord.verification_status === 'VERIFIED' && !selectedRecord.blockchain_tx_hash && (
-                          <Box sx={{ mt: 3 }}>
-                            <LoadingButton
-                              variant="contained"
-                              color="primary"
-                              loading={blockchainLoading}
-                              onClick={() => handleBlockchainVerify(selectedRecord.id)}
-                              startIcon={<CloudUploadIcon />}
-                            >
-                              Verify on Blockchain
-                            </LoadingButton>
-                          </Box>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
+                    {selectedRecord.verification_status === 'VERIFIED' && !selectedRecord.blockchain_tx_hash && (
+                      <Box sx={{ mt: 3 }}>
+                        <LoadingButton
+                          variant="contained"
+                          loading={blockchainLoading}
+                          onClick={() => handleBlockchainVerify(selectedRecord.id)}
+                          startIcon={<CloudUploadIcon />}
+                          sx={{
+                            bgcolor: t.primary,
+                            color: '#fff',
+                            '&:hover': { bgcolor: t.primaryDark }
+                          }}
+                        >
+                          Verify on Blockchain
+                        </LoadingButton>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
               </TabPanel>
             </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCloseModal}>Close</Button>
+            <DialogActions sx={{ p: 2, borderTop: `1px solid ${t.border}` }}>
+              <Button onClick={handleCloseModal} sx={{ color: t.textSecondary, textTransform: 'none', fontWeight: 600 }}>
+                Close
+              </Button>
             </DialogActions>
           </>
         )}
       </Dialog>
-
-      {/* Add the DocumentPreviewModal component */}
-      <DocumentPreviewModal
-        open={Boolean(previewDocUrl)}
-        onClose={() => {
-          setPreviewDocUrl(null);
-          setPreviewDocType(null);
-        }}
-      />
 
       {/* Snackbar for messages */}
       <Snackbar
@@ -974,6 +802,11 @@ const AdminProfessionalRecords = () => {
           onClose={() => {
             setError(null);
             setSuccess(null);
+          }}
+          sx={{
+            bgcolor: error ? t.errorBg : t.successBg,
+            color: error ? t.errorText : t.successText,
+            border: `1px solid ${error ? t.errorBorder : t.successBorder}`
           }}
         >
           {error || success}

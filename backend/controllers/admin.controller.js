@@ -244,12 +244,23 @@ exports.refreshAdminToken = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
-  const { page = 1, limit = 10, search = '', status = '' } = req.query;
+  const { 
+    page = 1, 
+    limit = 10, 
+    search = '', 
+    status = '', 
+    biometric = '', 
+    sortBy = 'created_at', 
+    sortOrder = 'DESC' 
+  } = req.query;
   
   try {
     let query = `
       SELECT u.id, u.name, u.government_id, u.email, u.phone, u.wallet_address, 
              u.is_verified, u.verification_status, u.created_at, u.updated_at,
+             COALESCE(u.is_active, true) as is_active,
+             u.did, u.blockchain_tx_hash, u.mfa_enabled,
+             (SELECT b.facemesh_hash FROM biometric_data b WHERE b.user_id = u.id AND b.is_active = true LIMIT 1) as facemesh_hash,
              EXISTS(SELECT 1 FROM biometric_data b WHERE b.user_id = u.id AND b.is_active = true) as has_biometric
       FROM users u
       WHERE 1=1
@@ -258,36 +269,88 @@ exports.getAllUsers = async (req, res) => {
     const queryParams = [];
     let paramIndex = 1;
     
-    if (search) {
-      query += ` AND (u.name ILIKE $${paramIndex} OR u.government_id ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`;
-      queryParams.push(`%${search}%`);
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      query += ` AND (u.name ILIKE $${paramIndex} OR u.government_id ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex} OR u.phone ILIKE $${paramIndex} OR u.wallet_address ILIKE $${paramIndex} OR u.did ILIKE $${paramIndex})`;
+      queryParams.push(term);
       paramIndex++;
     }
     
-    if (status) {
-      query += ` AND u.verification_status = $${paramIndex}`;
-      queryParams.push(status);
-      paramIndex++;
+    if (status && status.toUpperCase() !== 'ALL') {
+      const s = status.toUpperCase();
+      if (s === 'ACTIVE') {
+        query += ` AND COALESCE(u.is_active, true) = true`;
+      } else if (s === 'INACTIVE' || s === 'SUSPENDED') {
+        query += ` AND u.is_active = false`;
+      } else {
+        query += ` AND u.verification_status = $${paramIndex}`;
+        queryParams.push(s);
+        paramIndex++;
+      }
+    }
+
+    if (biometric && biometric.toUpperCase() !== 'ALL') {
+      const b = biometric.toUpperCase();
+      if (b === 'TRUE' || b === 'ENROLLED') {
+        query += ` AND EXISTS(SELECT 1 FROM biometric_data b WHERE b.user_id = u.id AND b.is_active = true)`;
+      } else if (b === 'FALSE' || b === 'MISSING') {
+        query += ` AND NOT EXISTS(SELECT 1 FROM biometric_data b WHERE b.user_id = u.id AND b.is_active = true)`;
+      }
     }
     
     // Count total users matching the criteria
     const countQuery = `SELECT COUNT(*) FROM (${query}) AS count`;
     const countResult = await db.query(countQuery, queryParams);
-    const totalUsers = parseInt(countResult.rows[0].count);
+    const totalUsers = parseInt(countResult.rows[0].count, 10);
     
+    // Summary KPI stats across entire user base
+    const statsResult = await db.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(CASE WHEN verification_status = 'VERIFIED' THEN 1 END) as verified,
+        COUNT(CASE WHEN verification_status = 'PENDING' THEN 1 END) as pending,
+        COUNT(CASE WHEN verification_status = 'REJECTED' THEN 1 END) as rejected,
+        COUNT(CASE WHEN COALESCE(is_active, true) = true THEN 1 END) as active,
+        COUNT(CASE WHEN is_active = false THEN 1 END) as suspended,
+        COUNT(CASE WHEN EXISTS(SELECT 1 FROM biometric_data b WHERE b.user_id = users.id AND b.is_active = true) THEN 1 END) as biometric_count
+      FROM users
+    `);
+    const statsRow = statsResult.rows[0] || {};
+    
+    // Safe sorting column
+    const allowedSortCols = {
+      created_at: 'u.created_at',
+      name: 'u.name',
+      government_id: 'u.government_id',
+      verification_status: 'u.verification_status',
+      updated_at: 'u.updated_at'
+    };
+    const sortCol = allowedSortCols[sortBy] || 'u.created_at';
+    const direction = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
     // Add pagination
-    const offset = (page - 1) * limit;
-    query += ` ORDER BY u.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    queryParams.push(limit, offset);
+    const offset = (Math.max(1, parseInt(page, 10)) - 1) * parseInt(limit, 10);
+    query += ` ORDER BY ${sortCol} ${direction} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    queryParams.push(parseInt(limit, 10), offset);
     
     const result = await db.query(query, queryParams);
     
     res.status(200).json({
       users: result.rows,
+      total: totalUsers,
+      stats: {
+        total: parseInt(statsRow.total || 0, 10),
+        verified: parseInt(statsRow.verified || 0, 10),
+        pending: parseInt(statsRow.pending || 0, 10),
+        rejected: parseInt(statsRow.rejected || 0, 10),
+        active: parseInt(statsRow.active || 0, 10),
+        suspended: parseInt(statsRow.suspended || 0, 10),
+        biometricCount: parseInt(statsRow.biometric_count || 0, 10)
+      },
       pagination: {
         total: totalUsers,
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
         pages: Math.ceil(totalUsers / limit)
       }
     });
@@ -313,6 +376,8 @@ exports.getUserById = async (req, res) => {
       `SELECT u.id, u.name, u.government_id, u.email, u.phone, u.wallet_address, 
               u.is_verified, u.verification_status, u.verification_notes, 
               u.created_at, u.updated_at, u.verified_at,
+              COALESCE(u.is_active, true) as is_active,
+              u.did, u.mfa_enabled, u.blockchain_tx_hash,
               a.username as verified_by_username
        FROM users u
        LEFT JOIN admins a ON u.verified_by = a.id
@@ -372,8 +437,22 @@ exports.getUserById = async (req, res) => {
       user.blockchain_tx_hash = null;
       user.biometric_verification_status = null;
     }
+
+    // Query live smart contracts on Ethereum Sepolia
+    const blockchainService = require('../services/blockchain.service');
+    let onChainData = null;
+    try {
+      if (user.wallet_address) {
+        onChainData = await blockchainService.getOnChainIdentity(user.wallet_address);
+      }
+    } catch (bcErr) {
+      logger.warn(`Error fetching on-chain identity for user ${id}: ${bcErr.message}`);
+    }
+    user.on_chain = onChainData;
+
     res.status(200).json({
       user,
+      onChain: onChainData,
       biometricData: biometricResult.rows.map(b => ({
         id: b.id,
         facemesh_hash: b.facemesh_hash,
@@ -695,6 +774,33 @@ exports.verifyUser = async (req, res) => {
           }
         } else {
           logger.error(`No wallet address available for user ${id}`);
+        }
+
+        // STEP 3: Issue on-chain attestation and Soulbound Badge (SBT) via smart contract
+        try {
+          const blockchainService = require('../services/blockchain.service');
+          const biometricRow = await client.query('SELECT facemesh_hash FROM biometric_data WHERE user_id = $1 AND is_active = true', [id]);
+          const bioHash = biometricRow.rows[0]?.facemesh_hash || '';
+          const attestRes = await blockchainService.attestCitizenOnChain(targetAddress, bioHash);
+          if (attestRes.success && attestRes.txHashes && attestRes.txHashes.length > 0) {
+            const primaryTx = attestRes.txHashes[0];
+            await client.query('UPDATE users SET blockchain_tx_hash = $1 WHERE id = $2', [primaryTx, id]);
+            await client.query(
+              `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+               VALUES ($1, $2, 'USER_BLOCKCHAIN_ATTESTED', 'users', $2, $3, $4)`,
+              [req.admin.id, id, JSON.stringify(attestRes), req.ip]
+            );
+          }
+        } catch (attestErr) {
+          logger.warn(`On-chain attestation error for user ${id}: ${attestErr.message}`);
+        }
+      } else if (verificationStatus === 'REJECTED' && user.wallet_address) {
+        // Revoke smart contract on-chain credentials if rejected
+        try {
+          const blockchainService = require('../services/blockchain.service');
+          await blockchainService.revokeCitizenOnChain(user.wallet_address, verificationNotes || 'Verification rejected by authority');
+        } catch (revokeErr) {
+          logger.warn(`Failed to revoke on-chain credentials for user ${id}: ${revokeErr.message}`);
         }
       }
       
@@ -1263,12 +1369,12 @@ exports.deactivateUser = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
   const userId = req.params.id;
-  const { action, notes } = req.body;
+  const { action, notes, reason } = req.body || {};
   
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, government_id, is_active FROM users WHERE id = $1',
+      'SELECT id, name, government_id, wallet_address, is_active FROM users WHERE id = $1',
       [userId]
     );
     
@@ -1294,6 +1400,17 @@ exports.deactivateUser = async (req, res) => {
       'DELETE FROM user_sessions WHERE user_id = $1',
       [userId]
     );
+
+    // Revoke smart contract on-chain soulbound badge & attestation
+    let blockchainRevocation = null;
+    if (user.wallet_address) {
+      try {
+        const blockchainService = require('../services/blockchain.service');
+        blockchainRevocation = await blockchainService.revokeCitizenOnChain(user.wallet_address, reason || 'Account deactivated by authority');
+      } catch (bcError) {
+        logger.warn(`Failed to execute smart contract revocation for deactivated user ${userId}: ${bcError.message}`);
+      }
+    }
     
     // Log the deactivation
     await db.query(
@@ -1307,20 +1424,22 @@ exports.deactivateUser = async (req, res) => {
         userId,
         JSON.stringify({
           reason: reason || 'No reason provided',
-          governmentId: user.government_id
+          governmentId: user.government_id,
+          onChainRevocation: blockchainRevocation
         }),
         req.ip
       ]
     );
     
     res.status(200).json({
-      message: 'User deactivated successfully',
+      message: 'User deactivated successfully and smart contract state synchronized',
       user: {
         id: user.id,
         name: user.name,
         governmentId: user.government_id,
         isActive: false
-      }
+      },
+      blockchain: blockchainRevocation
     });
   } catch (error) {
     logger.error('Deactivate user error:', error);
@@ -1341,7 +1460,7 @@ exports.reactivateUser = async (req, res) => {
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, government_id, is_active FROM users WHERE id = $1',
+      'SELECT id, name, government_id, wallet_address, is_active FROM users WHERE id = $1',
       [userId]
     );
     
@@ -1361,6 +1480,19 @@ exports.reactivateUser = async (req, res) => {
       'UPDATE users SET is_active = true, updated_at = NOW() WHERE id = $1',
       [userId]
     );
+
+    // Re-attest smart contract on-chain credentials
+    let blockchainAttestation = null;
+    if (user.wallet_address) {
+      try {
+        const blockchainService = require('../services/blockchain.service');
+        const bioResult = await db.query('SELECT facemesh_hash FROM biometric_data WHERE user_id = $1 AND is_active = true LIMIT 1', [userId]);
+        const bioHash = bioResult.rows[0]?.facemesh_hash || '';
+        blockchainAttestation = await blockchainService.attestCitizenOnChain(user.wallet_address, bioHash);
+      } catch (bcError) {
+        logger.warn(`Failed to execute smart contract re-attestation for reactivated user ${userId}: ${bcError.message}`);
+      }
+    }
     
     // Log the reactivation
     await db.query(
@@ -1373,20 +1505,22 @@ exports.reactivateUser = async (req, res) => {
         'users',
         userId,
         JSON.stringify({
-          governmentId: user.government_id
+          governmentId: user.government_id,
+          onChainAttestation: blockchainAttestation
         }),
         req.ip
       ]
     );
     
     res.status(200).json({
-      message: 'User reactivated successfully',
+      message: 'User reactivated successfully and smart contract credentials restored',
       user: {
         id: user.id,
         name: user.name,
         governmentId: user.government_id,
         isActive: true
-      }
+      },
+      blockchain: blockchainAttestation
     });
   } catch (error) {
     logger.error('Reactivate user error:', error);
@@ -1582,7 +1716,7 @@ exports.getAllProfessionalRecords = async (req, res) => {
     
     // Get professional records with user details
     const recordsResult = await db.query(
-      `SELECT pr.*, u.name as user_name, u.email as user_email
+      `SELECT pr.*, u.name as user_name, u.email as user_email, u.government_id as user_government_id
        FROM professional_records pr
        JOIN users u ON pr.user_id = u.id
        ORDER BY pr.${sort} ${order}
@@ -1590,8 +1724,20 @@ exports.getAllProfessionalRecords = async (req, res) => {
       [limit, offset]
     );
     
+    const records = recordsResult.rows.map(row => ({
+      ...row,
+      user: {
+        id: row.user_id,
+        name: row.user_name,
+        email: row.user_email,
+        government_id: row.user_government_id
+      }
+    }));
+    
     res.status(200).json({
-      records: recordsResult.rows,
+      records,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
       pagination: {
         total: totalCount,
         page: parseInt(page),
@@ -1778,5 +1924,267 @@ exports.updateProfessionalRecordStatus = async (req, res) => {
   } catch (error) {
     logger.error('Update professional record status error:', error);
     res.status(500).json({ message: 'Server error while updating professional record status' });
+  }
+};
+
+/**
+ * Execute batch action on multiple users
+ */
+exports.batchUserAction = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { action, userIds, reason = '' } = req.body || {};
+
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    return res.status(400).json({ message: 'User IDs array is required' });
+  }
+
+  const validActions = ['VERIFY', 'REJECT', 'DEACTIVATE', 'REACTIVATE'];
+  const act = (action || '').toUpperCase();
+  if (!validActions.includes(act)) {
+    return res.status(400).json({ message: `Invalid action. Supported: ${validActions.join(', ')}` });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    let affected = 0;
+
+    if (act === 'VERIFY') {
+      const result = await client.query(
+        `UPDATE users 
+         SET verification_status = 'VERIFIED', is_verified = true, verified_by = $1, verified_at = NOW(), updated_at = NOW()
+         WHERE id = ANY($2::int[])`,
+        [req.admin.id, userIds]
+      );
+      affected = result.rowCount;
+      await client.query(
+        `UPDATE biometric_data SET verification_status = 'VERIFIED', updated_at = NOW() WHERE user_id = ANY($1::int[]) AND is_active = true`,
+        [userIds]
+      );
+    } else if (act === 'REJECT') {
+      const result = await client.query(
+        `UPDATE users 
+         SET verification_status = 'REJECTED', is_verified = false, verification_notes = $1, updated_at = NOW()
+         WHERE id = ANY($2::int[])`,
+        [reason || 'Batch rejected by authority audit', userIds]
+      );
+      affected = result.rowCount;
+    } else if (act === 'DEACTIVATE') {
+      const result = await client.query(
+        `UPDATE users SET is_active = false, updated_at = NOW() WHERE id = ANY($1::int[])`,
+        [userIds]
+      );
+      affected = result.rowCount;
+      await client.query(`DELETE FROM user_sessions WHERE user_id = ANY($1::int[])`, [userIds]);
+    } else if (act === 'REACTIVATE') {
+      const result = await client.query(
+        `UPDATE users SET is_active = true, updated_at = NOW() WHERE id = ANY($1::int[])`,
+        [userIds]
+      );
+      affected = result.rowCount;
+    }
+
+    // Query users for blockchain smart contract interaction
+    const userRows = await client.query(
+      `SELECT u.id, u.wallet_address, 
+              (SELECT b.facemesh_hash FROM biometric_data b WHERE b.user_id = u.id AND b.is_active = true LIMIT 1) as facemesh_hash
+       FROM users u WHERE u.id = ANY($1::int[])`,
+      [userIds]
+    );
+
+    const blockchainService = require('../services/blockchain.service');
+    const blockchainResults = [];
+
+    if (act === 'VERIFY') {
+      for (const u of userRows.rows) {
+        if (u.wallet_address) {
+          try {
+            const bcRes = await blockchainService.attestCitizenOnChain(u.wallet_address, u.facemesh_hash || '');
+            blockchainResults.push({ userId: u.id, wallet: u.wallet_address, ...bcRes });
+            if (bcRes.txHashes && bcRes.txHashes.length > 0) {
+              await client.query('UPDATE users SET blockchain_tx_hash = $1 WHERE id = $2', [bcRes.txHashes[0], u.id]);
+            }
+          } catch (e) {
+            blockchainResults.push({ userId: u.id, wallet: u.wallet_address, success: false, error: e.message });
+          }
+        }
+      }
+    } else if (act === 'REJECT' || act === 'DEACTIVATE') {
+      for (const u of userRows.rows) {
+        if (u.wallet_address) {
+          try {
+            const bcRes = await blockchainService.revokeCitizenOnChain(u.wallet_address, reason || `Batch ${act}`);
+            blockchainResults.push({ userId: u.id, wallet: u.wallet_address, ...bcRes });
+          } catch (e) {
+            blockchainResults.push({ userId: u.id, wallet: u.wallet_address, success: false, error: e.message });
+          }
+        }
+      }
+    }
+
+    // Insert batch audit log
+    await client.query(
+      `INSERT INTO audit_logs (admin_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, 'users', $3, $4, $5)`,
+      [
+        req.admin.id,
+        `BATCH_USER_${act}`,
+        userIds[0],
+        JSON.stringify({ userIds, action: act, affected, reason, blockchainResults }),
+        req.ip
+      ]
+    );
+
+    await client.query('COMMIT');
+    res.status(200).json({
+      success: true,
+      message: `Batch ${act} applied successfully to ${affected} user(s) (Blockchain Smart Contract synced: ${blockchainResults.length})`,
+      affected,
+      blockchainResults
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    logger.error('Batch user action error:', err);
+    res.status(500).json({ message: 'Failed to execute batch user action' });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * Reset user MFA credentials
+ */
+exports.resetUserMfa = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { id } = req.params;
+
+  try {
+    const userCheck = await db.query('SELECT id, name, government_id FROM users WHERE id = $1', [id]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await db.query(
+      `UPDATE users 
+       SET mfa_enabled = false, mfa_secret = NULL, mfa_type = NULL, mfa_backup_codes = NULL, updated_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+
+    await db.query('DELETE FROM mfa_sessions WHERE user_id = $1', [id]);
+
+    await db.query(
+      `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, 'USER_MFA_RESET_BY_ADMIN', 'users', $2, $3, $4)`,
+      [req.admin.id, id, JSON.stringify({ message: 'Authority admin reset citizen MFA' }), req.ip]
+    );
+
+    res.status(200).json({ success: true, message: 'User MFA has been successfully reset' });
+  } catch (err) {
+    logger.error('Reset user MFA error:', err);
+    res.status(500).json({ message: 'Failed to reset user MFA' });
+  }
+};
+
+/**
+ * Direct citizen onboarding by authority admin
+ */
+exports.onboardUser = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { name, governmentId, email, phone, verificationStatus = 'PENDING', initialPassword = 'Password123!' } = req.body || {};
+
+  if (!name || !governmentId || !email) {
+    return res.status(400).json({ message: 'Name, Government ID, and Email are required' });
+  }
+
+  try {
+    const existing = await db.query(
+      'SELECT id FROM users WHERE government_id = $1 OR email = $2',
+      [governmentId.trim().toUpperCase(), email.trim().toLowerCase()]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ message: 'A citizen with this Government ID or Email already exists' });
+    }
+
+    const { ethers } = require('ethers');
+    const randomWallet = ethers.Wallet.createRandom();
+    const walletAddress = randomWallet.address;
+    const did = `did:trueid:${walletAddress.toLowerCase()}`;
+    const passwordHash = await argon2.hash(initialPassword);
+
+    const isVerified = verificationStatus.toUpperCase() === 'VERIFIED';
+
+    const insertResult = await db.query(
+      `INSERT INTO users (
+        name, government_id, email, phone, password_hash, password,
+        wallet_address, avax_address, avax_private_key, did,
+        verification_status, is_verified, verified_by, verified_at,
+        is_active, created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $5,
+        $6, $6, $7, $8,
+        $9, $10, $11, $12,
+        true, NOW(), NOW()
+      ) RETURNING id, name, government_id, email, phone, wallet_address, did, verification_status, is_active, created_at`,
+      [
+        name.trim(),
+        governmentId.trim().toUpperCase(),
+        email.trim().toLowerCase(),
+        phone ? phone.trim() : null,
+        passwordHash,
+        walletAddress,
+        randomWallet.privateKey,
+        did,
+        verificationStatus.toUpperCase(),
+        isVerified,
+        isVerified ? req.admin.id : null,
+        isVerified ? new Date() : null
+      ]
+    );
+
+    const newUser = insertResult.rows[0];
+
+    // If initial attestation is VERIFIED, mint Soulbound token on Ethereum Sepolia
+    let blockchainAttestation = null;
+    if (isVerified) {
+      try {
+        const blockchainService = require('../services/blockchain.service');
+        blockchainAttestation = await blockchainService.attestCitizenOnChain(walletAddress, null);
+        if (blockchainAttestation.txHashes && blockchainAttestation.txHashes.length > 0) {
+          await db.query('UPDATE users SET blockchain_tx_hash = $1 WHERE id = $2', [blockchainAttestation.txHashes[0], newUser.id]);
+          newUser.blockchain_tx_hash = blockchainAttestation.txHashes[0];
+        }
+      } catch (bcError) {
+        logger.warn(`Failed to mint initial on-chain attestation for onboarded user ${newUser.id}: ${bcError.message}`);
+      }
+    }
+
+    await db.query(
+      `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+       VALUES ($1, $2, 'USER_ONBOARDED_BY_ADMIN', 'users', $2, $3, $4)`,
+      [
+        req.admin.id,
+        newUser.id,
+        JSON.stringify({ 
+          governmentId: newUser.government_id, 
+          email: newUser.email,
+          onChainAttestation: blockchainAttestation
+        }),
+        req.ip
+      ]
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Citizen onboarded successfully and registered on authority ledger',
+      user: newUser,
+      blockchain: blockchainAttestation
+    });
+  } catch (err) {
+    logger.error('Onboard user error:', err);
+    res.status(500).json({ message: 'Failed to onboard citizen' });
   }
 };

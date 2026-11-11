@@ -94,7 +94,7 @@ class DatabaseService extends EventEmitter {
         const result = await client.query('SELECT NOW()');
         if (result.rows.length > 0) {
           if (!this.connectionActive) {
-            console.log('Database connected successfully:', result.rows[0]);
+            console.log('\x1b[32m✔ [DB]\x1b[0m PostgreSQL connection established');
             this.connectionActive = true;
             this.failureCount = 0;
             this.circuitBroken = false;
@@ -163,9 +163,9 @@ class DatabaseService extends EventEmitter {
       const res = await this.pool.query(text, params);
       const duration = Date.now() - start;
       
-      // Log slow queries
-      if (duration > 500) {
-        console.log('Slow query:', { text, duration, rows: res.rowCount });
+      // Log exceptionally slow queries (> 3s)
+      if (duration > 3000) {
+        console.warn(`[DB Slow Query] ${duration}ms: ${text.slice(0, 100).replace(/\s+/g, ' ')}...`);
       }
       
       return res;

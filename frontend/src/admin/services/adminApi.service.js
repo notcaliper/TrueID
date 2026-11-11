@@ -97,14 +97,48 @@ class ApiService {
   }
   
   // User management
-  async getUsers(page = 1, limit = 10, search = '', searchType = 'name') {
+  async getUsers(page = 1, limit = 10, search = '', status = '', biometric = '', sortBy = 'created_at', sortOrder = 'DESC') {
     try {
       const response = await this.api.get('/admin/users', {
-        params: { page, limit, search, searchType }
+        params: { page, limit, search, status, biometric, sortBy, sortOrder }
       });
       return response.data;
     } catch (error) {
       console.error('Error fetching users:', error);
+      throw error;
+    }
+  }
+
+  async batchUserAction(action, userIds, reason = '') {
+    try {
+      const response = await this.api.post('/admin/users/batch-action', {
+        action,
+        userIds,
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error executing batch user action:', error);
+      throw error;
+    }
+  }
+
+  async resetUserMfa(userId) {
+    try {
+      const response = await this.api.put(`/admin/users/${userId}/reset-mfa`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error resetting MFA for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  async onboardUser(userData) {
+    try {
+      const response = await this.api.post('/admin/users/onboard', userData);
+      return response.data;
+    } catch (error) {
+      console.error('Error onboarding user:', error);
       throw error;
     }
   }

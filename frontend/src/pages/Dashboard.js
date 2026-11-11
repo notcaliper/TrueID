@@ -51,6 +51,10 @@ import { useColorMode } from '../context/ThemeContext';
 import { userAPI, blockchainAPI } from '../services/api.service';
 import QRCode from 'qrcode';
 
+const resolveGovId = (u) => u?.government_id || u?.governmentId || '';
+const resolveWallet = (u) => u?.wallet_address || u?.walletAddress || '';
+const resolveDid = (u) => u?.did || (resolveWallet(u) ? `did:trueid:${resolveWallet(u)}` : '');
+
 const Dashboard = () => {
   const { user } = useAuth();
   const { isLight } = useColorMode();
@@ -67,21 +71,26 @@ const Dashboard = () => {
   // eslint-disable-next-line no-unused-vars
   const [activeTab, setActiveTab] = useState('overview');
 
-  const [identityData, setIdentityData] = useState({
-    name: user?.name || user?.full_name || '',
-    governmentId: user?.government_id || '',
-    did: user?.wallet_address ? `did:trueid:${user.wallet_address}` : '',
-    verificationStatus: user?.verification_status || 'PENDING',
-    walletAddress: user?.wallet_address || '',
-    trustScore: user?.trust_score || 0,
-    tier: 'Citizen',
-    recordsCount: 0,
-    facemeshStatus: user?.facemesh_hash ? 'Enrolled (SHA-256)' : 'Not Enrolled',
-    enclaveStatus: 'Protected',
-    blockchainTx: user?.blockchain_tx_hash || '',
-    contractAddress: process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '',
-    sbtTokenId: user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : (user?.is_verified ? 'SBT-Token #1' : ''),
-    lastSync: ''
+  const [identityData, setIdentityData] = useState(() => {
+    const govId = resolveGovId(user);
+    const wallet = resolveWallet(user);
+    const did = resolveDid(user);
+    return {
+      name: user?.name || user?.full_name || '',
+      governmentId: govId,
+      did: did,
+      verificationStatus: user?.verification_status || user?.verificationStatus || 'PENDING',
+      walletAddress: wallet,
+      trustScore: user?.trust_score || 0,
+      tier: 'Citizen',
+      recordsCount: 0,
+      facemeshStatus: user?.facemesh_hash ? 'Enrolled (SHA-256)' : 'Not Enrolled',
+      enclaveStatus: 'Protected',
+      blockchainTx: user?.blockchain_tx_hash || '',
+      contractAddress: process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf',
+      sbtTokenId: user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : (user?.is_verified ? 'SBT-Token #1' : ''),
+      lastSync: ''
+    };
   });
 
   const [credentialRecords, setCredentialRecords] = useState([]);
@@ -143,27 +152,33 @@ const Dashboard = () => {
   const fetchData = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [verRes, bcRes, recRes, bioRes, txRes] = await Promise.allSettled([
+      const [verRes, bcRes, recRes, bioRes, txRes, profRes] = await Promise.allSettled([
         userAPI.getVerificationStatus(),
         blockchainAPI.getBlockchainStatus(),
         userAPI.getProfessionalRecords(),
         userAPI.getBiometricStatus(),
-        blockchainAPI.getTransactions(1, 5)
+        blockchainAPI.getTransactions(1, 5),
+        userAPI.getProfile()
       ]);
+
+      const fetchedUser = profRes.status === 'fulfilled' ? profRes.value?.data?.user : null;
+      const effectiveGovId = resolveGovId(fetchedUser) || resolveGovId(user);
+      const effectiveWallet = resolveWallet(fetchedUser) || resolveWallet(user);
+      const effectiveDid = resolveDid(fetchedUser) || resolveDid(user);
+      const effectiveName = fetchedUser?.name || user?.name || user?.full_name || '';
 
       const verStatus = verRes.status === 'fulfilled' && (verRes.value?.data?.data?.status || verRes.value?.data?.status)
         ? (verRes.value?.data?.data?.status || verRes.value?.data?.status)
         : (user?.verification_status || 'PENDING');
       const records = recRes.status === 'fulfilled' && recRes.value?.data?.records ? recRes.value.data.records : [];
       const bcData = bcRes.status === 'fulfilled' ? (bcRes.value?.data?.status || bcRes.value?.data?.data || bcRes.value?.data) : null;
-      const citizenWallet = user?.wallet_address || '';
 
       setIdentityData(prev => ({
         ...prev,
-        name: user?.name || user?.full_name || '',
-        governmentId: user?.government_id || '',
-        walletAddress: citizenWallet,
-        did: citizenWallet ? `did:trueid:${citizenWallet}` : '',
+        name: effectiveName,
+        governmentId: effectiveGovId,
+        walletAddress: effectiveWallet,
+        did: effectiveDid,
         verificationStatus: verStatus,
         recordsCount: records.length,
         facemeshStatus: bioRes.status === 'fulfilled' && bioRes.value?.data?.hasBiometrics ? 'Enrolled (SHA-256)' : (user?.facemesh_hash ? 'Enrolled (SHA-256)' : 'Not Enrolled'),
@@ -199,9 +214,10 @@ const Dashboard = () => {
     }
   }, [user]);
 
+  const userId = user?.id;
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [userId, fetchData]);
 
   const handleCopyDID = () => {
     navigator.clipboard.writeText(identityData.did);

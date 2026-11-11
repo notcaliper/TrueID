@@ -15,7 +15,7 @@ const AdminRoute = ({ children }) => {
 
   // Check if authenticated
   if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/admin/login" replace />;
   }
 
   // In standalone / dev mode, allow access. If user object has role, allow ADMIN/SUPER_ADMIN.

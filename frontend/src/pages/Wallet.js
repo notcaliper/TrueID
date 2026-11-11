@@ -52,7 +52,7 @@ const Wallet = () => {
   const [externalWallet, setExternalWallet] = useState(null);
   const [qrModalOpen, setQrModalOpen] = useState(false);
 
-  const defaultAddress = user?.wallet_address || '';
+  const defaultAddress = user?.wallet_address || user?.walletAddress || '';
 
   const [walletData, setWalletData] = useState({
     address: defaultAddress,
