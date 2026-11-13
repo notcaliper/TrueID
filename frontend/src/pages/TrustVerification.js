@@ -16,8 +16,7 @@ import {
   FingerprintRounded,
   GppGoodRounded,
   BadgeRounded,
-  CheckRounded,
-  TaskAltRounded
+  CheckRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
@@ -249,30 +248,6 @@ const TrustVerification = () => {
       weight: '20%',
       score: 100,
       color: '#16a34a'
-    }
-  ];
-
-  // Citizen Privileges
-  const citizenPrivileges = [
-    {
-      title: 'Airport E-Gate Pass',
-      state: isVerified && hasBiometrics ? 'UNLOCKED' : 'LOCKED',
-      desc: 'Fast-track through airport and border automated gates'
-    },
-    {
-      title: 'Secure Online Banking',
-      state: isVerified ? 'UNLOCKED' : 'LOCKED',
-      desc: 'Verify high-value transactions with one tap'
-    },
-    {
-      title: 'Digital Citizen Voting',
-      state: isVerified ? 'UNLOCKED' : 'LOCKED',
-      desc: 'Vote securely in official government and local ballots'
-    },
-    {
-      title: 'Private Document Sharing',
-      state: isVerified ? 'UNLOCKED' : 'LOCKED',
-      desc: 'Prove age or citizenship without showing your full name or address'
     }
   ];
 
@@ -704,46 +679,6 @@ const TrustVerification = () => {
                         '& .MuiLinearProgress-bar': { bgcolor: factor.color, borderRadius: 3 }
                       }}
                     />
-                  </Box>
-                ))}
-              </Box>
-            </Card>
-
-            {/* Verified Privileges Card */}
-            <Card
-              sx={{
-                p: 3,
-                borderRadius: 3,
-                bgcolor: isLight ? '#ffffff' : '#181a1c',
-                border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
-                boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.04)' : 'none'
-              }}
-            >
-              <Typography variant="subtitle2" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', mb: 2 }}>
-                VERIFIED TIER 1 PRIVILEGES
-              </Typography>
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {citizenPrivileges.map((priv, idx) => (
-                  <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                    <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.2 }}>
-                      <TaskAltRounded sx={{ fontSize: 14 }} />
-                    </Box>
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#0f172a' : '#ffffff', fontSize: '0.82rem' }}>
-                          {priv.title}
-                        </Typography>
-                        <Chip
-                          label={priv.state}
-                          size="small"
-                          sx={{ bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 800, fontSize: '0.62rem', height: 18 }}
-                        />
-                      </Box>
-                      <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontSize: '0.75rem', lineHeight: 1.3, display: 'block', mt: 0.2 }}>
-                        {priv.desc}
-                      </Typography>
-                    </Box>
                   </Box>
                 ))}
               </Box>
