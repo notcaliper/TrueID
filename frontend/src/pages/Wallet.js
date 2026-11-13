@@ -618,18 +618,32 @@ const Wallet = () => {
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: isLight ? '#475569' : '#9ca3af' }}>
-                              {tx.hash.slice(0, 8)}...{tx.hash.slice(-6)}
-                            </Typography>
-                            <IconButton
-                              size="small"
-                              component="a"
-                              href={`https://sepolia.etherscan.io/tx/${tx.hash}`}
-                              target="_blank"
-                              sx={{ color: '#2563eb', p: 0.2 }}
-                            >
-                              <OpenInNewRounded sx={{ fontSize: 13 }} />
-                            </IconButton>
+                            <Tooltip title={tx.hash} arrow>
+                              <Typography variant="caption" sx={{ fontFamily: 'monospace', color: isLight ? '#475569' : '#9ca3af', cursor: 'pointer' }} onClick={() => copyToClipboard(tx.hash)}>
+                                {tx.hash.slice(0, 8)}...{tx.hash.slice(-6)}
+                              </Typography>
+                            </Tooltip>
+                            <Tooltip title={copied ? 'Copied Full Hash!' : 'Copy full hash'}>
+                              <IconButton
+                                size="small"
+                                onClick={() => copyToClipboard(tx.hash)}
+                                sx={{ color: isLight ? '#64748b' : '#9ca3af', p: 0.2 }}
+                              >
+                                <ContentCopyRounded sx={{ fontSize: 13 }} />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="View on Sepolia Etherscan">
+                              <IconButton
+                                size="small"
+                                component="a"
+                                href={`https://sepolia.etherscan.io/tx/${tx.hash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                sx={{ color: '#2563eb', p: 0.2 }}
+                              >
+                                <OpenInNewRounded sx={{ fontSize: 13 }} />
+                              </IconButton>
+                            </Tooltip>
                           </Box>
                         </TableCell>
                         <TableCell align="right">

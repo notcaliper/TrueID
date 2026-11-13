@@ -769,20 +769,35 @@ const Dashboard = () => {
                   </Typography>
                 </Box>
                 {identityData.blockchainTx && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>
                       Mint Tx:
                     </Typography>
-                    <Typography
-                      component="a"
-                      href={`https://sepolia.etherscan.io/tx/${identityData.blockchainTx}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      variant="caption"
-                      sx={{ color: '#818cf8', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-                    >
-                      {identityData.blockchainTx.slice(0, 8)}...{identityData.blockchainTx.slice(-6)}
-                    </Typography>
+                    <Tooltip title={identityData.blockchainTx} arrow>
+                      <Typography
+                        component="a"
+                        href={`https://sepolia.etherscan.io/tx/${identityData.blockchainTx}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="caption"
+                        sx={{ color: '#818cf8', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                      >
+                        {identityData.blockchainTx.slice(0, 8)}...{identityData.blockchainTx.slice(-6)}
+                      </Typography>
+                    </Tooltip>
+                    <Tooltip title="Copy Mint Tx Hash">
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          navigator.clipboard.writeText(identityData.blockchainTx);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        sx={{ color: '#94a3b8', p: 0.2 }}
+                      >
+                        <ContentCopyRounded sx={{ fontSize: 11 }} />
+                      </IconButton>
+                    </Tooltip>
                   </Box>
                 )}
               </Box>
