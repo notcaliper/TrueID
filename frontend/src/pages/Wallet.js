@@ -69,16 +69,28 @@ const Wallet = () => {
     setError(null);
 
     try {
-      const [profileRes, txRes] = await Promise.allSettled([
+      const [profileRes, bcRes, txRes] = await Promise.allSettled([
         userAPI.getProfile(),
+        blockchainAPI.getBlockchainStatus(),
         blockchainAPI.getTransactions(1, 10)
       ]);
 
-      const profileAddress = profileRes.status === 'fulfilled' && profileRes.value?.data?.user?.walletAddress 
-        ? profileRes.value.data.user.walletAddress 
-        : defaultAddress;
+      const fetchedUser = profileRes.status === 'fulfilled' ? profileRes.value?.data?.user : null;
+      const profileAddress = fetchedUser?.walletAddress || fetchedUser?.wallet_address || defaultAddress;
 
-      const balance = await walletService.getBalance(profileAddress).catch(() => '0.0000');
+      let balance = await walletService.getBalance(profileAddress).catch(() => '0.0000');
+
+      // If client RPC returned 0.0000, fallback to backend's verified Sepolia provider balance
+      if ((balance === '0.0000' || !balance) && bcRes.status === 'fulfilled') {
+        const backendBalance = bcRes.value?.data?.status?.balance || bcRes.value?.data?.balance;
+        if (backendBalance && backendBalance !== '0.0000') {
+          const parsed = parseFloat(backendBalance);
+          if (!isNaN(parsed)) {
+            balance = parsed.toFixed(4);
+          }
+        }
+      }
+
       const rawTxList = txRes.status === 'fulfilled' ? (txRes.value?.data?.transactions || txRes.value?.data?.data?.transactions || []) : [];
 
       setWalletData(prev => ({
@@ -148,11 +160,11 @@ const Wallet = () => {
     {
       title: 'Wallet Balance',
       value: `${walletData.balance} Sepolia ETH`,
-      status: 'FUNDS READY',
+      status: parseFloat(walletData.balance) > 0 ? 'FUNDS READY' : 'NO FUNDS',
       desc: 'Test funds available for signing and updating documents',
-      tag: 'Ready to Use',
-      color: '#2563eb',
-      bg: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.12)',
+      tag: 'Sepolia Gas',
+      color: parseFloat(walletData.balance) > 0 ? '#16a34a' : '#2563eb',
+      bg: isLight ? (parseFloat(walletData.balance) > 0 ? '#f0fdf4' : '#eff6ff') : (parseFloat(walletData.balance) > 0 ? 'rgba(22, 163, 74, 0.12)' : 'rgba(37, 99, 235, 0.12)'),
       icon: <AccountBalanceWalletRounded sx={{ fontSize: 24 }} />
     },
     {
