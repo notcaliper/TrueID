@@ -10,13 +10,18 @@ import {
   Button,
   Grid,
   Chip,
-  Alert
+  Alert,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import {
   FingerprintRounded,
   CameraAltRounded,
   CheckCircleRounded,
-  RefreshRounded
+  RefreshRounded,
+  ContentCopyRounded,
+  BadgeRounded,
+  VerifiedUserRounded
 } from '@mui/icons-material';
 
 const AdminFaceVerification = () => {
@@ -27,6 +32,14 @@ const AdminFaceVerification = () => {
   const [verificationResult, setVerificationResult] = useState(null);
   const [professionalRecords, setProfessionalRecords] = useState([]);
   const [error, setError] = useState(null);
+  const [copiedField, setCopiedField] = useState(null);
+
+  const copyToClipboard = (text, fieldName) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   const handleStartScan = () => {
     setError(null);
@@ -199,7 +212,7 @@ const AdminFaceVerification = () => {
                     Citizen Identity Authenticated
                   </Typography>
                   <Typography variant="caption" sx={{ color: t.successText, fontWeight: 700 }}>
-                    FaceMesh biometric vectors matched with 99.4% confidence score
+                    FaceMesh biometric vectors matched with {verificationResult.similarityScore ? `${(verificationResult.similarityScore * 100).toFixed(1)}%` : 'high'} confidence score
                   </Typography>
                 </Box>
               </Box>
@@ -225,39 +238,164 @@ const AdminFaceVerification = () => {
             </Box>
           </Card>
 
-          {/* Dossier Card */}
+          {/* Dossier & Credentials Grid */}
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 7 }}>
               <Card sx={getCardStyle(isLight, { p: 3, height: '100%' })}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: t.textPrimary, mb: 2 }}>
-                  Matched Dossier Details
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, color: t.textPrimary, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <BadgeRounded sx={{ color: t.primary, fontSize: 22 }} />
+                    Matched Citizen Dossier
+                  </Typography>
+                  <Chip
+                    icon={<VerifiedUserRounded sx={{ fontSize: '13px !important', color: `${t.success} !important` }} />}
+                    label={verificationResult.verificationStatus || verificationResult.verification_status || 'VERIFIED'}
+                    size="small"
+                    sx={{
+                      bgcolor: t.successBg,
+                      color: t.successText,
+                      border: `1px solid ${t.successBorder}`,
+                      fontWeight: 700,
+                      fontSize: '0.7rem'
+                    }}
+                  />
+                </Box>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {/* Legal Name */}
                   <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
-                    <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
+                    <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Citizen Legal Name
                     </Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 700, color: t.textPrimary, mt: 0.5 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: t.textPrimary, mt: 0.5 }}>
                       {verificationResult.name}
                     </Typography>
                   </Box>
 
+                  {/* Decentralized Identifier (DID) */}
                   <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
-                    <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
-                      Government ID
-                    </Typography>
-                    <Typography variant="body1" sx={{ fontFamily: 'monospace', fontWeight: 700, color: t.primary, mt: 0.5 }}>
-                      {verificationResult.government_id}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.8 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Decentralized Identifier (DID)
+                        </Typography>
+                        {verificationResult.did && (
+                          <Chip
+                            label="W3C ERC-1056"
+                            size="small"
+                            sx={{
+                              height: 18,
+                              fontSize: '0.62rem',
+                              fontWeight: 700,
+                              bgcolor: isLight ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.2)',
+                              color: t.primary,
+                              border: `1px solid ${t.primaryBorder}`
+                            }}
+                          />
+                        )}
+                      </Box>
+                      {verificationResult.did && (
+                        <Tooltip title={copiedField === 'did' ? 'Copied DID!' : 'Copy DID'}>
+                          <IconButton
+                            size="small"
+                            onClick={() => copyToClipboard(verificationResult.did, 'did')}
+                            sx={{ color: copiedField === 'did' ? t.success : t.textMuted }}
+                          >
+                            <ContentCopyRounded sx={{ fontSize: 15 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
+                    {verificationResult.did ? (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          color: t.primary,
+                          wordBreak: 'break-all',
+                          bgcolor: isLight ? '#f1f5f9' : 'rgba(0, 0, 0, 0.35)',
+                          p: 1.2,
+                          borderRadius: 1.5,
+                          border: `1px solid ${t.border}`
+                        }}
+                      >
+                        {verificationResult.did}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" sx={{ color: t.textMuted, fontStyle: 'italic', mt: 0.5 }}>
+                        No Decentralized Identifier (DID) enrolled for this citizen
+                      </Typography>
+                    )}
                   </Box>
 
+                  {/* Government ID & Sepolia Wallet Grid */}
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}`, height: '100%' }}>
+                        <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Government ID / National ID
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontFamily: 'monospace', fontWeight: 800, color: t.textPrimary, mt: 0.5 }}>
+                          {verificationResult.governmentId || verificationResult.government_id || 'Not Specified'}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}`, height: '100%' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Ethereum Sepolia Address
+                          </Typography>
+                          {(verificationResult.walletAddress || verificationResult.wallet_address) && (
+                            <Tooltip title={copiedField === 'wallet' ? 'Copied Wallet!' : 'Copy Address'}>
+                              <IconButton
+                                size="small"
+                                onClick={() => copyToClipboard(verificationResult.walletAddress || verificationResult.wallet_address, 'wallet')}
+                                sx={{ color: copiedField === 'wallet' ? t.success : t.textMuted }}
+                              >
+                                <ContentCopyRounded sx={{ fontSize: 13 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 700, color: t.textSecondary, mt: 0.5, wordBreak: 'break-all' }}>
+                          {verificationResult.walletAddress || verificationResult.wallet_address || 'Not Registered'}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+
+                  {/* Biometric Mesh Hash */}
+                  {(verificationResult.facemeshHash || verificationResult.facemesh_hash) && (
+                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          FaceMesh Cryptographic Hash
+                        </Typography>
+                        <Tooltip title={copiedField === 'hash' ? 'Copied Hash!' : 'Copy Hash'}>
+                          <IconButton
+                            size="small"
+                            onClick={() => copyToClipboard(verificationResult.facemeshHash || verificationResult.facemesh_hash, 'hash')}
+                            sx={{ color: copiedField === 'hash' ? t.success : t.textMuted }}
+                          >
+                            <ContentCopyRounded sx={{ fontSize: 13 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                      <Typography variant="caption" sx={{ fontFamily: 'monospace', color: t.textMuted, wordBreak: 'break-all', display: 'block' }}>
+                        {verificationResult.facemeshHash || verificationResult.facemesh_hash}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Communications */}
                   <Box sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
-                    <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>
+                    <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Email / Communications
                     </Typography>
-                    <Typography variant="body2" sx={{ color: t.textSecondary, mt: 0.5 }}>
-                      {verificationResult.email}
+                    <Typography variant="body2" sx={{ color: t.textSecondary, mt: 0.5, fontWeight: 500 }}>
+                      {verificationResult.email || 'No email registered'} {verificationResult.phone ? `• ${verificationResult.phone}` : ''}
                     </Typography>
                   </Box>
                 </Box>
@@ -265,9 +403,9 @@ const AdminFaceVerification = () => {
             </Grid>
 
             {/* Linked Credentials Card */}
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 5 }}>
               <Card sx={getCardStyle(isLight, { p: 3, height: '100%' })}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: t.textPrimary, mb: 2 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: t.textPrimary, mb: 2 }}>
                   Verified Professional Records ({professionalRecords.length})
                 </Typography>
 

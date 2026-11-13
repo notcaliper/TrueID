@@ -46,26 +46,31 @@ const BiometricVault = () => {
   const [verificationSuccess, setVerificationSuccess] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [biometricStats, setBiometricStats] = useState({
-    status: 'ACTIVE',
-    landmarkCount: 68,
-    livenessScore: 99.4,
+    status: user?.facemesh_hash || user?.has_biometric ? 'ACTIVE' : 'NOT_ENROLLED',
+    landmarkCount: user?.facemesh_hash || user?.has_biometric ? 68 : 0,
+    livenessScore: user?.facemesh_hash || user?.has_biometric ? 99 : 0,
     enclaveModel: 'MediaPipe FaceMesh Neural v2',
-    lastScan: 'Nov 5, 2026, 12:45 AM',
-    biometricHash: '0x99f4c3a1b2d5e6f708192a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b28dc'
+    lastScan: null,
+    biometricHash: user?.facemesh_hash || user?.biometric_hash || null
   });
 
   const fetchBiometricStatus = useCallback(async () => {
     setRefreshing(true);
     try {
       const res = await userAPI.getBiometricStatus().catch(() => null);
-      if (res?.data) {
+      const data = res?.data || res;
+      if (data) {
         setBiometricStats(prev => ({
           ...prev,
-          lastScan: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
+          status: data.facemeshExists ? (data.verified ? 'VERIFIED_ACTIVE' : 'ACTIVE') : 'NOT_ENROLLED',
+          landmarkCount: data.facemeshExists ? 68 : 0,
+          livenessScore: data.biometricDetails?.verificationScore || (data.verified ? 99 : 0),
+          biometricHash: data.facemeshHash || data.biometricDetails?.facemeshHash || prev.biometricHash,
+          lastScan: data.lastVerified ? new Date(data.lastVerified).toLocaleString() : prev.lastScan
         }));
       }
     } catch (_) {
-      // Keep active cache
+      // Keep state
     } finally {
       setRefreshing(false);
     }
@@ -200,7 +205,7 @@ const BiometricVault = () => {
             {refreshing ? 'Syncing Enclave...' : 'Sync Biometrics'}
           </Button>
           <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280' }}>
-            • Last Scan: {biometricStats.lastScan}
+            • Last Scan: {biometricStats.lastScan || 'Verified in Registry'}
           </Typography>
         </Box>
       </Box>
@@ -478,6 +483,7 @@ const BiometricVault = () => {
             >
               <BiometricVerification
                 userId={user?.id}
+                mode={biometricStats.status === 'NOT_ENROLLED' ? 'update' : 'verify'}
                 onVerificationComplete={handleVerificationComplete}
               />
             </Box>
@@ -587,7 +593,7 @@ const BiometricVault = () => {
                     SHA-256 GEOMETRIC COMMITMENT HASH
                   </Typography>
                   <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isLight ? '#f1f5f9' : '#1e2124', fontFamily: 'monospace', fontSize: '0.75rem', color: '#7c3aed', wordBreak: 'break-all', mt: 0.5 }}>
-                    {biometricStats.biometricHash}
+                    {biometricStats.biometricHash || 'No biometric vector enrolled'}
                   </Box>
                 </Box>
 

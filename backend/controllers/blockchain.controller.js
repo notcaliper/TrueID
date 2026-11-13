@@ -4,6 +4,7 @@
  */
 const blockchainService = require('../services/blockchain.service');
 const ethers = require('ethers');
+const crypto = require('crypto');
 
 /**
  * Record user identity on blockchain
@@ -60,8 +61,14 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
     
     const biometricData = biometricResult.rows[0];
     
-    // Generate a hash for professional data (placeholder)
-    const professionalDataHash = 'professional_data_hash_placeholder';
+    // Fetch actual professional credentials or compute canonical zero-state hash
+    const profResult = await db.query(
+      'SELECT id, record_type, institution, data_hash FROM professional_records WHERE user_id = $1 ORDER BY id ASC',
+      [userId]
+    );
+    const professionalDataHash = profResult.rows.length > 0
+      ? crypto.createHash('sha256').update(JSON.stringify(profResult.rows)).digest('hex')
+      : crypto.createHash('sha256').update(`trueid:user:${userId}:credentials`).digest('hex');
     
     // Log network being used
     logger.info(`Recording identity on Ethereum Sepolia blockchain for user ${userId}`);
@@ -80,6 +87,10 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
       [result.transactionHash, result.network, biometricData.id]
     );
     
+    const regStatus = (result.status === 'SUCCESS' || result.status === 'CONFIRMED' || result.status === 'success')
+      ? 'CONFIRMED'
+      : (result.status === 'PENDING' ? 'PENDING' : 'FAILED');
+
     // Record transaction in database
     await db.query(
       `INSERT INTO blockchain_transactions 
@@ -90,7 +101,7 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
         'IDENTITY_REGISTRATION',
         result.transactionHash,
         result.blockNumber,
-        result.status,
+        regStatus,
         result.network,
         JSON.stringify({
           walletAddress: user.wallet_address,
@@ -246,6 +257,7 @@ exports.getUserBlockchainStatus = async (req, res) => {
     // Get full user blockchain status and wallet information
     const userResult = await db.query(
       `SELECT id, wallet_address, is_verified, verification_status,
+              COALESCE(is_active, true) as is_active,
               blockchain_status, blockchain_tx_hash, blockchain_network,
               soulbound_token_id, soulbound_badge_minted, verified_at, created_at
        FROM users WHERE id = $1`,
@@ -299,21 +311,30 @@ exports.getUserBlockchainStatus = async (req, res) => {
       logger.warn('Error fetching biometric root hash:', bioErr);
     }
 
-    // Get on-chain blockchain status
+    // Get on-chain blockchain status & Soulbound Badge token ID
     let onChainRegistered = false;
     let onChainVerified = false;
+    let onChainTokenId = user.soulbound_token_id ? Number(user.soulbound_token_id) : null;
+    let onChain = null;
     
     try {
-      onChainRegistered = await blockchainService.isIdentityRegistered(walletAddress);
-      if (onChainRegistered) {
-        onChainVerified = await blockchainService.isIdentityVerified(walletAddress);
+      onChain = await blockchainService.getOnChainIdentity(walletAddress);
+      if (onChain && onChain.isRegisteredOnChain) onChainRegistered = true;
+      if (onChain && onChain.isVerifiedOnChain) onChainVerified = true;
+      if (onChain && onChain.soulboundTokenId) {
+        onChainTokenId = Number(onChain.soulboundTokenId);
+        if (!user.soulbound_token_id) {
+          await db.query('UPDATE users SET soulbound_token_id = $1, soulbound_badge_minted = true WHERE id = $2', [onChainTokenId, userId]);
+        }
       }
     } catch (contractErr) {
       logger.warn(`On-chain status check error for ${walletAddress}:`, contractErr.message);
     }
     
-    const isRegistered = Boolean(onChainRegistered || user.soulbound_badge_minted || user.blockchain_status === 'CONFIRMED');
-    const isIdentityVerified = Boolean(onChainVerified || isDbVerified);
+    const isUserActive = user.is_active !== false;
+    const isBadgeValid = onChain ? onChain.isBadgeValid : isUserActive;
+    const isRegistered = Boolean(onChainRegistered || user.soulbound_badge_minted || onChainTokenId || user.blockchain_status === 'CONFIRMED');
+    const isIdentityVerified = Boolean(isUserActive && isBadgeValid && (onChainVerified || isDbVerified));
 
     // Get recent blockchain transactions
     let recentTransactions = [];
@@ -346,11 +367,19 @@ exports.getUserBlockchainStatus = async (req, res) => {
       }
     }
     
+    // Prefer actual attestation / registration tx over generic funding transfer
+    const attestationTx = recentTransactions.find(t => 
+      t.transaction_type === 'IDENTITY_REGISTRATION' || 
+      t.transaction_type === 'SOULBOUND_BADGE_MINT' || 
+      t.transaction_type === 'ATTESTATION'
+    );
     const latestTx = recentTransactions.length > 0 ? recentTransactions[0] : null;
-    const txHash = user.blockchain_tx_hash || (latestTx ? latestTx.transaction_hash : '');
-    const sbtTokenId = user.soulbound_token_id 
-      ? `SBT-Token #${user.soulbound_token_id}` 
-      : (isRegistered ? 'SBT-Token #1' : '');
+    const txHash = user.blockchain_tx_hash || (attestationTx ? attestationTx.transaction_hash : (latestTx ? latestTx.transaction_hash : ''));
+    let sbtTokenLabel = null;
+    if (onChainTokenId || user.soulbound_token_id) {
+      const tid = onChainTokenId || user.soulbound_token_id;
+      sbtTokenLabel = `SBT-Token #${tid}${(!isBadgeValid || !isUserActive) ? ' (Revoked)' : ''}`;
+    }
 
     let liveConfirmations = 0;
     if (txHash) {
@@ -375,16 +404,31 @@ exports.getUserBlockchainStatus = async (req, res) => {
       liveConfirmations = 1;
     }
 
+    let balance = '0.0000';
+    if (walletAddress) {
+      try {
+        const walletService = require('../services/wallet.service');
+        balance = await walletService.getBalance(walletAddress);
+      } catch (_) {}
+    }
+
+    const identityStatus = !isUserActive 
+      ? 'SUSPENDED' 
+      : (isIdentityVerified ? 'VERIFIED' : (isRegistered ? 'REGISTERED' : 'NOT_REGISTERED'));
+
     res.status(200).json({
       status: {
         walletAddress,
+        balance,
         isRegistered,
         isVerified: isIdentityVerified,
+        isSuspended: !isUserActive,
+        isBadgeValid,
         network,
-        identityStatus: isIdentityVerified ? 'VERIFIED' : (isRegistered ? 'REGISTERED' : 'NOT_REGISTERED'),
+        identityStatus,
         registrationTxHash: txHash,
         transactionHash: txHash,
-        sbtTokenId: sbtTokenId,
+        sbtTokenId: sbtTokenLabel,
         soulboundBadgeMinted: Boolean(user.soulbound_badge_minted || isRegistered),
         registrationTimestamp: (latestTx && latestTx.created_at) || user.verified_at || user.created_at,
         contractAddress: process.env.SOULBOUND_BADGE_ADDRESS || process.env.CONTRACT_ADDRESS,
@@ -462,23 +506,28 @@ exports.recordProfessionalRecord = async (req, res) => {
       logger.info(`Created blockchain identity for user ${userId}`);
     }
     
-    // Record on blockchain
-    const startTimestamp = Math.floor(new Date(record.start_date).getTime() / 1000);
-    const endTimestamp = record.end_date ? Math.floor(new Date(record.end_date).getTime() / 1000) : 0;
+    // Record on blockchain via TrueID Credential Registry and mint Soulbound Credential Badge
+    const result = await blockchainService.attestProfessionalCredentialOnChain({
+      subjectAddress: user.wallet_address,
+      recordId: record.id,
+      credentialId: record.credential_id || `urn:uuid:${record.id}`,
+      recordType: record.record_type,
+      institution: record.institution,
+      title: record.title,
+      credentialHash: record.data_hash,
+      biometricHash: user.biometric_hash || ''
+    });
     
-    const result = await blockchainService.addProfessionalRecord(
-      user.wallet_address,
-      record.data_hash,
-      startTimestamp,
-      endTimestamp
-    );
-    
+    const txHash = result.primaryTxHash || result.txHashes[0] || '0x00';
+
     // Update record with blockchain transaction hash
     await db.query(
       'UPDATE professional_records SET blockchain_tx_hash = $1, on_blockchain = true WHERE id = $2',
-      [result.transactionHash, recordId]
+      [txHash, recordId]
     );
     
+    const txStatus = 'CONFIRMED';
+
     // Record transaction in database
     await db.query(
       `INSERT INTO blockchain_transactions 
@@ -486,15 +535,17 @@ exports.recordProfessionalRecord = async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         userId,
-        'PROFESSIONAL_RECORD_ADDED',
-        result.transactionHash,
-        result.blockNumber,
-        result.status,
+        'CREDENTIAL_ATTESTATION',
+        txHash,
+        result.blockNumber || 0,
+        txStatus,
         JSON.stringify({
           recordId,
           recordType: record.record_type,
           institution: record.institution,
-          title: record.title
+          title: record.title,
+          tokenId: result.tokenId,
+          txHashes: result.txHashes
         })
       ]
     );
@@ -718,7 +769,7 @@ exports.recordUserProfessionalRecord = async (req, res) => {
           user.wallet_address,
           process.env.CONTRACT_ADDRESS,
           'PROFESSIONAL_RECORD',
-          'COMPLETED',
+          'CONFIRMED',
           recordId
         ]
       );

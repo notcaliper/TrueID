@@ -174,11 +174,25 @@ export const userAPI = {
   },
 
   getBiometricStatus: async () => {
-    return api.get('/users/verification-status');
+    return api.get('/users/biometric-status');
+  },
+
+  updateFacemesh: async (data) => {
+    return api.put('/users/update-facemesh', data);
+  },
+
+  verifyBiometric: async (data) => {
+    return api.post('/users/verify-biometric', data);
   },
 
   getProfessionVerificationStatus: async () => {
     return api.get('/users/verification-status');
+  },
+
+  uploadProfessionImage: async (formData) => {
+    return api.post('/profession/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
   },
 
   getProfessionalRecords: async () => {
@@ -251,8 +265,8 @@ export const walletAPI = {
       data: {
         address: resolvedAddress,
         did: user.did || (resolvedAddress ? `did:trueid:${resolvedAddress}` : ''),
-        balance: '0.0000',
-        network: 'Ethereum Sepolia Testnet'
+        balance: status.balance || '0.0000',
+        network: status.network || 'Ethereum Sepolia Testnet'
       }
     };
   },

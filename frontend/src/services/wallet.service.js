@@ -49,37 +49,59 @@ class WalletService {
    */
   async getBalance(address) {
     if (!address) return '0.0000';
+
+    // 1. If window.ethereum is available and connected to Sepolia (chainId 0xaa36a7 = 11155111)
     if (typeof window !== 'undefined' && window.ethereum) {
       try {
-        const balanceHex = await window.ethereum.request({
-          method: 'eth_getBalance',
-          params: [address, 'latest']
-        });
-        return (parseInt(balanceHex, 16) / 1e18).toFixed(4);
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' }).catch(() => null);
+        if (chainId === '0xaa36a7' || chainId === '11155111') {
+          const balanceHex = await window.ethereum.request({
+            method: 'eth_getBalance',
+            params: [address, 'latest']
+          });
+          const bal = parseInt(balanceHex, 16) / 1e18;
+          if (!isNaN(bal) && bal >= 0) {
+            return bal.toFixed(4);
+          }
+        }
       } catch {
         // Fall back to direct RPC
       }
     }
 
-    try {
-      const rpcUrl = process.env.REACT_APP_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
-      const response = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'eth_getBalance',
-          params: [address, 'latest'],
-          id: 1
-        })
-      });
-      const data = await response.json();
-      if (data && data.result) {
-        return (parseInt(data.result, 16) / 1e18).toFixed(4);
+    // 2. Direct Sepolia RPC queries (multi-endpoint fallback for reliable testnet resolution)
+    const rpcEndpoints = [
+      process.env.REACT_APP_SEPOLIA_RPC_URL,
+      'https://ethereum-sepolia-rpc.publicnode.com',
+      'https://1rpc.io/sepolia',
+      'https://rpc.sepolia.org',
+      'https://rpc2.sepolia.org'
+    ].filter(Boolean);
+
+    for (const rpcUrl of rpcEndpoints) {
+      try {
+        const response = await fetch(rpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'eth_getBalance',
+            params: [address, 'latest'],
+            id: 1
+          })
+        });
+        const data = await response.json();
+        if (data && data.result) {
+          const bal = parseInt(data.result, 16) / 1e18;
+          if (!isNaN(bal)) {
+            return bal.toFixed(4);
+          }
+        }
+      } catch (e) {
+        // Try next endpoint
       }
-    } catch (e) {
-      console.warn('Direct RPC balance fetch error:', e);
     }
+
     return '0.0000';
   }
 

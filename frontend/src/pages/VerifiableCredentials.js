@@ -35,7 +35,8 @@ import {
   RefreshRounded,
   GppGoodRounded,
   FactCheckRounded,
-  BadgeRounded
+  BadgeRounded,
+  OpenInNewRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
@@ -71,6 +72,54 @@ const VerifiableCredentials = () => {
   const [submitting, setSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
 
+  const modalInputSx = {
+    '& .MuiOutlinedInput-root': {
+      bgcolor: isLight ? '#f8fafc' : '#141618',
+      borderRadius: 2,
+      color: isLight ? '#0f172a' : '#ffffff',
+      fontSize: '0.875rem',
+      '& fieldset': {
+        borderColor: isLight ? '#e2e8f0' : '#282a2d',
+        transition: 'border-color 0.15s ease'
+      },
+      '&:hover fieldset': {
+        borderColor: isLight ? '#cbd5e1' : '#3f4246'
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: '#2563eb !important'
+      }
+    },
+    '& .MuiInputLabel-root': {
+      color: isLight ? '#64748b' : '#9ca3af',
+      bgcolor: isLight ? '#ffffff' : '#181a1c',
+      px: 0.8,
+      borderRadius: 0.5,
+      zIndex: 2,
+      fontSize: '0.85rem',
+      '&.Mui-focused': {
+        color: '#2563eb !important'
+      }
+    },
+    '& .MuiSelect-icon': {
+      color: isLight ? '#64748b' : '#9ca3af'
+    },
+    '& input::placeholder': {
+      color: isLight ? '#94a3b8' : '#64748b',
+      opacity: 1
+    },
+    '& textarea::placeholder': {
+      color: isLight ? '#94a3b8' : '#64748b',
+      opacity: 1
+    },
+    '& input[type="date"]': {
+      colorScheme: isLight ? 'light' : 'dark'
+    },
+    '& input[type="date"]::-webkit-calendar-picker-indicator': {
+      filter: isLight ? 'none' : 'invert(0.8)',
+      cursor: 'pointer'
+    }
+  };
+
   const fetchRecords = useCallback(async () => {
     setRefreshing(true);
     setError(null);
@@ -91,8 +140,20 @@ const VerifiableCredentials = () => {
     fetchRecords();
   }, [fetchRecords]);
 
-  const generateRandomHash = () =>
-    '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+  const sbtContractAddress = process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf';
+  const credentialContractAddress = process.env.REACT_APP_CREDENTIAL_REGISTRY_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x13b46Af37e8cc566446647deD8b6A0b4b7CE54B2';
+
+  const computeSha256 = async (data) => {
+    let buffer;
+    if (data instanceof Blob || data instanceof File) {
+      buffer = await data.arrayBuffer();
+    } else {
+      buffer = new TextEncoder().encode(typeof data === 'string' ? data : JSON.stringify(data));
+    }
+    const hashBuf = await window.crypto.subtle.digest('SHA-256', buffer);
+    const hashArr = Array.from(new Uint8Array(hashBuf));
+    return '0x' + hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
 
   const handleOpenDialog = () => {
     setRecordForm({
@@ -102,7 +163,7 @@ const VerifiableCredentials = () => {
       description: '',
       start_date: '',
       end_date: '',
-      data_hash: generateRandomHash()
+      data_hash: ''
     });
     setSelectedFile(null);
     setOpenDialog(true);
@@ -119,9 +180,16 @@ const VerifiableCredentials = () => {
     }));
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      try {
+        const hash = await computeSha256(file);
+        setRecordForm(prev => ({ ...prev, data_hash: hash }));
+      } catch (err) {
+        console.warn('Cryptographic hash computation notice:', err);
+      }
     }
   };
 
@@ -137,6 +205,9 @@ const VerifiableCredentials = () => {
         throw new Error('Please upload a supporting credential document (PDF or image).');
       }
 
+      // Compute cryptographic SHA-256 hash of document
+      const fileHash = recordForm.data_hash || await computeSha256(selectedFile);
+
       const payload = {
         title: recordForm.title,
         institution: recordForm.institution,
@@ -144,7 +215,7 @@ const VerifiableCredentials = () => {
         description: recordForm.description,
         startDate: recordForm.start_date,
         endDate: recordForm.end_date || null,
-        dataHash: recordForm.data_hash,
+        dataHash: fileHash,
       };
 
       const addRes = await userAPI.addProfessionalRecord(payload);
@@ -158,15 +229,8 @@ const VerifiableCredentials = () => {
         }
       }
 
-      // Add to local state
-      const newRec = {
-        id: `REC-${Date.now()}`,
-        ...recordForm,
-        verification_status: 'PENDING',
-        on_blockchain: false,
-        blockchain_tx_hash: null
-      };
-      setRecords(prev => [newRec, ...prev]);
+      // Authoritative refetch from database
+      await fetchRecords();
 
       handleCloseDialog();
       setSuccess('Credential successfully registered and submitted for authority notary attestation.');
@@ -276,7 +340,7 @@ const VerifiableCredentials = () => {
       title: 'Ethereum Sepolia Ledger',
       value: `${onChainCount} Anchored`,
       status: 'SMART CONTRACT BOUND',
-      desc: 'Soulbound registry contract 0x266B...816E • Tamper-proof',
+      desc: `Soulbound registry ${sbtContractAddress.slice(0, 6)}...${sbtContractAddress.slice(-4)} • Tamper-proof`,
       tag: 'On-Chain SBT',
       color: '#0891b2',
       bg: isLight ? '#ecfeff' : 'rgba(8, 145, 178, 0.12)',
@@ -499,7 +563,7 @@ const VerifiableCredentials = () => {
               100% Official Verification Rate
             </Typography>
             <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.7rem' }}>
-              Smart Contract: 0x266B...816E
+              Registry: {credentialContractAddress.slice(0, 6)}...{credentialContractAddress.slice(-4)}
             </Typography>
           </Box>
         </Box>
@@ -709,9 +773,9 @@ const VerifiableCredentials = () => {
                           </Typography>
 
                           {(record.blockchain_tx_hash || record.data_hash) && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                               <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 600 }}>
-                                On-Chain Hash:
+                                {record.blockchain_tx_hash ? 'Transaction Hash:' : 'Proof Hash:'}
                               </Typography>
                               <Typography
                                 variant="caption"
@@ -722,20 +786,50 @@ const VerifiableCredentials = () => {
                                   px: 0.8,
                                   py: 0.3,
                                   borderRadius: 1,
-                                  fontSize: '0.72rem'
+                                  fontSize: '0.73rem',
+                                  wordBreak: 'break-all',
+                                  fontWeight: 600
                                 }}
                               >
-                                {(record.blockchain_tx_hash || record.data_hash || '').slice(0, 12)}...{(record.blockchain_tx_hash || record.data_hash || '').slice(-8)}
+                                {record.blockchain_tx_hash || record.data_hash}
                               </Typography>
-                              <Tooltip title={copiedHash === `hash-${record.id}` ? 'Copied Hash!' : 'Copy Hash'}>
+                              <Tooltip title={copiedHash === `hash-${record.id}` ? 'Copied Full Hash!' : 'Copy full hash'}>
                                 <IconButton
                                   size="small"
                                   onClick={() => copyToClipboard(record.blockchain_tx_hash || record.data_hash, `hash-${record.id}`)}
-                                  sx={{ color: copiedHash === `hash-${record.id}` ? '#16a34a' : isLight ? '#64748b' : '#8b949e', p: 0.3 }}
+                                  sx={{ color: copiedHash === `hash-${record.id}` ? '#16a34a' : (isLight ? '#64748b' : '#8b949e'), p: 0.3 }}
                                 >
-                                  <ContentCopyRounded sx={{ fontSize: 14 }} />
+                                  {copiedHash === `hash-${record.id}` ? <CheckCircleRounded sx={{ fontSize: 14 }} /> : <ContentCopyRounded sx={{ fontSize: 14 }} />}
                                 </IconButton>
                               </Tooltip>
+
+                              {record.blockchain_tx_hash && (
+                                <Button
+                                  component="a"
+                                  href={`https://sepolia.etherscan.io/tx/${record.blockchain_tx_hash}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  size="small"
+                                  endIcon={<OpenInNewRounded sx={{ fontSize: '13px !important' }} />}
+                                  sx={{
+                                    textTransform: 'none',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    color: isLight ? '#1d4ed8' : '#60a5fa',
+                                    bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.12)',
+                                    border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.3)'}`,
+                                    borderRadius: 1.5,
+                                    px: 1.2,
+                                    py: 0.25,
+                                    '&:hover': {
+                                      bgcolor: isLight ? '#dbeafe' : 'rgba(37, 99, 235, 0.22)',
+                                      textDecoration: 'none'
+                                    }
+                                  }}
+                                >
+                                  View on Sepolia Etherscan ↗
+                                </Button>
+                              )}
                             </Box>
                           )}
                         </Box>
@@ -759,15 +853,19 @@ const VerifiableCredentials = () => {
                         />
 
                         <Chip
-                          icon={<SecurityRounded sx={{ fontSize: '13px !important', color: '#2563eb !important' }} />}
-                          label={record.on_blockchain ? 'ON-CHAIN' : 'OFF-CHAIN'}
+                          icon={<SecurityRounded sx={{ fontSize: '13px !important', color: `${(record.on_blockchain || record.blockchain_tx_hash) ? '#2563eb' : '#64748b'} !important` }} />}
+                          label={(record.on_blockchain || record.blockchain_tx_hash) ? 'ON-CHAIN' : 'OFF-CHAIN'}
                           size="small"
                           sx={{
                             fontWeight: 700,
                             fontSize: '0.7rem',
-                            bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.15)',
-                            color: '#2563eb',
-                            border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.3)'}`
+                            bgcolor: (record.on_blockchain || record.blockchain_tx_hash)
+                              ? (isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.15)')
+                              : (isLight ? '#f1f5f9' : '#1e2124'),
+                            color: (record.on_blockchain || record.blockchain_tx_hash) ? '#2563eb' : (isLight ? '#64748b' : '#9ca3af'),
+                            border: `1px solid ${(record.on_blockchain || record.blockchain_tx_hash)
+                              ? (isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.3)')
+                              : (isLight ? '#e2e8f0' : '#32363a')}`
                           }}
                         />
                       </Box>
@@ -816,7 +914,7 @@ const VerifiableCredentials = () => {
           }
         }}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: { xs: 2.5, sm: 3 }, pt: 2.5 }}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 800, color: isLight ? '#0f172a' : '#ffffff' }}>
               Register Verifiable Credential
@@ -830,7 +928,7 @@ const VerifiableCredentials = () => {
           </IconButton>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 2 }}>
+        <DialogContent sx={{ pt: '28px !important', px: { xs: 2.5, sm: 3 }, pb: 2 }}>
           <Grid container spacing={2.5}>
             <Grid size={12}>
               <TextField
@@ -843,12 +941,7 @@ const VerifiableCredentials = () => {
                 placeholder="e.g., Master of Science in Distributed Systems"
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
-                  }
-                }}
+                sx={modalInputSx}
               />
             </Grid>
 
@@ -863,10 +956,29 @@ const VerifiableCredentials = () => {
                 onChange={handleFormChange}
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
+                sx={modalInputSx}
+                SelectProps={{
+                  MenuProps: {
+                    PaperProps: {
+                      sx: {
+                        bgcolor: isLight ? '#ffffff' : '#181a1c',
+                        border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+                        borderRadius: 2,
+                        boxShadow: isLight ? '0 10px 25px -5px rgba(0,0,0,0.1)' : '0 10px 25px -5px rgba(0,0,0,0.5)',
+                        '& .MuiMenuItem-root': {
+                          color: isLight ? '#0f172a' : '#ffffff',
+                          fontSize: '0.85rem',
+                          '&:hover': {
+                            bgcolor: isLight ? '#f1f5f9' : '#21262d'
+                          },
+                          '&.Mui-selected': {
+                            bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.15)',
+                            color: '#2563eb',
+                            fontWeight: 600
+                          }
+                        }
+                      }
+                    }
                   }
                 }}
               >
@@ -888,12 +1000,7 @@ const VerifiableCredentials = () => {
                 placeholder="e.g., University / Organization Name"
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
-                  }
-                }}
+                sx={modalInputSx}
               />
             </Grid>
 
@@ -908,12 +1015,7 @@ const VerifiableCredentials = () => {
                 multiline
                 rows={3}
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
-                  }
-                }}
+                sx={modalInputSx}
               />
             </Grid>
 
@@ -928,12 +1030,7 @@ const VerifiableCredentials = () => {
                 onChange={handleFormChange}
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
-                  }
-                }}
+                sx={modalInputSx}
               />
             </Grid>
 
@@ -947,12 +1044,7 @@ const VerifiableCredentials = () => {
                 onChange={handleFormChange}
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
-                  }
-                }}
+                sx={modalInputSx}
               />
             </Grid>
 
@@ -970,7 +1062,11 @@ const VerifiableCredentials = () => {
                   bgcolor: isLight ? '#f8fafc' : '#141618',
                   border: `2px dashed ${selectedFile ? '#16a34a' : isLight ? '#cbd5e1' : '#3f4246'}`,
                   cursor: 'pointer',
-                  '&:hover': { bgcolor: isLight ? '#f1f5f9' : '#1e2124' }
+                  transition: 'all 0.15s ease',
+                  '&:hover': {
+                    bgcolor: isLight ? '#f1f5f9' : '#1e2124',
+                    borderColor: '#2563eb'
+                  }
                 }}
               >
                 <input type="file" hidden accept=".pdf,image/*" onChange={handleFileChange} />
@@ -986,15 +1082,23 @@ const VerifiableCredentials = () => {
           </Grid>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleCloseDialog} sx={{ color: isLight ? '#64748b' : '#9ca3af', textTransform: 'none' }}>
+        <DialogActions sx={{ px: { xs: 2.5, sm: 3 }, pb: 2.5, pt: 1 }}>
+          <Button onClick={handleCloseDialog} sx={{ color: isLight ? '#64748b' : '#9ca3af', textTransform: 'none', fontWeight: 600 }}>
             Cancel
           </Button>
           <Button
             variant="contained"
             disabled={submitting}
             onClick={handleSubmit}
-            sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, px: 3, '&:hover': { bgcolor: '#1d4ed8' } }}
+            sx={{
+              bgcolor: '#2563eb',
+              textTransform: 'none',
+              fontWeight: 700,
+              px: 3,
+              borderRadius: 2,
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+              '&:hover': { bgcolor: '#1d4ed8' }
+            }}
           >
             {submitting ? 'Registering...' : 'Register Claim'}
           </Button>
@@ -1016,19 +1120,19 @@ const VerifiableCredentials = () => {
           }
         }}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: { xs: 2.5, sm: 3 }, pt: 2.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <FactCheckRounded sx={{ color: '#2563eb' }} />
-            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1rem', color: isLight ? '#0f172a' : '#ffffff' }}>
               W3C Cryptographic Proof Verification
             </Typography>
           </Box>
-          <IconButton size="small" onClick={() => setProofModalOpen(false)}>
+          <IconButton size="small" onClick={() => setProofModalOpen(false)} sx={{ color: isLight ? '#64748b' : '#9ca3af' }}>
             <CloseRounded />
           </IconButton>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 2 }}>
+        <DialogContent sx={{ pt: '20px !important', px: { xs: 2.5, sm: 3 }, pb: 2 }}>
           {selectedProof && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Box sx={{ p: 2, borderRadius: 2, bgcolor: isLight ? '#f8fafc' : '#141618', border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}` }}>
@@ -1044,12 +1148,53 @@ const VerifiableCredentials = () => {
               </Box>
 
               <Box>
-                <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
-                  SHA-256 NOTARY PROOF HASH
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
+                  <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, textTransform: 'uppercase' }}>
+                    {selectedProof.blockchain_tx_hash ? 'SEPOLIA BLOCKCHAIN TRANSACTION HASH' : 'SHA-256 NOTARY PROOF HASH'}
+                  </Typography>
+                  <Tooltip title={copiedHash === 'modal-proof' ? 'Copied Full Hash!' : 'Copy full hash'}>
+                    <Button
+                      size="small"
+                      onClick={() => copyToClipboard(selectedProof.blockchain_tx_hash || selectedProof.data_hash, 'modal-proof')}
+                      startIcon={copiedHash === 'modal-proof' ? <CheckCircleRounded sx={{ fontSize: 14 }} /> : <ContentCopyRounded sx={{ fontSize: 14 }} />}
+                      sx={{ textTransform: 'none', fontSize: '0.72rem', fontWeight: 700, color: copiedHash === 'modal-proof' ? '#16a34a' : '#2563eb' }}
+                    >
+                      {copiedHash === 'modal-proof' ? 'Copied' : 'Copy Hash'}
+                    </Button>
+                  </Tooltip>
+                </Box>
                 <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isLight ? '#f1f5f9' : '#1e2124', fontFamily: 'monospace', fontSize: '0.8rem', color: '#2563eb', wordBreak: 'break-all' }}>
                   {selectedProof.blockchain_tx_hash || selectedProof.data_hash || 'Verified on Ethereum Sepolia'}
                 </Box>
+
+                {/* Direct Link to Etherscan Testnet in Modal */}
+                {selectedProof.blockchain_tx_hash && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Button
+                      component="a"
+                      href={`https://sepolia.etherscan.io/tx/${selectedProof.blockchain_tx_hash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      fullWidth
+                      variant="outlined"
+                      endIcon={<OpenInNewRounded sx={{ fontSize: '15px !important' }} />}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        color: isLight ? '#1d4ed8' : '#60a5fa',
+                        borderColor: isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.4)',
+                        bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.08)',
+                        py: 0.8,
+                        '&:hover': {
+                          bgcolor: isLight ? '#dbeafe' : 'rgba(37, 99, 235, 0.18)'
+                        }
+                      }}
+                    >
+                      Verify On-Chain via Sepolia Etherscan Explorer ↗
+                    </Button>
+                  </Box>
+                )}
               </Box>
 
               <Box>
@@ -1077,18 +1222,18 @@ const VerifiableCredentials = () => {
   "id": "urn:uuid:${selectedProof.id}",
   "type": ["VerifiableCredential", "${selectedProof.record_type}"],
   "issuer": "${selectedProof.institution}",
-  "issuanceDate": "${selectedProof.start_date || new Date().toISOString()}T00:00:00Z",
+  "issuanceDate": "${selectedProof.start_date ? selectedProof.start_date + 'T00:00:00Z' : (selectedProof.created_at || new Date().toISOString())}",
   "credentialSubject": {
-    "id": "did:trueid:${user?.wallet_address || ''}",
+    "id": "${user?.did || (user?.wallet_address ? `did:trueid:${user.wallet_address}` : '')}",
     "qualification": "${selectedProof.title}",
     "status": "${selectedProof.verification_status}"
   },
   "proof": {
     "type": "Ed25519Signature2020",
-    "created": "2026-11-05T00:00:00Z",
-    "verificationMethod": "did:trueid:${user?.wallet_address || ''}#key-1",
+    "created": "${selectedProof.created_at || new Date().toISOString()}",
+    "verificationMethod": "${user?.did || (user?.wallet_address ? `did:trueid:${user.wallet_address}` : '')}#key-1",
     "proofPurpose": "assertionMethod",
-    "proofValue": "${(selectedProof.blockchain_tx_hash || selectedProof.data_hash || '').slice(0, 32)}..."
+    "proofValue": "${selectedProof.blockchain_tx_hash || selectedProof.data_hash || ''}"
   }
 }`}
                 </Box>

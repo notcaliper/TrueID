@@ -6,6 +6,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { authenticateUser } = require('../middleware/auth.middleware');
 const { authenticateAdmin } = require('../middleware/auth.middleware');
 const professionController = require('../controllers/profession.controller');
@@ -23,7 +24,7 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const ext = path.extname(file.originalname);
-    const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    const filename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
     cb(null, filename);
   },
 });

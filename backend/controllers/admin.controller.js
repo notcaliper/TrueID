@@ -3,6 +3,7 @@
  */
 const jwt = require('jsonwebtoken');
 const argon2 = require('argon2');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -404,10 +405,11 @@ exports.getUserById = async (req, res) => {
     const recordsResult = await db.query(
       `SELECT id, record_type, institution, title, description, 
               start_date, end_date, is_current, is_verified, 
+              document_url, data_hash, blockchain_tx_hash, verification_status,
               created_at, updated_at
        FROM professional_records
        WHERE user_id = $1
-       ORDER BY start_date DESC`,
+       ORDER BY created_at DESC`,
       [id]
     );
     
@@ -581,7 +583,7 @@ exports.verifyUser = async (req, res) => {
                 'VERIFICATION_FUNDING',
                 fundingResult.transactionHash,
                 fundingResult.blockNumber,
-                'SUCCESS',
+                'CONFIRMED',
                 JSON.stringify({
                   amount: amount,
                   from: fundingResult.from,
@@ -611,8 +613,8 @@ exports.verifyUser = async (req, res) => {
               ]
             );
             
-            // STEP 2: After successful funding, forcefully register user's identity on blockchain
-            if (user.avax_private_key) {
+            // STEP 2: After successful funding, attest citizen identity on blockchain
+            if (user.wallet_address) {
               try {
                 // Get user's biometric data hash
                 const biometricResult = await client.query(
@@ -668,16 +670,29 @@ exports.verifyUser = async (req, res) => {
                     // Use empty professional data hash for now
                     const professionalDataHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
                     
-                    logger.info(`Registering user ${user.id} identity on blockchain using their private key`);
-                    
-                    // Register identity on blockchain using user's private key
-                    blockchainRegistrationResult = await blockchainService.registerIdentity(
-                      user.avax_private_key,
-                      biometricHash,
-                      professionalDataHash
-                    );
+                    if (user.avax_private_key) {
+                      logger.info(`Registering user ${user.id} identity on blockchain using legacy key`);
+                      blockchainRegistrationResult = await blockchainService.registerIdentity(
+                        user.avax_private_key,
+                        biometricHash,
+                        professionalDataHash
+                      );
+                    } else {
+                      logger.info(`Attesting citizen user ${user.id} on Ethereum Sepolia via authority notary`);
+                      const attestRes = await blockchainService.attestCitizenOnChain(targetAddress, biometricHash);
+                      blockchainRegistrationResult = {
+                        transactionHash: attestRes.sbtTxHash || attestRes.identityTxHash || (attestRes.txHashes && attestRes.txHashes[0]) || '0x00',
+                        blockNumber: 0,
+                        status: 'CONFIRMED',
+                        network: 'sepolia'
+                      };
+                    }
                   
                     // Record blockchain registration only if we actually registered (not for existing identities)
+                    const regStatus = (blockchainRegistrationResult.status === 'SUCCESS' || blockchainRegistrationResult.status === 'CONFIRMED' || blockchainRegistrationResult.status === 'success')
+                      ? 'CONFIRMED'
+                      : (blockchainRegistrationResult.status === 'PENDING' ? 'PENDING' : 'FAILED');
+
                     await client.query(
                       `INSERT INTO blockchain_transactions 
                        (user_id, transaction_type, transaction_hash, block_number, status, data)
@@ -687,7 +702,7 @@ exports.verifyUser = async (req, res) => {
                         'IDENTITY_REGISTRATION',
                         blockchainRegistrationResult.transactionHash,
                         blockchainRegistrationResult.blockNumber,
-                        blockchainRegistrationResult.status,
+                        regStatus,
                         JSON.stringify({
                           biometricHash: biometricHash,
                           registeredBy: 'SYSTEM_AUTOMATIC',
@@ -783,8 +798,11 @@ exports.verifyUser = async (req, res) => {
           const bioHash = biometricRow.rows[0]?.facemesh_hash || '';
           const attestRes = await blockchainService.attestCitizenOnChain(targetAddress, bioHash);
           if (attestRes.success && attestRes.txHashes && attestRes.txHashes.length > 0) {
-            const primaryTx = attestRes.txHashes[0];
-            await client.query('UPDATE users SET blockchain_tx_hash = $1 WHERE id = $2', [primaryTx, id]);
+            const primaryTx = attestRes.sbtTxHash || attestRes.identityTxHash || attestRes.txHashes[0];
+            await client.query(
+              'UPDATE users SET blockchain_tx_hash = $1, soulbound_token_id = COALESCE($2, soulbound_token_id), soulbound_badge_minted = true WHERE id = $3',
+              [primaryTx, attestRes.tokenId || null, id]
+            );
             await client.query(
               `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
                VALUES ($1, $2, 'USER_BLOCKCHAIN_ATTESTED', 'users', $2, $3, $4)`,
@@ -870,12 +888,12 @@ exports.updateUser = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
   const { id } = req.params;
-  const { name, email, phone, walletAddress } = req.body;
+  const { name, email, phone, walletAddress, facemesh_hash, facemeshHash } = req.body;
   
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, email, phone, wallet_address FROM users WHERE id = $1',
+      'SELECT id, name, email, phone, wallet_address, verification_status FROM users WHERE id = $1',
       [id]
     );
     
@@ -907,6 +925,25 @@ exports.updateUser = async (req, res) => {
     );
     
     const updatedUser = updateResult.rows[0];
+
+    // Handle FaceMesh update if provided
+    const newFacemesh = facemesh_hash || facemeshHash;
+    if (newFacemesh) {
+      const bioCheck = await db.query('SELECT id FROM biometric_data WHERE user_id = $1 AND is_active = true', [id]);
+      if (bioCheck.rows.length > 0) {
+        await db.query(
+          'UPDATE biometric_data SET facemesh_hash = $1, updated_at = NOW() WHERE user_id = $2 AND is_active = true',
+          [newFacemesh, id]
+        );
+      } else {
+        await db.query(
+          `INSERT INTO biometric_data (user_id, facemesh_hash, is_active, verification_status, created_at, updated_at)
+           VALUES ($1, $2, true, $3, NOW(), NOW())`,
+          [id, newFacemesh, user.verification_status || 'PENDING']
+        );
+      }
+      updatedUser.facemesh_hash = newFacemesh;
+    }
     
     // Log the update action
     await db.query(
@@ -1411,6 +1448,29 @@ exports.deactivateUser = async (req, res) => {
         logger.warn(`Failed to execute smart contract revocation for deactivated user ${userId}: ${bcError.message}`);
       }
     }
+
+    // Record blockchain revocation transaction if any
+    if (blockchainRevocation && Array.isArray(blockchainRevocation.txHashes)) {
+      for (const txHash of blockchainRevocation.txHashes) {
+        await db.query(
+          `INSERT INTO blockchain_transactions (
+            user_id, transaction_type, transaction_hash, network, chain_id,
+            status, data, created_at, updated_at
+          ) VALUES ($1, 'ATTESTATION_REVOCATION', $2, 'sepolia', 11155111, 'CONFIRMED', $3, NOW(), NOW())
+          ON CONFLICT (transaction_hash) DO NOTHING`,
+          [
+            userId,
+            txHash,
+            JSON.stringify({
+              reason: reason || 'Account deactivated by authority',
+              walletAddress: user.wallet_address,
+              sbtRevoked: blockchainRevocation.sbtRevoked,
+              sbtTokenId: blockchainRevocation.sbtTokenId
+            })
+          ]
+        ).catch(err => logger.warn(`Failed to record revocation tx ${txHash}: ${err.message}`));
+      }
+    }
     
     // Log the deactivation
     await db.query(
@@ -1857,6 +1917,60 @@ exports.updateProfessionalRecordStatus = async (req, res) => {
     try {
       await client.query('BEGIN');
 
+      // Fetch professional record and user details
+      const recQuery = await client.query(
+        `SELECT pr.*, u.wallet_address, u.name as user_name, u.email as user_email,
+                (SELECT facemesh_hash FROM biometric_data WHERE user_id = pr.user_id AND is_active = true LIMIT 1) as biometric_hash
+         FROM professional_records pr
+         JOIN users u ON pr.user_id = u.id
+         WHERE pr.id = $1`,
+        [recordId]
+      );
+
+      if (recQuery.rows.length === 0) {
+        throw new Error('Professional record not found');
+      }
+
+      const existingRecord = recQuery.rows[0];
+      let blockchainResult = null;
+      let onBlockchain = existingRecord.on_blockchain || false;
+      let blockchainTxHash = existingRecord.blockchain_tx_hash || null;
+      let credentialId = existingRecord.credential_id || `urn:uuid:${uuidv4()}`;
+
+      // When approving/verifying, anchor the credential on Ethereum Sepolia and mint Soulbound Credential Badge
+      if (status === 'VERIFIED' && existingRecord.wallet_address) {
+        try {
+          const blockchainService = require('../services/blockchain.service');
+          const credentialHash = existingRecord.data_hash || crypto.createHash('sha256').update(JSON.stringify({
+            userId: existingRecord.user_id,
+            title: existingRecord.title,
+            institution: existingRecord.institution || existingRecord.organization,
+            startDate: existingRecord.start_date,
+            endDate: existingRecord.end_date
+          })).digest('hex');
+
+          logger.info(`Attesting professional record #${recordId} on Sepolia for wallet ${existingRecord.wallet_address}`);
+          blockchainResult = await blockchainService.attestProfessionalCredentialOnChain({
+            subjectAddress: existingRecord.wallet_address,
+            recordId: existingRecord.id,
+            credentialId,
+            recordType: existingRecord.record_type,
+            institution: existingRecord.institution || existingRecord.organization,
+            title: existingRecord.title,
+            credentialHash,
+            biometricHash: existingRecord.biometric_hash || ''
+          });
+
+          if (blockchainResult && blockchainResult.primaryTxHash) {
+            onBlockchain = true;
+            blockchainTxHash = blockchainResult.primaryTxHash;
+            logger.info(`Professional record #${recordId} anchored with tx: ${blockchainTxHash}, tokenId: ${blockchainResult.tokenId}`);
+          }
+        } catch (bcError) {
+          logger.error(`Blockchain attestation failed for professional record ${recordId}:`, bcError);
+        }
+      }
+
       // Update professional record
       const result = await client.query(
         `UPDATE professional_records
@@ -1864,19 +1978,45 @@ exports.updateProfessionalRecordStatus = async (req, res) => {
              verified_by = $2,
              verified_at = NOW(),
              verification_remarks = $3,
+             on_blockchain = $4,
+             blockchain_tx_hash = $5,
+             credential_id = COALESCE(credential_id, $6),
              updated_at = NOW()
-         WHERE id = $4
-         RETURNING id, user_id, title, institution, verification_status`,
-        [status, adminId, notes, recordId]
+         WHERE id = $7
+         RETURNING id, user_id, title, institution, verification_status, on_blockchain, blockchain_tx_hash, credential_id`,
+        [status, adminId, notes, onBlockchain, blockchainTxHash, credentialId, recordId]
       );
-
-      if (result.rows.length === 0) {
-        throw new Error('Professional record not found');
-      }
 
       const record = result.rows[0];
 
-      // Log the action
+      // If blockchain attestation took place, log the transaction in blockchain_transactions
+      if (blockchainResult && blockchainResult.primaryTxHash) {
+        await client.query(
+          `INSERT INTO blockchain_transactions 
+             (user_id, transaction_type, transaction_hash, block_number, status, data)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            record.user_id,
+            'CREDENTIAL_ATTESTATION',
+            blockchainResult.primaryTxHash,
+            blockchainResult.blockNumber || 0,
+            'CONFIRMED',
+            JSON.stringify({
+              recordId: record.id,
+              title: record.title,
+              institution: record.institution,
+              recordType: existingRecord.record_type,
+              credentialId: credentialId,
+              tokenId: blockchainResult.tokenId,
+              txHashes: blockchainResult.txHashes,
+              primaryTxHash: blockchainResult.primaryTxHash,
+              recipient: existingRecord.wallet_address
+            })
+          ]
+        );
+      }
+
+      // Log the action in audit_logs
       await client.query(
         `INSERT INTO audit_logs (
           admin_id,
@@ -1897,7 +2037,10 @@ exports.updateProfessionalRecordStatus = async (req, res) => {
             status,
             notes,
             title: record.title,
-            institution: record.institution
+            institution: record.institution,
+            onBlockchain,
+            blockchainTxHash,
+            tokenId: blockchainResult?.tokenId || null
           }),
           req.ip
         ]
@@ -1906,13 +2049,19 @@ exports.updateProfessionalRecordStatus = async (req, res) => {
       await client.query('COMMIT');
 
       res.status(200).json({
-        message: 'Professional record status updated successfully',
+        message: blockchainResult?.tokenId
+          ? `Professional record verified! Soulbound Credential Token #${blockchainResult.tokenId} minted on Sepolia.`
+          : 'Professional record status updated successfully',
         record: {
           id: record.id,
           status: record.verification_status,
           verifiedAt: new Date(),
-          verifiedBy: adminId
-        }
+          verifiedBy: adminId,
+          onBlockchain: record.on_blockchain,
+          blockchainTxHash: record.blockchain_tx_hash,
+          credentialId: record.credential_id
+        },
+        blockchain: blockchainResult
       });
 
     } catch (error) {
@@ -2186,5 +2335,184 @@ exports.onboardUser = async (req, res) => {
   } catch (err) {
     logger.error('Onboard user error:', err);
     res.status(500).json({ message: 'Failed to onboard citizen' });
+  }
+};
+
+/**
+ * Identify citizen by biometric face scan (1-to-N or 1-to-1)
+ */
+exports.identifyUserBiometric = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { facemeshData, userId } = req.body || {};
+
+  if (!facemeshData) {
+    return res.status(400).json({ message: 'Facemesh biometric data is required' });
+  }
+
+  try {
+    const { calculateFacemeshSimilarity, generateFacemeshHash } = require('../utils/biometric.utils');
+    const incomingHash = generateFacemeshHash(facemeshData);
+
+    // If specific userId provided (1-to-1 verification)
+    if (userId) {
+      const userRes = await db.query(
+        `SELECT u.id, u.name, u.government_id, u.email, u.wallet_address, u.did, u.verification_status,
+                b.id as biometric_id, b.facemesh_hash, b.facemesh_data
+         FROM users u
+         JOIN biometric_data b ON b.user_id = u.id AND b.is_active = true
+         WHERE u.id = $1`,
+        [userId]
+      );
+
+      if (userRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'No active biometric enrollment found for this citizen' });
+      }
+
+      const row = userRes.rows[0];
+      let score = 0;
+      let matched = false;
+
+      if (row.facemesh_hash === incomingHash) {
+        score = 1.0;
+        matched = true;
+      } else if (row.facemesh_data) {
+        try {
+          const stored = typeof row.facemesh_data === 'string' ? JSON.parse(row.facemesh_data) : row.facemesh_data;
+          score = calculateFacemeshSimilarity(facemeshData, stored);
+          matched = score >= 0.70;
+        } catch (_) {
+          matched = false;
+        }
+      }
+
+      if (matched) {
+        await db.query('UPDATE biometric_data SET last_verified_at = NOW(), verification_score = $1 WHERE id = $2', [score * 100, row.biometric_id]);
+        return res.status(200).json({
+          success: true,
+          matched: true,
+          similarityScore: score,
+          userInfo: {
+            id: row.id,
+            name: row.name,
+            governmentId: row.government_id,
+            government_id: row.government_id,
+            email: row.email,
+            walletAddress: row.wallet_address,
+            wallet_address: row.wallet_address,
+            did: row.did || null,
+            verificationStatus: row.verification_status,
+            verification_status: row.verification_status,
+            facemeshHash: row.facemesh_hash,
+            facemesh_hash: row.facemesh_hash
+          }
+        });
+      }
+
+      return res.status(200).json({
+        success: false,
+        matched: false,
+        similarityScore: score,
+        message: 'Biometric verification did not match the enrolled citizen profile'
+      });
+    }
+
+    // 1-to-N matching across enrolled users
+    const allEnrolled = await db.query(
+      `SELECT u.id, u.name, u.government_id, u.email, u.phone, u.wallet_address, u.did, u.verification_status,
+              b.id as biometric_id, b.facemesh_hash, b.facemesh_data
+       FROM users u
+       JOIN biometric_data b ON b.user_id = u.id AND b.is_active = true
+       ORDER BY b.updated_at DESC`
+    );
+
+    if (allEnrolled.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'No enrolled citizens found in biometric registry' });
+    }
+
+    let bestMatch = null;
+    let highestScore = -1;
+
+    for (const row of allEnrolled.rows) {
+      let score = 0;
+      if (row.facemesh_hash === incomingHash) {
+        score = 1.0;
+      } else if (row.facemesh_data) {
+        try {
+          const stored = typeof row.facemesh_data === 'string' ? JSON.parse(row.facemesh_data) : row.facemesh_data;
+          score = calculateFacemeshSimilarity(facemeshData, stored);
+        } catch (_) {
+          score = 0;
+        }
+      }
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestMatch = row;
+      }
+    }
+
+    const isMatched = highestScore >= 0.65 && bestMatch !== null;
+
+    if (!isMatched) {
+      return res.status(200).json({
+        success: false,
+        matched: false,
+        similarityScore: Math.max(0, highestScore),
+        message: 'No registered citizen matched the scanned biometric template'
+      });
+    }
+
+    const finalCandidate = bestMatch;
+    const finalScore = highestScore;
+
+    if (finalCandidate) {
+      await db.query(
+        'UPDATE biometric_data SET last_verified_at = NOW(), verification_score = $1 WHERE id = $2',
+        [finalScore * 100, finalCandidate.biometric_id]
+      );
+
+      await db.query(
+        `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+         VALUES ($1, $2, 'ADMIN_BIOMETRIC_IDENTIFICATION_MATCH', 'users', $2, $3, $4)`,
+        [
+          req.admin.id,
+          finalCandidate.id,
+          JSON.stringify({ similarityScore: finalScore, matchedGovernmentId: finalCandidate.government_id }),
+          req.ip
+        ]
+      );
+
+      return res.status(200).json({
+        success: true,
+        matched: true,
+        similarityScore: finalScore,
+        userInfo: {
+          id: finalCandidate.id,
+          name: finalCandidate.name,
+          governmentId: finalCandidate.government_id,
+          government_id: finalCandidate.government_id,
+          email: finalCandidate.email,
+          phone: finalCandidate.phone,
+          walletAddress: finalCandidate.wallet_address,
+          wallet_address: finalCandidate.wallet_address,
+          did: finalCandidate.did || null,
+          verificationStatus: finalCandidate.verification_status,
+          verification_status: finalCandidate.verification_status,
+          facemeshHash: finalCandidate.facemesh_hash,
+          facemesh_hash: finalCandidate.facemesh_hash
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: false,
+      matched: false,
+      similarityScore: Math.max(0, highestScore),
+      message: 'No registered citizen matched the scanned biometric template'
+    });
+  } catch (err) {
+    logger.error('Biometric identification error:', err);
+    res.status(500).json({ message: 'Server error during biometric identification' });
   }
 };

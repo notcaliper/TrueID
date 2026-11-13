@@ -219,7 +219,8 @@ exports.verifyMFALogin = async (req, res) => {
     const sessionResult = await db.query(
       `SELECT ms.*, u.mfa_secret, u.mfa_backup_codes, u.id as user_id, 
               u.username, u.name, u.government_id, u.email, u.phone,
-              u.is_verified, u.verification_status, u.wallet_address, u.did
+              u.is_verified, u.verification_status, u.wallet_address, u.did,
+              COALESCE(u.is_active, true) as is_active
        FROM mfa_sessions ms
        JOIN users u ON ms.user_id = u.id
        WHERE ms.temp_token = $1 AND ms.expires_at > NOW() AND ms.used_at IS NULL`,
@@ -231,6 +232,14 @@ exports.verifyMFALogin = async (req, res) => {
     }
 
     const session = sessionResult.rows[0];
+
+    // Check if account is suspended / deactivated
+    if (session.is_active === false) {
+      return res.status(403).json({
+        message: 'This account has been suspended by the authority administrator. Access revoked.',
+        suspended: true
+      });
+    }
 
     // Check attempts
     if (session.attempts >= session.max_attempts) {
@@ -352,7 +361,11 @@ exports.verifyMFALogin = async (req, res) => {
     );
 
     const mfaWallet = session.wallet_address || '';
-    const mfaDid = session.did || (mfaWallet ? `did:trueid:${mfaWallet}` : '');
+    let mfaDid = session.did;
+    if (!mfaDid && mfaWallet) {
+      mfaDid = `did:trueid:${mfaWallet}`;
+      await db.query('UPDATE users SET did = $1 WHERE id = $2', [mfaDid, session.user_id]).catch(() => {});
+    }
 
     res.status(200).json({
       success: true,

@@ -44,7 +44,8 @@ import {
   Fingerprint as FingerprintIcon,
   Link as LinkIcon,
   Close as CloseIcon,
-  WorkspacePremiumRounded
+  WorkspacePremiumRounded,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 import { LoadingButton } from '@mui/lab';
 import ApiService from '../services/adminApi.service';
@@ -82,7 +83,15 @@ const AdminProfessionalRecords = () => {
   const [tabValue, setTabValue] = useState(0);
   const [previewDocUrl, setPreviewDocUrl] = useState(null);
   const [previewDocType, setPreviewDocType] = useState(null);
+  const [previewDocError, setPreviewDocError] = useState(false);
   const [hashDetails, setHashDetails] = useState(null);
+
+  const getFullDocUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const backendBase = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+    return `${backendBase}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -221,10 +230,13 @@ const AdminProfessionalRecords = () => {
     setBlockchainLoading(true);
     try {
       const result = await ApiService.verifyOnBlockchain(recordId);
-      if (result.success) {
-        setSuccess('Record verified on blockchain successfully');
+      if (result) {
+        setSuccess('Record anchored on Sepolia & credential token minted successfully!');
         const updatedRecord = await ApiService.getProfessionalRecord(recordId);
-        setSelectedRecord(updatedRecord);
+        if (updatedRecord && updatedRecord.record) {
+          setSelectedRecord(updatedRecord.record);
+        }
+        debouncedFetch(searchQuery, page, rowsPerPage);
       } else {
         setError('Blockchain verification failed');
       }
@@ -239,13 +251,29 @@ const AdminProfessionalRecords = () => {
   const handleAdminVerify = async (recordId, status) => {
     setActionLoading(true);
     try {
-      await ApiService.updateProfessionalRecordStatus(recordId, {
+      const response = await ApiService.updateProfessionalRecordStatus(recordId, {
         status,
         notes: adminNotes
       });
-      setSuccess('Record status updated successfully');
+      
+      const bc = response?.blockchain;
+      if (status === 'VERIFIED') {
+        const tokenMsg = bc?.tokenId ? ` (Soulbound Token #${bc.tokenId} Minted)` : '';
+        const txMsg = bc?.primaryTxHash ? ` [Tx: ${bc.primaryTxHash.substring(0, 10)}...]` : '';
+        setSuccess(`Record verified & anchored on Sepolia!${tokenMsg}${txMsg}`);
+      } else {
+        setSuccess('Record status updated successfully');
+      }
+
+      // Re-fetch record details so the modal displays on-chain status and Etherscan link!
+      try {
+        const refreshed = await ApiService.getProfessionalRecord(recordId);
+        if (refreshed && refreshed.record) {
+          setSelectedRecord(refreshed.record);
+        }
+      } catch (e) {}
+
       debouncedFetch(searchQuery, page, rowsPerPage);
-      setOpenModal(false);
       setAdminNotes('');
     } catch (err) {
       setError(`Failed to update record status: ${err.message}`);
@@ -670,35 +698,68 @@ const AdminProfessionalRecords = () => {
                 <Typography variant="h6" sx={{ color: t.textPrimary, fontWeight: 700, mb: 2 }}>Linked Documents</Typography>
                 {linkedDocuments.length > 0 ? (
                   <List>
-                    {linkedDocuments.map((doc) => (
-                      <ListItem key={doc.id} sx={{ bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}`, borderRadius: 2, mb: 1 }}>
-                        <ListItemText
-                          primary={<Typography sx={{ color: t.textPrimary, fontWeight: 600 }}>{doc.original_name}</Typography>}
-                          secondary={
-                            <Box sx={{ mt: 0.5 }}>
-                              <Typography variant="body2" sx={{ color: t.textSecondary }}>
-                                Status: <StatusChip status={doc.verification_status} />
+                    {linkedDocuments.map((doc) => {
+                      const fileName = doc.original_name || doc.fileName || (doc.file_url ? doc.file_url.split('/').pop() : 'Attached Document');
+                      const rawUrl = doc.file_url || doc.fileUrl;
+                      const fullUrl = getFullDocUrl(rawUrl);
+                      const isPdf = (doc.mime_type || doc.mimeType || '').includes('pdf') || (fullUrl && fullUrl.toLowerCase().endsWith('.pdf'));
+
+                      return (
+                        <ListItem key={doc.id} sx={{ bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}`, borderRadius: 2, mb: 1.5, p: 2 }}>
+                          <ListItemText
+                            primary={
+                              <Typography sx={{ color: t.textPrimary, fontWeight: 700, fontSize: '0.95rem' }}>
+                                {fileName}
                               </Typography>
-                              <Typography variant="caption" sx={{ color: t.textMuted, fontFamily: 'monospace', display: 'block', mt: 0.5 }}>
-                                Hash: {doc.file_hash || 'Not available'}
-                              </Typography>
-                              {doc.blockchain_tx_hash && (
-                                <Typography variant="caption" sx={{ color: t.primary, fontFamily: 'monospace', display: 'block' }}>
-                                  TX: {doc.blockchain_tx_hash}
+                            }
+                            secondary={
+                              <Box sx={{ mt: 0.8 }}>
+                                <Typography variant="body2" sx={{ color: t.textSecondary }}>
+                                  Status: <StatusChip status={doc.verification_status || doc.verificationStatus || 'PENDING'} />
                                 </Typography>
-                              )}
-                            </Box>
-                          }
-                        />
-                        <ListItemSecondaryAction>
-                          <Tooltip title="Download">
-                            <IconButton edge="end" href={doc.file_url} download sx={{ color: t.primary }}>
-                              <DownloadIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                    ))}
+                                <Typography variant="caption" sx={{ color: t.textMuted, fontFamily: 'monospace', display: 'block', mt: 0.5 }}>
+                                  Hash: {doc.file_hash || doc.fileHash || 'Not available'}
+                                </Typography>
+                                {doc.blockchain_tx_hash && (
+                                  <Typography variant="caption" sx={{ color: t.primary, fontFamily: 'monospace', display: 'block' }}>
+                                    TX: {doc.blockchain_tx_hash}
+                                  </Typography>
+                                )}
+                              </Box>
+                            }
+                          />
+                          <ListItemSecondaryAction sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {fullUrl && (
+                              <>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={<VisibilityIcon sx={{ fontSize: '15px !important' }} />}
+                                  onClick={() => {
+                                    setPreviewDocError(false);
+                                    setPreviewDocUrl(fullUrl);
+                                    setPreviewDocType(isPdf ? 'pdf' : 'image');
+                                  }}
+                                  sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.75rem', borderColor: t.primaryBorder, color: t.primary, bgcolor: t.primaryBg }}
+                                >
+                                  Preview
+                                </Button>
+                                <Tooltip title="Open in New Tab">
+                                  <IconButton component="a" href={fullUrl} target="_blank" rel="noopener noreferrer" sx={{ color: t.primary }}>
+                                    <LinkIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Download">
+                                  <IconButton component="a" href={fullUrl} download sx={{ color: t.primary }}>
+                                    <DownloadIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            )}
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                      );
+                    })}
                   </List>
                 ) : (
                   <Box sx={{ textAlign: 'center', py: 4, color: t.textMuted }}>
@@ -758,8 +819,49 @@ const AdminProfessionalRecords = () => {
                       </Box>
                     )}
 
+                    {selectedRecord.verification_status === 'VERIFIED' && selectedRecord.blockchain_tx_hash && (
+                      <Box sx={{ mt: 3, p: 2.5, borderRadius: 2, bgcolor: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.08)', border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)'}` }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                          <CheckCircleIcon sx={{ color: '#10b981', fontSize: 24 }} />
+                          <Box>
+                            <Typography sx={{ fontWeight: 700, color: t.textPrimary, fontSize: '0.95rem' }}>
+                              On-Chain Verifiable Credential Anchored
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#10b981', fontWeight: 600 }}>
+                              Ethereum Sepolia • ERC-5192 Soulbound Token Minted
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        {selectedRecord.credential_id && (
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="caption" sx={{ color: t.textMuted, display: 'block' }}>W3C Credential URN:</Typography>
+                            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: t.textPrimary, wordBreak: 'break-all' }}>
+                              {selectedRecord.credential_id}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        <Box sx={{ mt: 1.5 }}>
+                          <Typography variant="caption" sx={{ color: t.textMuted, display: 'block' }}>Attestation Transaction:</Typography>
+                          <Link
+                            href={`https://sepolia.etherscan.io/tx/${selectedRecord.blockchain_tx_hash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: t.primary, fontWeight: 700, fontSize: '0.82rem', mt: 0.3 }}
+                          >
+                            <LinkIcon sx={{ fontSize: 16 }} />
+                            View on Sepolia Etherscan ↗
+                          </Link>
+                        </Box>
+                      </Box>
+                    )}
+
                     {selectedRecord.verification_status === 'VERIFIED' && !selectedRecord.blockchain_tx_hash && (
                       <Box sx={{ mt: 3 }}>
+                        <Typography variant="body2" sx={{ color: t.textSecondary, mb: 1.5 }}>
+                          This record is verified in the database but has not been anchored on the Ethereum Sepolia ledger yet.
+                        </Typography>
                         <LoadingButton
                           variant="contained"
                           loading={blockchainLoading}
@@ -771,7 +873,7 @@ const AdminProfessionalRecords = () => {
                             '&:hover': { bgcolor: t.primaryDark }
                           }}
                         >
-                          Verify on Blockchain
+                          Anchor on Sepolia & Mint Token
                         </LoadingButton>
                       </Box>
                     )}
@@ -786,6 +888,136 @@ const AdminProfessionalRecords = () => {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Document Preview Dialog */}
+      <Dialog
+        open={Boolean(previewDocUrl)}
+        onClose={() => {
+          setPreviewDocUrl(null);
+          setPreviewDocType(null);
+          setPreviewDocError(false);
+        }}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: isLight ? '#ffffff' : '#181a1c',
+            border: `1px solid ${t.border}`,
+            borderRadius: 3
+          }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: 3, pt: 2.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DescriptionIcon sx={{ color: t.primary, fontSize: 20 }} />
+            <Typography variant="h6" sx={{ fontWeight: 800, color: t.textPrimary, fontSize: '1.05rem' }}>
+              Credential Supporting Document Preview
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {previewDocUrl && (
+              <Button
+                component="a"
+                href={previewDocUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                size="small"
+                startIcon={<LinkIcon sx={{ fontSize: 15 }} />}
+                sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600, color: t.primary }}
+              >
+                Open in New Tab
+              </Button>
+            )}
+            <IconButton size="small" onClick={() => { setPreviewDocUrl(null); setPreviewDocType(null); setPreviewDocError(false); }} sx={{ color: t.textMuted }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: isLight ? '#f8fafc' : '#141618', minHeight: 400 }}>
+          {previewDocError ? (
+            <Box sx={{ textAlign: 'center', py: 4, px: 2, maxWidth: 500 }}>
+              <Box sx={{
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                bgcolor: isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 2,
+                border: `1px solid ${isLight ? '#fecaca' : 'rgba(239, 68, 68, 0.25)'}`
+              }}>
+                <DescriptionIcon sx={{ fontSize: 32, color: '#ef4444' }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: t.textPrimary, mb: 1, fontSize: '1rem' }}>
+                Inline Preview Unavailable
+              </Typography>
+              <Typography variant="body2" sx={{ color: t.textSecondary, mb: 3, lineHeight: 1.6, fontSize: '0.85rem' }}>
+                The document could not be rendered inline directly (file may be in an external format, not physically stored on this server, or restricted by cross-origin security). You can still access the file directly.
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                <Button
+                  component="a"
+                  href={previewDocUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="outlined"
+                  size="small"
+                  startIcon={<LinkIcon />}
+                  sx={{ textTransform: 'none', fontWeight: 600, color: t.primary, borderColor: t.primaryBorder }}
+                >
+                  Open in New Tab
+                </Button>
+                <Button
+                  component="a"
+                  href={previewDocUrl}
+                  download
+                  variant="contained"
+                  size="small"
+                  startIcon={<DownloadIcon />}
+                  sx={{ bgcolor: t.primary, textTransform: 'none', fontWeight: 700 }}
+                >
+                  Download File
+                </Button>
+              </Box>
+            </Box>
+          ) : previewDocType === 'pdf' ? (
+            <Box
+              component="iframe"
+              src={previewDocUrl}
+              title="Document Preview"
+              onError={() => setPreviewDocError(true)}
+              sx={{ width: '100%', height: '70vh', border: 'none', borderRadius: 1.5 }}
+            />
+          ) : (
+            <Box
+              component="img"
+              src={previewDocUrl}
+              alt="Document Preview"
+              onError={() => setPreviewDocError(true)}
+              sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 1.5, boxShadow: isLight ? '0 4px 12px rgba(0,0,0,0.08)' : '0 4px 16px rgba(0,0,0,0.4)' }}
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => { setPreviewDocUrl(null); setPreviewDocType(null); setPreviewDocError(false); }} sx={{ color: t.textMuted, textTransform: 'none' }}>
+            Close Preview
+          </Button>
+          {previewDocUrl && (
+            <Button
+              component="a"
+              href={previewDocUrl}
+              download
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              sx={{ bgcolor: t.primary, textTransform: 'none', fontWeight: 700 }}
+            >
+              Download File
+            </Button>
+          )}
+        </DialogActions>
       </Dialog>
 
       {/* Snackbar for messages */}

@@ -8,13 +8,32 @@ const normalizeUser = (u) => {
   const govId = u.government_id || u.governmentId || '';
   const wallet = u.wallet_address || u.walletAddress || '';
   const did = u.did || (wallet ? `did:trueid:${wallet}` : '');
+  const faceHash = u.facemesh_hash || u.facemeshHash || u.biometric_hash || '';
+  const hasBio = Boolean(u.has_biometrics || u.hasBiometrics || u.hasBiometricData || faceHash);
+  const tokenId = u.soulbound_token_id || u.soulboundTokenId || '';
+  const txHash = u.blockchain_tx_hash || u.blockchainTxHash || '';
+  const bioAt = u.biometric_verified_at || u.biometricVerifiedAt || null;
+  const isActive = u.is_active !== undefined ? Boolean(u.is_active) : (u.isActive !== undefined ? Boolean(u.isActive) : true);
+
   return {
     ...u,
+    is_active: isActive,
+    isActive: isActive,
     government_id: govId,
     governmentId: govId,
     wallet_address: wallet,
     walletAddress: wallet,
-    did: did
+    did: did,
+    facemesh_hash: faceHash,
+    facemeshHash: faceHash,
+    has_biometrics: hasBio,
+    hasBiometrics: hasBio,
+    soulbound_token_id: tokenId,
+    soulboundTokenId: tokenId,
+    blockchain_tx_hash: txHash,
+    blockchainTxHash: txHash,
+    biometric_verified_at: bioAt,
+    biometricVerifiedAt: bioAt
   };
 };
 
@@ -51,17 +70,32 @@ export const AuthProvider = ({ children }) => {
         if (decodedToken.exp < currentTime) {
           // Token is expired, try to refresh
           try {
-            const response = await authAPI.refreshToken(refreshToken);
-            const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data.tokens;
-            
-            localStorage.setItem('accessToken', newAccessToken);
-            localStorage.setItem('refreshToken', newRefreshToken);
-            
-            const candidateUser = response.data.user || (storedUser ? JSON.parse(storedUser) : null);
-            if (candidateUser) {
-              const normalized = normalizeUser(candidateUser);
-              setUser(normalized);
-              localStorage.setItem('user', JSON.stringify(normalized));
+            if (decodedToken.type === 'admin') {
+              const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/admin/refresh-token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken })
+              });
+              const data = await response.json();
+              if (response.ok && data.tokens) {
+                localStorage.setItem('accessToken', data.tokens.accessToken);
+                localStorage.setItem('refreshToken', data.tokens.refreshToken);
+              } else {
+                throw new Error('Admin refresh failed');
+              }
+            } else {
+              const response = await authAPI.refreshToken(refreshToken);
+              const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data.tokens;
+              
+              localStorage.setItem('accessToken', newAccessToken);
+              localStorage.setItem('refreshToken', newRefreshToken);
+              
+              const candidateUser = response.data.user || (storedUser ? JSON.parse(storedUser) : null);
+              if (candidateUser) {
+                const normalized = normalizeUser(candidateUser);
+                setUser(normalized);
+                localStorage.setItem('user', JSON.stringify(normalized));
+              }
             }
           } catch (refreshError) {
             // Refresh token is invalid, clear storage
@@ -76,16 +110,25 @@ export const AuthProvider = ({ children }) => {
             setUser(initialUser);
           }
           
-          // Refresh user profile from authoritative database to ensure DID & Gov ID are populated
-          try {
-            const profileRes = await userAPI.getProfile();
-            if (profileRes?.data?.user) {
-              const freshUser = normalizeUser(profileRes.data.user);
-              setUser(freshUser);
-              localStorage.setItem('user', JSON.stringify(freshUser));
+          // Refresh user profile from authoritative database if regular citizen account
+          if (decodedToken.type === 'user') {
+            try {
+              const profileRes = await userAPI.getProfile();
+              if (profileRes?.data?.user) {
+                const freshUser = normalizeUser(profileRes.data.user);
+                setUser(freshUser);
+                localStorage.setItem('user', JSON.stringify(freshUser));
+              }
+            } catch (profErr) {
+              if (profErr.response?.status === 403 && profErr.response?.data?.suspended) {
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('user');
+                setUser(null);
+                setError('Your citizen account has been suspended by the authority administrator.');
+              }
+              // Silent fallback to stored user if offline
             }
-          } catch (profErr) {
-            // Silent fallback to stored user if offline
           }
         }
       } catch (err) {
@@ -236,16 +279,31 @@ export const AuthProvider = ({ children }) => {
       });
 
       const response = await authAPI.verifyBiometric(requestData);
-      console.log('Biometric verification response:', response);
+      const data = response?.data || response;
+      console.log('Biometric verification response:', data);
 
-      if (response.success) {
+      if (data && (data.success || data.verified)) {
+        setUser(prev => {
+          if (!prev) return prev;
+          const updated = normalizeUser({
+            ...prev,
+            has_biometrics: true,
+            hasBiometrics: true,
+            facemesh_hash: data.facemeshHash || prev.facemesh_hash,
+            facemeshHash: data.facemeshHash || prev.facemeshHash,
+            biometric_verified_at: new Date().toISOString()
+          });
+          localStorage.setItem('user', JSON.stringify(updated));
+          return updated;
+        });
         return {
           success: true,
-          verified: response.verified,
-          message: response.message
+          verified: data.verified !== undefined ? data.verified : true,
+          similarityScore: data.similarityScore,
+          message: data.message
         };
       } else {
-        throw new Error(response.error || 'Verification failed');
+        throw new Error(data?.error || data?.message || 'Verification failed');
       }
     } catch (err) {
       const errorMessage = err.message || 'Biometric verification failed.';

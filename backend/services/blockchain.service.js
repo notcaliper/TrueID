@@ -838,7 +838,7 @@ exports.processExpiredBlockchainStatuses = async (db) => {
                       adminWalletAddress,
                       ethers.utils.formatEther(amountToSend),
                       'EXPIRY_REFUND',
-                      'COMPLETED'
+                      'CONFIRMED'
                     ]
                   );
                 }
@@ -1016,13 +1016,113 @@ exports.mintSoulboundBadgeOnChain = async ({
   );
 
   const receipt = await tx.wait(1);
+
+  let mintedTokenId = null;
+  if (receipt && receipt.logs) {
+    for (const log of receipt.logs) {
+      try {
+        const parsed = contract.interface.parseLog(log);
+        if (parsed && (parsed.name === 'BadgeMinted' || parsed.name === 'Transfer')) {
+          mintedTokenId = parsed.args.tokenId ? parsed.args.tokenId.toString() : null;
+          if (mintedTokenId) break;
+        }
+      } catch (e) {
+        // Not a contract log, continue
+      }
+    }
+  }
+
+  if (!mintedTokenId) {
+    try {
+      const bId = await contract.userPrimaryBadge(recipientAddress);
+      if (bId && Number(bId) > 0) mintedTokenId = bId.toString();
+    } catch (e) {}
+  }
+
   return {
     txHash: tx.hash,
     blockNumber: receipt.blockNumber,
     recipient: recipientAddress,
     badgeType,
+    tokenId: mintedTokenId,
     status: 'CONFIRMED'
   };
+};
+
+/**
+ * Attest a professional record on chain:
+ * 1. Register W3C Verifiable Credential on TrueIDCredentialRegistry
+ * 2. Mint ERC-5192 Soulbound Credential Badge to citizen wallet
+ */
+exports.attestProfessionalCredentialOnChain = async ({
+  subjectAddress,
+  recordId,
+  credentialId,
+  recordType,
+  institution,
+  title,
+  credentialHash,
+  biometricHash = ''
+}) => {
+  if (!subjectAddress) {
+    throw new Error('Citizen wallet address is required for on-chain credential attestation');
+  }
+
+  const results = {
+    subjectAddress,
+    recordId,
+    credentialId,
+    txHashes: [],
+    credentialTxHash: null,
+    sbtTxHash: null,
+    tokenId: null,
+    status: 'CONFIRMED'
+  };
+
+  // 1. Register W3C Credential on TrueIDCredentialRegistry
+  try {
+    const credRes = await exports.registerW3CCredential({
+      credentialId: credentialId || `urn:uuid:cred-${recordId}-${Date.now()}`,
+      subjectAddress,
+      recordType: recordType || 'EMPLOYMENT',
+      institution: institution || 'TrueID Accredited Issuer',
+      credentialHash: credentialHash || id(`trueid-credential-${recordId}`),
+      credentialURI: `https://trueid.authority.gov/credentials/${recordId}`,
+      validityDuration: 0 // Permanent
+    });
+    results.credentialTxHash = credRes.txHash;
+    results.blockNumber = credRes.blockNumber;
+    results.txHashes.push(credRes.txHash);
+  } catch (credErr) {
+    console.warn(`[Blockchain] Credential registry anchoring skipped/failed: ${credErr.message}`);
+  }
+
+  // 2. Mint ERC-5192 Soulbound Token to citizen
+  try {
+    const formattedBiometric = (biometricHash && biometricHash.length === 64)
+      ? `0x${biometricHash}`
+      : (biometricHash && biometricHash.startsWith('0x') && biometricHash.length === 66 ? biometricHash : '0x0000000000000000000000000000000000000000000000000000000000000000');
+
+    const badgeType = `CREDENTIAL_${(recordType || 'VERIFIED').toUpperCase()}`;
+    const sbtRes = await exports.mintSoulboundBadgeOnChain({
+      recipientAddress: subjectAddress,
+      badgeType,
+      metadataURI: `https://trueid.authority.gov/credentials/badge/${recordId}`,
+      identityCommitment: formattedBiometric
+    });
+
+    results.sbtTxHash = sbtRes.txHash;
+    results.tokenId = sbtRes.tokenId;
+    if (sbtRes.txHash && !results.txHashes.includes(sbtRes.txHash)) {
+      results.txHashes.push(sbtRes.txHash);
+    }
+  } catch (sbtErr) {
+    console.warn(`[Blockchain] Soulbound badge minting for credential skipped/failed: ${sbtErr.message}`);
+  }
+
+  results.primaryTxHash = results.sbtTxHash || results.credentialTxHash || (results.txHashes[0] || null);
+  results.success = Boolean(results.primaryTxHash);
+  return results;
 };
 
 /**

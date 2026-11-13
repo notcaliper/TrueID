@@ -138,7 +138,7 @@ const OnboardUserModal = ({ open, onClose, onUserCreated }) => {
                 fullWidth
                 size="small"
                 name="governmentId"
-                placeholder="e.g. JIFPM9413P"
+                placeholder="e.g. GOV-894132"
                 value={formData.governmentId}
                 onChange={handleChange}
                 required

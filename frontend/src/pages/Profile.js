@@ -41,7 +41,8 @@ import {
   GppGoodRounded,
   KeyRounded,
   VpnKeyRounded,
-  FactCheckRounded
+  FactCheckRounded,
+  AccessTimeRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
@@ -58,6 +59,7 @@ const Profile = () => {
   const { user, setUser } = useAuth();
   const { isLight } = useColorMode();
   const theme = useTheme();
+  const sbtContractAddress = process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf';
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -185,24 +187,27 @@ const Profile = () => {
   const userInitials = displayName ? displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ID';
 
   // 4 Core Identity Pillars (Consistent with Dashboard)
-  const isVerifiedUser = user?.is_verified || user?.verification_status === 'VERIFIED';
+  const isSuspendedUser = Boolean(user?.is_active === false || profileData?.is_active === false || profileData?.verificationStatus === 'SUSPENDED');
+  const isVerifiedUser = !isSuspendedUser && Boolean(user?.is_verified || user?.verification_status === 'VERIFIED' || profileData?.verificationStatus === 'VERIFIED');
+  const hasSoulbound = !isSuspendedUser && isVerifiedUser && Boolean(user?.soulbound_token_id || user?.soulbound_badge_minted || user?.blockchain_tx_hash);
+  const hasBiometrics = !isSuspendedUser && Boolean(user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics);
   const profilePillars = [
     {
       title: 'National KYC Identity',
       idVal: profileData.governmentId || 'Not Registered',
-      status: isVerifiedUser ? 'VERIFIED' : 'PENDING',
-      desc: isVerifiedUser ? 'Identity record officially verified on record' : 'Awaiting identity verification check',
-      tag: isVerifiedUser ? 'Verified' : 'Pending',
-      color: isVerifiedUser ? '#16a34a' : '#d97706',
-      bg: isLight ? (isVerifiedUser ? '#eff6ff' : '#fffbeb') : (isVerifiedUser ? 'rgba(37, 99, 235, 0.12)' : 'rgba(217, 119, 6, 0.12)'),
+      status: isSuspendedUser ? 'SUSPENDED' : (isVerifiedUser ? 'VERIFIED' : 'PENDING'),
+      desc: isSuspendedUser ? 'Identity attestation revoked by authority' : (isVerifiedUser ? 'Identity record officially verified on record' : 'Awaiting identity verification check'),
+      tag: isSuspendedUser ? 'Suspended' : (isVerifiedUser ? 'Verified' : 'Pending'),
+      color: isSuspendedUser ? '#dc2626' : (isVerifiedUser ? '#16a34a' : '#d97706'),
+      bg: isLight ? (isSuspendedUser ? '#fef2f2' : (isVerifiedUser ? '#eff6ff' : '#fffbeb')) : (isSuspendedUser ? 'rgba(220, 38, 38, 0.12)' : (isVerifiedUser ? 'rgba(37, 99, 235, 0.12)' : 'rgba(217, 119, 6, 0.12)')),
       icon: <BadgeRounded sx={{ fontSize: 24 }} />
     },
     {
       title: '3D FaceMesh Biometrics',
-      idVal: user?.facemesh_hash ? 'Enrolled Active Enclave' : 'Not Enrolled',
-      status: user?.facemesh_hash ? 'LIVENESS VERIFIED' : 'PENDING SCAN',
-      desc: user?.facemesh_hash ? 'Hardware secured facial geometry vector active' : 'No biometric vectors enrolled yet',
-      tag: user?.facemesh_hash ? 'Enrolled' : 'Not Enrolled',
+      idVal: (user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics) ? 'Enrolled Active Enclave' : 'Not Enrolled',
+      status: (user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics) ? 'LIVENESS VERIFIED' : 'PENDING SCAN',
+      desc: (user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics) ? 'Hardware secured facial geometry vector active' : 'No biometric vectors enrolled yet',
+      tag: (user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics) ? 'Enrolled' : 'Not Enrolled',
       color: '#7c3aed',
       bg: isLight ? '#f5f3ff' : 'rgba(124, 58, 237, 0.12)',
       icon: <FingerprintRounded sx={{ fontSize: 24 }} />
@@ -219,12 +224,16 @@ const Profile = () => {
     },
     {
       title: 'Soulbound SBT Root',
-      idVal: 'ERC-5192 #002 (Non-Transferable)',
-      status: 'SEPOLIA LEDGER ANCHORED',
-      desc: 'Smart contract 0x266B...816E • 16 Block Confirmations',
-      tag: 'On-Chain SBT',
-      color: '#0891b2',
-      bg: isLight ? '#ecfeff' : 'rgba(8, 145, 178, 0.12)',
+      idVal: isSuspendedUser 
+        ? (user?.soulbound_token_id ? `ERC-5192 #${user.soulbound_token_id} (Revoked on-chain)` : 'Revoked')
+        : (user?.soulbound_token_id ? `ERC-5192 #${user.soulbound_token_id} (Non-Transferable)` : 'Attestation Pending'),
+      status: isSuspendedUser ? 'REVOKED ON SEPOLIA' : (user?.soulbound_token_id ? 'SEPOLIA LEDGER ANCHORED' : 'AWAITING REGISTRY MINT'),
+      desc: isSuspendedUser 
+        ? 'Soulbound identity credential revoked on Sepolia smart contract by authority'
+        : `Smart contract ${sbtContractAddress.slice(0, 6)}...${sbtContractAddress.slice(-4)} • ${user?.soulbound_token_id ? 'Attested On-Chain' : 'Sepolia Network'}`,
+      tag: isSuspendedUser ? 'Revoked' : (user?.soulbound_token_id ? 'On-Chain SBT' : 'Unminted'),
+      color: isSuspendedUser ? '#dc2626' : '#0891b2',
+      bg: isLight ? (isSuspendedUser ? '#fef2f2' : '#ecfeff') : (isSuspendedUser ? 'rgba(220, 38, 38, 0.12)' : 'rgba(8, 145, 178, 0.12)'),
       icon: <SecurityRounded sx={{ fontSize: 24 }} />
     }
   ];
@@ -323,7 +332,7 @@ const Profile = () => {
                   width: 22,
                   height: 22,
                   borderRadius: '50%',
-                  bgcolor: '#16a34a',
+                  bgcolor: isVerifiedUser ? '#16a34a' : '#d97706',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -331,7 +340,11 @@ const Profile = () => {
                   color: '#ffffff'
                 }}
               >
-                <CheckCircleRounded sx={{ fontSize: 14 }} />
+                {isVerifiedUser ? (
+                  <CheckCircleRounded sx={{ fontSize: 14 }} />
+                ) : (
+                  <AccessTimeRounded sx={{ fontSize: 13 }} />
+                )}
               </Box>
             </Box>
 
@@ -342,13 +355,31 @@ const Profile = () => {
                 </Typography>
 
                 <Chip
-                  label="SOULBOUND VERIFIED"
+                  label={
+                    isVerifiedUser
+                      ? (hasSoulbound ? 'SOULBOUND VERIFIED' : 'VERIFIED CITIZEN')
+                      : (profileData.verificationStatus === 'REJECTED' ? 'REJECTED' : 'PENDING VERIFICATION')
+                  }
                   size="small"
-                  icon={<GppGoodRounded sx={{ fontSize: '14px !important', color: '#16a34a !important' }} />}
+                  icon={
+                    isVerifiedUser ? (
+                      <GppGoodRounded sx={{ fontSize: '14px !important', color: '#16a34a !important' }} />
+                    ) : (
+                      <AccessTimeRounded sx={{ fontSize: '14px !important', color: (isLight ? '#b45309 !important' : '#fbbf24 !important') }} />
+                    )
+                  }
                   sx={{
-                    bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)',
-                    color: isLight ? '#16a34a' : '#4ade80',
-                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)'}`,
+                    bgcolor: isVerifiedUser
+                      ? (isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)')
+                      : (isLight ? '#fffbeb' : 'rgba(217, 119, 6, 0.15)'),
+                    color: isVerifiedUser
+                      ? (isLight ? '#16a34a' : '#4ade80')
+                      : (isLight ? '#b45309' : '#fbbf24'),
+                    border: `1px solid ${
+                      isVerifiedUser
+                        ? (isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)')
+                        : (isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.3)')
+                    }`,
                     fontWeight: 700,
                     fontSize: '0.72rem',
                     height: 24
@@ -389,18 +420,37 @@ const Profile = () => {
                     height: 26
                   }}
                 />
-                <Chip
-                  label="FaceMesh 68 Enclave"
-                  size="small"
-                  sx={{
-                    bgcolor: isLight ? '#f1f5f9' : '#1e2124',
-                    color: isLight ? '#334155' : '#cbd5e1',
-                    border: `1px solid ${isLight ? '#e2e8f0' : '#32363a'}`,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    height: 26
-                  }}
-                />
+
+                {hasBiometrics ? (
+                  <Chip
+                    label="FaceMesh 68 Enclave"
+                    size="small"
+                    icon={<CheckCircleRounded sx={{ fontSize: '13px !important', color: '#16a34a !important' }} />}
+                    sx={{
+                      bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.12)',
+                      color: isLight ? '#16a34a' : '#4ade80',
+                      border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)'}`,
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                ) : (
+                  <Chip
+                    label="Face: Not Enrolled"
+                    size="small"
+                    icon={<AccessTimeRounded sx={{ fontSize: '13px !important', color: isLight ? '#b45309 !important' : '#f59e0b !important' }} />}
+                    sx={{
+                      bgcolor: isLight ? '#fffbeb' : 'rgba(217, 119, 6, 0.1)',
+                      color: isLight ? '#b45309' : '#f59e0b',
+                      border: `1px solid ${isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.2)'}`,
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                )}
+
                 <Chip
                   label={mfaEnabled ? "2FA Protected" : "MFA Disabled"}
                   size="small"
@@ -444,8 +494,8 @@ const Profile = () => {
               <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block' }}>
                 CITIZEN STANDING
               </Typography>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#16a34a' }}>
-                Tier 1 Verified Citizen
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: isVerifiedUser ? '#16a34a' : '#d97706' }}>
+                {isVerifiedUser ? 'Tier 1 Verified Citizen' : 'Pending Verification'}
               </Typography>
             </Box>
 
@@ -797,7 +847,7 @@ const Profile = () => {
                       SHA-256 NOTARY AUDIT HASH
                     </Typography>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#2563eb', fontSize: '0.78rem', wordBreak: 'break-all', mt: 0.3 }}>
-                      {user?.biometric_hash || user?.wallet_address || 'Not Enrolled'}
+                      {user?.facemesh_hash || user?.biometric_hash || 'Not Enrolled'}
                     </Typography>
                   </Box>
                 </Box>

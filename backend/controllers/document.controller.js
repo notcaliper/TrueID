@@ -385,32 +385,45 @@ exports.listProfessionalRecordDocuments = async (req, res) => {
 
     // Get the document for the professional record
     const result = await db.query(
-      `SELECT d.*,
+      `SELECT pr.id as pr_id, pr.document_url as pr_doc_url, pr.title as pr_title,
+              d.id, d.original_name, d.file_url, d.file_hash, d.file_size, d.mime_type, d.verification_status,
               a.username as verified_by_username,
               vr.notes as verification_notes
        FROM professional_records pr
-       JOIN document_records d ON d.file_url = pr.document_url
+       LEFT JOIN document_records d ON d.file_url = pr.document_url
        LEFT JOIN admins a ON d.verified_by = a.id
        LEFT JOIN verification_requests vr ON d.id = vr.record_id AND vr.record_type = 'DOCUMENT'
        WHERE pr.id = $1`,
       [professionalRecordId]
     );
 
+    const documents = result.rows
+      .filter(row => row.file_url || row.pr_doc_url)
+      .map(doc => {
+        const url = doc.file_url || doc.pr_doc_url;
+        const name = doc.original_name || (url ? path.basename(url) : `${doc.pr_title || 'Credential'}-Document`);
+        return {
+          id: doc.id || doc.pr_id,
+          fileName: name,
+          original_name: name,
+          fileUrl: url,
+          file_url: url,
+          fileHash: doc.file_hash || '',
+          file_hash: doc.file_hash || '',
+          fileSize: doc.file_size || null,
+          file_size: doc.file_size || null,
+          mimeType: doc.mime_type || (url.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+          mime_type: doc.mime_type || (url.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+          verificationStatus: doc.verification_status || 'PENDING',
+          verification_status: doc.verification_status || 'PENDING',
+          verifiedBy: doc.verified_by_username || null,
+          verificationNotes: doc.verification_notes || null
+        };
+      });
+
     res.status(200).json({
       message: 'Documents retrieved successfully',
-      documents: result.rows.map(doc => ({
-        id: doc.id,
-        fileName: doc.original_name,
-        fileUrl: doc.file_url,
-        fileSize: doc.file_size,
-        mimeType: doc.mime_type,
-        verificationStatus: doc.verification_status,
-        verificationDate: doc.verification_date,
-        verifiedBy: doc.verified_by_username,
-        verificationNotes: doc.verification_notes,
-        createdAt: doc.created_at,
-        updatedAt: doc.updated_at
-      }))
+      documents
     });
 
   } catch (error) {

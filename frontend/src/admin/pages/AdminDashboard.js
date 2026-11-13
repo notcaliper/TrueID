@@ -83,8 +83,8 @@ const AdminDashboard = () => {
           pendingChange: 0,
           rejectedChange: 0
         },
-        recentActivities: (data.recentActivity || []).map(activity => ({
-          id: activity.id || Math.random().toString(36).substr(2, 9),
+        recentActivities: (data.recentActivity || []).map((activity, idx) => ({
+          id: activity.id || activity.activity_id || `activity-${activity.created_at || Date.now()}-${idx}`,
           action: activity.action,
           timestamp: new Date(activity.created_at || activity.timestamp || Date.now()),
           userName: activity.user_name || activity.userName || 'Unknown User',

@@ -42,9 +42,12 @@ import {
   LockRounded,
   GppGoodRounded,
   CloseRounded,
+  CancelRounded,
   DownloadRounded,
   HistoryRounded,
-  FactCheckRounded
+  FactCheckRounded,
+  OpenInNewRounded,
+  AccessTimeRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
@@ -66,6 +69,7 @@ const Dashboard = () => {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [proofModalOpen, setProofModalOpen] = useState(false);
+  const [modalCopied, setModalCopied] = useState(false);
   const [selectedProof, setSelectedProof] = useState(null);
   const [recordSearch, setRecordSearch] = useState('');
   // eslint-disable-next-line no-unused-vars
@@ -88,7 +92,7 @@ const Dashboard = () => {
       enclaveStatus: 'Protected',
       blockchainTx: user?.blockchain_tx_hash || '',
       contractAddress: process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf',
-      sbtTokenId: user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : (user?.is_verified ? 'SBT-Token #1' : ''),
+      sbtTokenId: user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : '',
       lastSync: ''
     };
   });
@@ -167,11 +171,14 @@ const Dashboard = () => {
       const effectiveDid = resolveDid(fetchedUser) || resolveDid(user);
       const effectiveName = fetchedUser?.name || user?.name || user?.full_name || '';
 
-      const verStatus = verRes.status === 'fulfilled' && (verRes.value?.data?.data?.status || verRes.value?.data?.status)
-        ? (verRes.value?.data?.data?.status || verRes.value?.data?.status)
-        : (user?.verification_status || 'PENDING');
       const records = recRes.status === 'fulfilled' && recRes.value?.data?.records ? recRes.value.data.records : [];
       const bcData = bcRes.status === 'fulfilled' ? (bcRes.value?.data?.status || bcRes.value?.data?.data || bcRes.value?.data) : null;
+      const isSuspendedUser = fetchedUser?.is_active === false || user?.is_active === false || Boolean(bcData?.isSuspended);
+      const verStatus = isSuspendedUser 
+        ? 'SUSPENDED' 
+        : (verRes.status === 'fulfilled' && (verRes.value?.data?.data?.status || verRes.value?.data?.status)
+            ? (verRes.value?.data?.data?.status || verRes.value?.data?.status)
+            : (user?.verification_status || 'PENDING'));
 
       setIdentityData(prev => ({
         ...prev,
@@ -180,11 +187,12 @@ const Dashboard = () => {
         walletAddress: effectiveWallet,
         did: effectiveDid,
         verificationStatus: verStatus,
+        isSuspended: isSuspendedUser,
         recordsCount: records.length,
-        facemeshStatus: bioRes.status === 'fulfilled' && bioRes.value?.data?.hasBiometrics ? 'Enrolled (SHA-256)' : (user?.facemesh_hash ? 'Enrolled (SHA-256)' : 'Not Enrolled'),
+        facemeshStatus: (bioRes.status === 'fulfilled' && (bioRes.value?.data?.hasBiometrics || bioRes.value?.data?.facemeshExists || bioRes.value?.data?.verified)) || user?.facemesh_hash || user?.has_biometrics ? 'Enrolled (SHA-256)' : 'Not Enrolled',
         blockchainTx: bcData?.registrationTxHash || bcData?.transactionHash || user?.blockchain_tx_hash || '',
         contractAddress: bcData?.contractAddress || process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf',
-        sbtTokenId: bcData?.sbtTokenId || (user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : (user?.is_verified ? 'SBT-Token #1' : '')),
+        sbtTokenId: bcData?.sbtTokenId || (user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}${isSuspendedUser ? ' (Revoked)' : ''}` : ''),
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
 
@@ -225,55 +233,61 @@ const Dashboard = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // 4 Core Identity Pillars (Simple English)
+  const isSuspended = user?.is_active === false || identityData.isSuspended || identityData.verificationStatus === 'SUSPENDED';
+  const isRevoked = isSuspended || (identityData.sbtTokenId && identityData.sbtTokenId.includes('Revoked'));
+  const isVerified = !isSuspended && (identityData.verificationStatus === 'VERIFIED' || user?.verification_status === 'VERIFIED' || Boolean(user?.is_verified));
+  const hasSoulbound = !isRevoked && isVerified && Boolean(identityData.sbtTokenId || identityData.blockchainTx || user?.soulbound_token_id || user?.soulbound_badge_minted);
+  const hasFaceVerified = !isSuspended && Boolean(identityData.facemeshStatus === 'Enrolled (SHA-256)' || user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics);
+
+  // 4 Core Identity Pillars (Dynamic based on real user state)
   const corePillars = [
     {
       title: 'National ID Card',
-      idVal: identityData.governmentId,
-      status: 'VERIFIED & APPROVED',
-      desc: 'Government identity record confirmed and approved by official notary',
-      tag: 'Official Approval',
+      idVal: identityData.governmentId || 'Not Assigned',
+      status: isVerified ? 'VERIFIED & APPROVED' : (identityData.verificationStatus === 'REJECTED' ? 'APPLICATION REJECTED' : 'PENDING NOTARY REVIEW'),
+      desc: isVerified ? 'Government identity record confirmed and approved by official notary' : 'Application submitted, awaiting authorized notary officer review',
+      tag: isVerified ? 'Official Approval' : 'Under Review',
       linkText: 'View ID Details',
       linkTo: '/profile',
       icon: <BadgeRounded sx={{ fontSize: 24 }} />,
-      color: '#2563eb',
-      bg: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.12)'
+      color: isVerified ? '#2563eb' : '#d97706',
+      bg: isLight ? (isVerified ? '#eff6ff' : '#fffbeb') : (isVerified ? 'rgba(37, 99, 235, 0.12)' : 'rgba(217, 119, 6, 0.12)')
     },
     {
       title: 'Face Verification',
-      idVal: 'Face Match Active',
-      status: 'FACE SCAN PASSED',
-      desc: 'Real-time camera face check passed and securely stored on your device',
-      tag: 'Device Secured',
+      idVal: hasFaceVerified ? 'Face Match Active' : 'Scan Required',
+      status: hasFaceVerified ? 'FACE SCAN PASSED' : 'NOT ENROLLED',
+      desc: hasFaceVerified ? 'Real-time camera face check passed and securely stored on your device' : 'Perform live 3D FaceMesh scan to verify biometrics and liveness',
+      tag: hasFaceVerified ? 'Device Secured' : 'Action Required',
       linkText: 'Open Face Scan',
       linkTo: '/biometric-verification',
       icon: <FingerprintRounded sx={{ fontSize: 24 }} />,
-      color: '#7c3aed',
-      bg: isLight ? '#f5f3ff' : 'rgba(124, 58, 237, 0.12)'
+      color: hasFaceVerified ? '#7c3aed' : '#d97706',
+      bg: isLight ? (hasFaceVerified ? '#f5f3ff' : '#fffbeb') : (hasFaceVerified ? 'rgba(124, 58, 237, 0.12)' : 'rgba(217, 119, 6, 0.12)')
     },
     {
       title: 'Blockchain Record',
-      idVal: 'Permanent Digital Badge',
-      status: 'SAVED ON BLOCKCHAIN',
-      desc: 'Your verified identity badge is permanently recorded on the blockchain network',
-      tag: 'Permanent Record',
+      idVal: hasSoulbound ? (identityData.sbtTokenId || 'Permanent Digital Badge') : 'Pending Verification',
+      status: hasSoulbound ? 'SAVED ON BLOCKCHAIN' : 'NOT MINTED',
+      desc: hasSoulbound ? 'Your verified identity badge is permanently recorded on the blockchain network' : 'Permanent digital badge will be minted on Ethereum Sepolia upon notary approval',
+      tag: hasSoulbound ? 'Permanent Record' : 'Awaiting Approval',
       linkText: 'View on Blockchain',
       linkTo: '/blockchain-status',
       icon: <SecurityRounded sx={{ fontSize: 24 }} />,
-      color: '#16a34a',
-      bg: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.12)'
+      color: hasSoulbound ? '#16a34a' : '#64748b',
+      bg: isLight ? (hasSoulbound ? '#f0fdf4' : '#f8fafc') : (hasSoulbound ? 'rgba(22, 163, 74, 0.12)' : 'rgba(100, 116, 139, 0.12)')
     },
     {
       title: 'Verified Documents',
-      idVal: '4 Approved Documents',
-      status: 'ALL VERIFIED',
-      desc: 'College degrees, work experience, certificates, and ID papers',
-      tag: 'Approved Papers',
+      idVal: credentialRecords.length > 0 ? `${credentialRecords.length} Document${credentialRecords.length === 1 ? '' : 's'}` : '0 Documents',
+      status: credentialRecords.length > 0 ? `${credentialRecords.filter(r => r.status === 'VERIFIED').length} of ${credentialRecords.length} VERIFIED` : 'NO DOCUMENTS',
+      desc: credentialRecords.length > 0 ? 'College degrees, work experience, certificates, and ID papers' : 'Upload credentials or degrees to add verified claims to your identity',
+      tag: credentialRecords.length > 0 ? (credentialRecords.every(r => r.status === 'VERIFIED') ? 'All Verified' : 'In Review') : 'None Uploaded',
       linkText: 'View Documents',
       linkTo: '/professional-records',
       icon: <SchoolRounded sx={{ fontSize: 24 }} />,
-      color: '#0891b2',
-      bg: isLight ? '#ecfeff' : 'rgba(8, 145, 178, 0.12)'
+      color: credentialRecords.length > 0 ? '#0891b2' : '#64748b',
+      bg: isLight ? (credentialRecords.length > 0 ? '#ecfeff' : '#f8fafc') : (credentialRecords.length > 0 ? 'rgba(8, 145, 178, 0.12)' : 'rgba(100, 116, 139, 0.12)')
     }
   ];
 
@@ -373,7 +387,7 @@ const Dashboard = () => {
                   width: 22,
                   height: 22,
                   borderRadius: '50%',
-                  bgcolor: '#16a34a',
+                  bgcolor: isVerified ? '#16a34a' : '#d97706',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -381,7 +395,11 @@ const Dashboard = () => {
                   color: '#ffffff'
                 }}
               >
-                <CheckCircleRounded sx={{ fontSize: 14 }} />
+                {isVerified ? (
+                  <CheckCircleRounded sx={{ fontSize: 14 }} />
+                ) : (
+                  <AccessTimeRounded sx={{ fontSize: 13 }} />
+                )}
               </Box>
             </Box>
 
@@ -392,13 +410,31 @@ const Dashboard = () => {
                 </Typography>
 
                 <Chip
-                  label="SOULBOUND VERIFIED"
+                  label={
+                    isVerified
+                      ? (hasSoulbound ? 'SOULBOUND VERIFIED' : 'VERIFIED CITIZEN')
+                      : (identityData.verificationStatus === 'REJECTED' ? 'REJECTED' : 'PENDING VERIFICATION')
+                  }
                   size="small"
-                  icon={<GppGoodRounded sx={{ fontSize: '14px !important', color: '#16a34a !important' }} />}
+                  icon={
+                    isVerified ? (
+                      <GppGoodRounded sx={{ fontSize: '14px !important', color: '#16a34a !important' }} />
+                    ) : (
+                      <AccessTimeRounded sx={{ fontSize: '14px !important', color: (isLight ? '#b45309 !important' : '#fbbf24 !important') }} />
+                    )
+                  }
                   sx={{
-                    bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)',
-                    color: isLight ? '#16a34a' : '#4ade80',
-                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)'}`,
+                    bgcolor: isVerified
+                      ? (isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)')
+                      : (isLight ? '#fffbeb' : 'rgba(217, 119, 6, 0.15)'),
+                    color: isVerified
+                      ? (isLight ? '#16a34a' : '#4ade80')
+                      : (isLight ? '#b45309' : '#fbbf24'),
+                    border: `1px solid ${
+                      isVerified
+                        ? (isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)')
+                        : (isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.3)')
+                    }`,
                     fontWeight: 700,
                     fontSize: '0.72rem',
                     height: 24
@@ -425,7 +461,7 @@ const Dashboard = () => {
                 </Tooltip>
               </Box>
 
-              {/* Key Identity Attribute Badges */}
+              {/* Key Identity Attribute Badges (Dynamic based on real verified state) */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
                 <Chip
                   label={`Gov ID: ${identityData.governmentId}`}
@@ -439,30 +475,66 @@ const Dashboard = () => {
                     height: 26
                   }}
                 />
-                <Chip
-                  label="Blockchain Badge"
-                  size="small"
-                  sx={{
-                    bgcolor: isLight ? '#f1f5f9' : '#1e2124',
-                    color: isLight ? '#334155' : '#cbd5e1',
-                    border: `1px solid ${isLight ? '#e2e8f0' : '#32363a'}`,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    height: 26
-                  }}
-                />
-                <Chip
-                  label="Face Verified"
-                  size="small"
-                  sx={{
-                    bgcolor: isLight ? '#f1f5f9' : '#1e2124',
-                    color: isLight ? '#334155' : '#cbd5e1',
-                    border: `1px solid ${isLight ? '#e2e8f0' : '#32363a'}`,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    height: 26
-                  }}
-                />
+
+                {hasSoulbound ? (
+                  <Chip
+                    label={identityData.sbtTokenId ? identityData.sbtTokenId : "Blockchain Badge"}
+                    size="small"
+                    icon={<LanRounded sx={{ fontSize: '13px !important', color: '#38bdf8 !important' }} />}
+                    sx={{
+                      bgcolor: isLight ? '#eff6ff' : 'rgba(56, 189, 248, 0.12)',
+                      color: isLight ? '#1d4ed8' : '#38bdf8',
+                      border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(56, 189, 248, 0.3)'}`,
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                ) : (
+                  <Chip
+                    label="Badge: Not Minted"
+                    size="small"
+                    sx={{
+                      bgcolor: isLight ? '#f8fafc' : '#141618',
+                      color: isLight ? '#94a3b8' : '#64748b',
+                      border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                )}
+
+                {hasFaceVerified ? (
+                  <Chip
+                    label="Face Verified"
+                    size="small"
+                    icon={<CheckCircleRounded sx={{ fontSize: '13px !important', color: '#16a34a !important' }} />}
+                    sx={{
+                      bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.12)',
+                      color: isLight ? '#16a34a' : '#4ade80',
+                      border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)'}`,
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                ) : (
+                  <Chip
+                    label="Face: Not Enrolled"
+                    size="small"
+                    icon={<AccessTimeRounded sx={{ fontSize: '13px !important', color: isLight ? '#b45309 !important' : '#f59e0b !important' }} />}
+                    sx={{
+                      bgcolor: isLight ? '#fffbeb' : 'rgba(217, 119, 6, 0.1)',
+                      color: isLight ? '#b45309' : '#f59e0b',
+                      border: `1px solid ${isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.2)'}`,
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                )}
+
                 <Chip
                   label="Privacy Protected"
                   size="small"
@@ -494,18 +566,18 @@ const Dashboard = () => {
               IDENTITY TRUST SCORE
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 0.5, my: 0.2 }}>
-              <Typography variant="h3" sx={{ fontWeight: 800, color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {identityData.verificationStatus === 'VERIFIED' ? '100%' : '0%'}
+              <Typography variant="h3" sx={{ fontWeight: 800, color: isVerified ? '#16a34a' : '#d97706', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                {isVerified ? '100%' : '0%'}
               </Typography>
               <Typography variant="body2" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700 }}>
                 / 100
               </Typography>
             </Box>
-            <Typography variant="caption" sx={{ color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706', fontWeight: 700, display: 'block' }}>
-              {identityData.verificationStatus === 'VERIFIED' ? 'Verified Citizen' : 'Pending Verification'}
+            <Typography variant="caption" sx={{ color: isVerified ? '#16a34a' : '#d97706', fontWeight: 700, display: 'block' }}>
+              {isVerified ? 'Verified Citizen' : 'Pending Verification'}
             </Typography>
             <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.7rem' }}>
-              {identityData.verificationStatus === 'VERIFIED' ? 'Attested on Ethereum Sepolia' : 'Awaiting admin verification'}
+              {isVerified ? 'Attested on Ethereum Sepolia' : 'Awaiting admin verification'}
             </Typography>
           </Box>
         </Box>
@@ -653,10 +725,10 @@ const Dashboard = () => {
                   </Box>
                   <Box>
                     <Typography variant="subtitle2" sx={{ color: '#ffffff', fontWeight: 900, letterSpacing: '0.08em', fontSize: '0.88rem' }}>
-                      TRUEID DIGITAL PASS
+                      {isSuspended ? 'SUSPENDED CITIZEN IDENTITY' : 'TRUEID DIGITAL PASS'}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>
-                      OFFICIAL IDENTITY CARD • VERIFIED CITIZEN
+                    <Typography variant="caption" sx={{ color: isSuspended ? '#f87171' : '#94a3b8', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>
+                      {isSuspended ? 'ATTESTATION REVOKED • ACCESS SUSPENDED' : (isVerified ? 'OFFICIAL IDENTITY CARD • VERIFIED CITIZEN' : 'OFFICIAL IDENTITY CARD • PENDING VERIFICATION')}
                     </Typography>
                   </Box>
                 </Box>
@@ -675,19 +747,21 @@ const Dashboard = () => {
                       height: 24
                     }}
                   />
-                  <Chip
-                    icon={<CheckCircleRounded sx={{ color: '#4ade80 !important', fontSize: '13px !important' }} />}
-                    label={identityData.sbtTokenId || 'ERC-5192 SBT #1'}
-                    size="small"
-                    sx={{
-                      bgcolor: 'rgba(34, 197, 94, 0.12)',
-                      color: '#4ade80',
-                      fontWeight: 800,
-                      fontSize: '0.68rem',
-                      border: '1px solid rgba(34, 197, 94, 0.3)',
-                      height: 24
-                    }}
-                  />
+                  {identityData.sbtTokenId ? (
+                    <Chip
+                      icon={isRevoked ? <CancelRounded sx={{ color: '#f87171 !important', fontSize: '13px !important' }} /> : <CheckCircleRounded sx={{ color: '#4ade80 !important', fontSize: '13px !important' }} />}
+                      label={identityData.sbtTokenId}
+                      size="small"
+                      sx={{
+                        bgcolor: isRevoked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.12)',
+                        color: isRevoked ? '#f87171' : '#4ade80',
+                        fontWeight: 800,
+                        fontSize: '0.68rem',
+                        border: `1px solid ${isRevoked ? 'rgba(239, 68, 68, 0.35)' : 'rgba(34, 197, 94, 0.3)'}`,
+                        height: 24
+                      }}
+                    />
+                  ) : null}
                 </Box>
               </Box>
 
@@ -726,7 +800,7 @@ const Dashboard = () => {
                       CITIZEN FULL NAME
                     </Typography>
                     <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                      {identityData.name || 'Akshay Manbhaw'}
+                      {identityData.name || 'Citizen'}
                     </Typography>
                   </Box>
                 </Box>
@@ -736,7 +810,7 @@ const Dashboard = () => {
                     NATIONAL CITIZEN IDENTIFIER
                   </Typography>
                   <Typography variant="h5" sx={{ color: '#38bdf8', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '0.06em', textShadow: '0 0 16px rgba(56, 189, 248, 0.45)', lineHeight: 1.1 }}>
-                    {identityData.governmentId || 'JIFPM9413P'}
+                    {identityData.governmentId || 'Not Assigned'}
                   </Typography>
                 </Box>
               </Box>
@@ -747,8 +821,8 @@ const Dashboard = () => {
                   <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>
                     Badge Token:
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#4ade80', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem' }}>
-                    {identityData.sbtTokenId || 'SBT-Token #1'} (Locked)
+                  <Typography variant="caption" sx={{ color: isRevoked ? '#f87171' : '#4ade80', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem' }}>
+                    {isRevoked ? `${identityData.sbtTokenId || 'SBT-Badge'} (Revoked on Sepolia)` : (identityData.sbtTokenId ? `${identityData.sbtTokenId} (Locked)` : (isVerified ? 'Attestation Confirmed' : 'Attestation Pending'))}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
@@ -767,20 +841,35 @@ const Dashboard = () => {
                   </Typography>
                 </Box>
                 {identityData.blockchainTx && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>
-                      Mint Tx:
+                      Attestation Tx:
                     </Typography>
-                    <Typography
-                      component="a"
-                      href={`https://sepolia.etherscan.io/tx/${identityData.blockchainTx}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      variant="caption"
-                      sx={{ color: '#818cf8', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-                    >
-                      {identityData.blockchainTx.slice(0, 8)}...{identityData.blockchainTx.slice(-6)}
-                    </Typography>
+                    <Tooltip title={identityData.blockchainTx} arrow>
+                      <Typography
+                        component="a"
+                        href={`https://sepolia.etherscan.io/tx/${identityData.blockchainTx}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="caption"
+                        sx={{ color: '#818cf8', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                      >
+                        {identityData.blockchainTx.slice(0, 8)}...{identityData.blockchainTx.slice(-6)}
+                      </Typography>
+                    </Tooltip>
+                    <Tooltip title="Copy Attestation Tx Hash">
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          navigator.clipboard.writeText(identityData.blockchainTx);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        sx={{ color: '#94a3b8', p: 0.2 }}
+                      >
+                        <ContentCopyRounded sx={{ fontSize: 11 }} />
+                      </IconButton>
+                    </Tooltip>
                   </Box>
                 )}
               </Box>
@@ -1029,19 +1118,19 @@ const Dashboard = () => {
 
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
                 <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 800, color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706', letterSpacing: '-0.02em' }}>
-                    {identityData.verificationStatus === 'VERIFIED' ? '100%' : '0%'}
+                  <Typography variant="h4" sx={{ fontWeight: 800, color: isVerified ? '#16a34a' : '#d97706', letterSpacing: '-0.02em' }}>
+                    {isVerified ? '100%' : '0%'}
                   </Typography>
                   <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 600 }}>
-                    {identityData.verificationStatus === 'VERIFIED' ? 'Attested Citizen Standing' : 'Pending Verification'}
+                    {isVerified ? 'Attested Citizen Standing' : 'Pending Verification'}
                   </Typography>
                 </Box>
                 <Chip
-                  label={identityData.verificationStatus === 'VERIFIED' ? 'VERIFIED CITIZEN' : 'PENDING'}
+                  label={isVerified ? 'VERIFIED CITIZEN' : 'PENDING'}
                   size="small"
                   sx={{
-                    bgcolor: isLight ? (identityData.verificationStatus === 'VERIFIED' ? '#f0fdf4' : '#fffbeb') : (identityData.verificationStatus === 'VERIFIED' ? 'rgba(22, 163, 74, 0.15)' : 'rgba(217, 119, 6, 0.15)'),
-                    color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706',
+                    bgcolor: isLight ? (isVerified ? '#f0fdf4' : '#fffbeb') : (isVerified ? 'rgba(22, 163, 74, 0.15)' : 'rgba(217, 119, 6, 0.15)'),
+                    color: isVerified ? '#16a34a' : '#d97706',
                     fontWeight: 800,
                     fontSize: '0.7rem'
                   }}
@@ -1080,10 +1169,18 @@ const Dashboard = () => {
                       Verified Documents & Credentials
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#2563eb', fontSize: '0.82rem' }}>
-                      98%
+                      {credentialRecords.length > 0
+                        ? `${Math.round((credentialRecords.filter(r => r.status === 'VERIFIED').length / credentialRecords.length) * 100)}%`
+                        : '100%'}
                     </Typography>
                   </Box>
-                  <LinearProgress variant="determinate" value={98} sx={{ height: 6, borderRadius: 3, bgcolor: isLight ? '#f1f5f9' : '#282a2d', '& .MuiLinearProgress-bar': { bgcolor: '#2563eb' } }} />
+                  <LinearProgress
+                    variant="determinate"
+                    value={credentialRecords.length > 0
+                      ? Math.round((credentialRecords.filter(r => r.status === 'VERIFIED').length / credentialRecords.length) * 100)
+                      : 100}
+                    sx={{ height: 6, borderRadius: 3, bgcolor: isLight ? '#f1f5f9' : '#282a2d', '& .MuiLinearProgress-bar': { bgcolor: '#2563eb' } }}
+                  />
                 </Box>
 
                 <Box>
@@ -1271,11 +1368,13 @@ const Dashboard = () => {
             Scan with any authorized TrueID Notary or border kiosk to cryptographically verify citizenship.
           </Typography>
 
-          <Chip
-            label={identityData.sbtTokenId || 'ERC-5192 SBT #1'}
-            size="small"
-            sx={{ bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 800, fontSize: '0.72rem' }}
-          />
+          {identityData.sbtTokenId && (
+            <Chip
+              label={identityData.sbtTokenId}
+              size="small"
+              sx={{ bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 800, fontSize: '0.72rem' }}
+            />
+          )}
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -1300,19 +1399,19 @@ const Dashboard = () => {
           }
         }}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: { xs: 2.5, sm: 3 }, pt: 2.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <FactCheckRounded sx={{ color: '#2563eb' }} />
-            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1rem', color: isLight ? '#0f172a' : '#ffffff' }}>
               W3C Cryptographic Proof Verification
             </Typography>
           </Box>
-          <IconButton size="small" onClick={() => setProofModalOpen(false)}>
+          <IconButton size="small" onClick={() => setProofModalOpen(false)} sx={{ color: isLight ? '#64748b' : '#9ca3af' }}>
             <CloseRounded />
           </IconButton>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 2 }}>
+        <DialogContent sx={{ pt: '20px !important', px: { xs: 2.5, sm: 3 }, pb: 2 }}>
           {selectedProof && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Box sx={{ p: 2, borderRadius: 2, bgcolor: isLight ? '#f8fafc' : '#141618', border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}` }}>
@@ -1328,12 +1427,56 @@ const Dashboard = () => {
               </Box>
 
               <Box>
-                <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
-                  SHA-256 NOTARY PROOF HASH
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
+                  <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, textTransform: 'uppercase' }}>
+                    {selectedProof.hash && selectedProof.hash.startsWith('0x') ? 'SEPOLIA BLOCKCHAIN TRANSACTION HASH' : 'SHA-256 NOTARY PROOF HASH'}
+                  </Typography>
+                  <Tooltip title={modalCopied ? 'Copied Full Hash!' : 'Copy full hash'}>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedProof.hash);
+                        setModalCopied(true);
+                        setTimeout(() => setModalCopied(false), 2000);
+                      }}
+                      startIcon={modalCopied ? <CheckCircleRounded sx={{ fontSize: 14 }} /> : <ContentCopyRounded sx={{ fontSize: 14 }} />}
+                      sx={{ textTransform: 'none', fontSize: '0.72rem', fontWeight: 700, color: modalCopied ? '#16a34a' : '#2563eb' }}
+                    >
+                      {modalCopied ? 'Copied' : 'Copy Hash'}
+                    </Button>
+                  </Tooltip>
+                </Box>
                 <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isLight ? '#f1f5f9' : '#1e2124', fontFamily: 'monospace', fontSize: '0.8rem', color: '#2563eb', wordBreak: 'break-all' }}>
                   {selectedProof.hash}
                 </Box>
+
+                {selectedProof.hash && selectedProof.hash.startsWith('0x') && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Button
+                      component="a"
+                      href={`https://sepolia.etherscan.io/tx/${selectedProof.hash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      fullWidth
+                      variant="outlined"
+                      endIcon={<OpenInNewRounded sx={{ fontSize: '15px !important' }} />}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        color: isLight ? '#1d4ed8' : '#60a5fa',
+                        borderColor: isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.4)',
+                        bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.08)',
+                        py: 0.8,
+                        '&:hover': {
+                          bgcolor: isLight ? '#dbeafe' : 'rgba(37, 99, 235, 0.18)'
+                        }
+                      }}
+                    >
+                      Verify On-Chain via Sepolia Etherscan Explorer ↗
+                    </Button>
+                  </Box>
+                )}
               </Box>
 
               <Box>
@@ -1361,17 +1504,17 @@ const Dashboard = () => {
   "id": "urn:uuid:${selectedProof.id}",
   "type": ["VerifiableCredential", "${selectedProof.type}"],
   "issuer": "${selectedProof.issuer}",
-  "issuanceDate": "2026-01-15T00:00:00Z",
+  "issuanceDate": "${selectedProof.created_at ? new Date(selectedProof.created_at).toISOString() : new Date().toISOString()}",
   "credentialSubject": {
     "id": "${identityData.did}",
     "qualification": "${selectedProof.title}"
   },
   "proof": {
     "type": "Ed25519Signature2020",
-    "created": "2026-01-15T00:00:00Z",
+    "created": "${selectedProof.created_at ? new Date(selectedProof.created_at).toISOString() : new Date().toISOString()}",
     "verificationMethod": "${identityData.did}#keys-1",
     "proofPurpose": "assertionMethod",
-    "proofValue": "${(selectedProof.hash || selectedProof.transaction_hash || selectedProof.blockchain_tx_hash || '').slice(0, 32)}..."
+    "proofValue": "${selectedProof.hash || selectedProof.transaction_hash || selectedProof.blockchain_tx_hash || ''}"
   }
 }`}
                 </Box>

@@ -29,6 +29,13 @@ router.post('/refresh-token', adminController.refreshAdminToken);
 router.get('/users', authenticateAdmin, adminController.getAllUsers);
 
 /**
+ * @route POST /api/admin/identify-biometric
+ * @desc Match incoming biometric facemesh against registered citizen templates
+ * @access Admin
+ */
+router.post('/identify-biometric', authenticateAdmin, adminController.identifyUserBiometric);
+
+/**
  * @route POST /api/admin/users/batch-action
  * @desc Batch verify, reject, deactivate, or reactivate multiple users
  * @access Admin

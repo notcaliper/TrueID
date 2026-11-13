@@ -31,12 +31,19 @@ import {
   LanRounded,
   BadgeRounded,
   AccountCircleRounded,
-  LockRounded
+  LockRounded,
+  AccountBalanceWalletRounded,
+  ElectricBoltRounded,
+  ContentCopyRounded,
+  CheckRounded,
+  CheckCircleRounded,
+  WarningAmberRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
+import walletService from '../services/wallet.service';
 
-const steps = ['Personal Info', 'Account Setup', 'Security & Terms'];
+const steps = ['Personal Info', 'Account Details', 'Web3 Wallet', 'Security & Terms'];
 
 // Keyframes for background animation
 const float1 = `
@@ -73,11 +80,15 @@ const Register = () => {
     password: '',
     confirmPassword: '',
     governmentId: '',
+    walletAddress: '',
     agreeTerms: false,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [connectedWallet, setConnectedWallet] = useState(null);
+  const [connectingWallet, setConnectingWallet] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -88,6 +99,34 @@ const Register = () => {
     const { name, value, checked } = e.target;
     setFormData({ ...formData, [name]: name === 'agreeTerms' ? checked : value });
     setLocalError('');
+  };
+
+  const handleCopyAddress = (addr) => {
+    if (!addr) return;
+    navigator.clipboard.writeText(addr);
+    setCopiedAddress(true);
+    setTimeout(() => setCopiedAddress(false), 2000);
+  };
+
+  const handleConnectMetaMask = async () => {
+    setConnectingWallet(true);
+    setLocalError('');
+    try {
+      const info = await walletService.connectWallet();
+      setConnectedWallet(info);
+      setFormData(prev => ({ ...prev, walletAddress: info.address }));
+    } catch (err) {
+      console.error('MetaMask connection error:', err);
+      setLocalError(err.message || 'Failed to connect MetaMask. You can also paste your Ethereum address manually.');
+    } finally {
+      setConnectingWallet(false);
+    }
+  };
+
+  const handleDisconnectWallet = () => {
+    walletService.disconnect();
+    setConnectedWallet(null);
+    setFormData(prev => ({ ...prev, walletAddress: '' }));
   };
 
   const validateStep = () => {
@@ -102,6 +141,14 @@ const Register = () => {
         if (!formData.phone?.trim()) return 'Phone number is required';
         break;
       case 2:
+        if (!formData.walletAddress?.trim()) {
+          return 'An external Web3 Ethereum address (e.g. MetaMask) is required to receive your Soulbound identity pass';
+        }
+        if (!/^0x[a-fA-F0-9]{40}$/.test(formData.walletAddress.trim())) {
+          return 'Invalid Ethereum wallet address format. Must be a 42-character hex address starting with 0x';
+        }
+        break;
+      case 3:
         if (!formData.password || formData.password.length < 8) return 'Password must be at least 8 characters long';
         if (formData.password !== formData.confirmPassword) return 'Passwords do not match';
         if (!formData.agreeTerms) return 'You must accept the terms of service';
@@ -172,7 +219,7 @@ const Register = () => {
                   label="First Name"
                   value={formData.firstName}
                   onChange={handleChange}
-                  placeholder="e.g. Akshay"
+                  placeholder="e.g. John"
                   sx={inputStyle}
                 />
                 <TextField
@@ -181,7 +228,7 @@ const Register = () => {
                   label="Last Name"
                   value={formData.lastName}
                   onChange={handleChange}
-                  placeholder="e.g. Manbhaw"
+                  placeholder="e.g. Doe"
                   sx={inputStyle}
                 />
               </Box>
@@ -192,7 +239,7 @@ const Register = () => {
                 label="National Citizen Identifier (Gov ID)"
                 value={formData.governmentId}
                 onChange={handleChange}
-                placeholder="e.g. JIFPM9413P"
+                placeholder="e.g. GOV-894132"
                 helperText="Used to generate your unique decentralized identifier (DID)"
                 sx={{
                   ...inputStyle,
@@ -223,7 +270,7 @@ const Register = () => {
                 label="Username"
                 value={formData.username}
                 onChange={handleChange}
-                placeholder="e.g. NotAkshay"
+                placeholder="e.g. citizen_user"
                 sx={inputStyle}
               />
 
@@ -234,7 +281,7 @@ const Register = () => {
                 label="Email Address"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="e.g. akshay@trueid.org"
+                placeholder="e.g. citizen@domain.org"
                 sx={inputStyle}
               />
 
@@ -252,6 +299,199 @@ const Register = () => {
         );
 
       case 2:
+        const hasValidAddress = Boolean(formData.walletAddress && /^0x[a-fA-F0-9]{40}$/.test(formData.walletAddress.trim()));
+        return (
+          <Fade in={true}>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                <AccountBalanceWalletRounded sx={{ color: '#2563eb', fontSize: 26 }} />
+                <Typography variant="h6" sx={{ fontWeight: 800, color: theme.palette.text.primary, letterSpacing: '-0.01em' }}>
+                  Web3 Wallet Linkage
+                </Typography>
+              </Box>
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 2.5 }}>
+                Connect your personal Ethereum wallet (MetaMask) to anchor your decentralized identity.
+              </Typography>
+
+              {/* Non-Custodial Self-Custody Guarantee Notice */}
+              <Box
+                sx={{
+                  p: 2,
+                  mb: 2.5,
+                  borderRadius: 2.5,
+                  bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.1)',
+                  border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.25)'}`,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 1.5
+                }}
+              >
+                <ShieldRounded sx={{ color: '#16a34a', fontSize: 22, mt: 0.2, flexShrink: 0 }} />
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: isLight ? '#15803d' : '#4ade80', fontSize: '0.84rem' }}>
+                    100% Non-Custodial • You Own Your Private Keys
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isLight ? '#166534' : '#86efac', fontSize: '0.76rem', lineHeight: 1.4, display: 'block', mt: 0.2 }}>
+                    TrueID never generates disposable custodial wallets or holds your private keys. Your permanent Soulbound token will be minted directly to your personal address on Ethereum Sepolia.
+                  </Typography>
+                </Box>
+              </Box>
+
+              {connectedWallet ? (
+                /* Connected Web3 Card */
+                <Box
+                  sx={{
+                    p: 2.5,
+                    borderRadius: 2.5,
+                    bgcolor: isLight ? '#f8fafc' : '#141618',
+                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)'}`,
+                    mb: 2.5
+                  }}
+                >
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#16a34a', boxShadow: '0 0 0 3px rgba(22, 163, 74, 0.2)' }} />
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: isLight ? '#0f172a' : '#ffffff', fontSize: '0.88rem' }}>
+                        MetaMask Connected
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={connectedWallet.network || 'Ethereum Sepolia'}
+                      size="small"
+                      sx={{
+                        bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.15)',
+                        color: '#2563eb',
+                        fontWeight: 700,
+                        fontSize: '0.68rem',
+                        height: 22
+                      }}
+                    />
+                  </Box>
+
+                  <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: isLight ? '#ffffff' : '#1e2124', border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`, mb: 1.5 }}>
+                    <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, display: 'block', mb: 0.3 }}>
+                      PUBLIC RECIPIENT ADDRESS (NON-CUSTODIAL)
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 700, color: isLight ? '#0f172a' : '#ffffff', fontSize: '0.85rem', wordBreak: 'break-all' }}>
+                        {connectedWallet.address}
+                      </Typography>
+                      <Tooltip title={copiedAddress ? 'Copied!' : 'Copy Address'}>
+                        <IconButton size="small" onClick={() => handleCopyAddress(connectedWallet.address)} sx={{ color: isLight ? '#64748b' : '#9ca3af' }}>
+                          {copiedAddress ? <CheckRounded sx={{ fontSize: 16, color: '#16a34a' }} /> : <ContentCopyRounded sx={{ fontSize: 16 }} />}
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 600 }}>
+                      Testnet Balance: <strong style={{ color: isLight ? '#0f172a' : '#ffffff' }}>{connectedWallet.balance} ETH</strong>
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={handleDisconnectWallet}
+                      sx={{ textTransform: 'none', color: '#ef4444', fontSize: '0.75rem', fontWeight: 700, p: 0.5 }}
+                    >
+                      Disconnect / Change
+                    </Button>
+                  </Box>
+                </Box>
+              ) : (
+                /* Connect or Manual Input Mode */
+                <Box sx={{ mb: 2.5 }}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    startIcon={<ElectricBoltRounded />}
+                    onClick={handleConnectMetaMask}
+                    disabled={connectingWallet}
+                    sx={{
+                      py: 1.4,
+                      borderRadius: 2.5,
+                      bgcolor: '#2563eb',
+                      fontWeight: 800,
+                      fontSize: '0.95rem',
+                      textTransform: 'none',
+                      boxShadow: '0 4px 14px rgba(37, 99, 235, 0.25)',
+                      mb: 2,
+                      '&:hover': { bgcolor: '#1d4ed8' }
+                    }}
+                  >
+                    {connectingWallet ? 'Waiting for MetaMask approval...' : 'Connect MetaMask / Web3 Extension'}
+                  </Button>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, my: 2 }}>
+                    <Box sx={{ flex: 1, height: '1px', bgcolor: isLight ? '#e2e8f0' : '#282a2d' }} />
+                    <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#64748b', fontWeight: 700, letterSpacing: '0.05em' }}>
+                      OR ENTER ADDRESS MANUALLY
+                    </Typography>
+                    <Box sx={{ flex: 1, height: '1px', bgcolor: isLight ? '#e2e8f0' : '#282a2d' }} />
+                  </Box>
+
+                  <TextField
+                    fullWidth
+                    name="walletAddress"
+                    label="External Ethereum Address (0x...)"
+                    value={formData.walletAddress}
+                    onChange={handleChange}
+                    placeholder="0x71C...4982"
+                    helperText={
+                      hasValidAddress
+                        ? '✓ Valid 42-character Ethereum address format'
+                        : 'Enter your 42-character Ethereum address from MetaMask, Rabby, or Coinbase'
+                    }
+                    InputProps={{
+                      endAdornment: formData.walletAddress ? (
+                        <InputAdornment position="end">
+                          {hasValidAddress ? (
+                            <CheckCircleRounded sx={{ color: '#16a34a', fontSize: 20 }} />
+                          ) : (
+                            <WarningAmberRounded sx={{ color: '#d97706', fontSize: 20 }} />
+                          )}
+                        </InputAdornment>
+                      ) : null
+                    }}
+                    sx={{
+                      ...inputStyle,
+                      '& .MuiFormHelperText-root': {
+                        color: hasValidAddress ? '#16a34a' : theme.palette.text.secondary,
+                        fontWeight: hasValidAddress ? 700 : 500,
+                        fontSize: '0.74rem'
+                      }
+                    }}
+                  />
+                </Box>
+              )}
+
+              {/* Informative DID preview */}
+              <Box
+                sx={{
+                  p: 1.8,
+                  borderRadius: 2,
+                  bgcolor: isLight ? '#f8fafc' : '#141618',
+                  border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5
+                }}
+              >
+                <LanRounded sx={{ color: '#2563eb', fontSize: 20, flexShrink: 0 }} />
+                <Box sx={{ overflow: 'hidden' }}>
+                  <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, display: 'block' }}>
+                    YOUR W3C DECENTRALIZED IDENTIFIER (DID) PREVIEW
+                  </Typography>
+                  <Typography variant="caption" sx={{ fontFamily: 'monospace', color: hasValidAddress ? '#2563eb' : (isLight ? '#94a3b8' : '#64748b'), fontWeight: 700, wordBreak: 'break-all' }}>
+                    {hasValidAddress ? `did:trueid:${formData.walletAddress.trim()}` : 'did:trueid:<awaiting-wallet-connection>'}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Fade>
+        );
+
+      case 3:
         return (
           <Fade in={true}>
             <Box>
@@ -520,7 +760,7 @@ const Register = () => {
                   fontSize: '0.92rem'
                 }}
               >
-                Join the verified Ethereum Sepolia decentralized registry in three quick steps.
+                Join the verified Ethereum Sepolia decentralized registry in four quick steps.
               </Typography>
 
               {/* Step Progression Indicators */}
@@ -537,9 +777,14 @@ const Register = () => {
                     desc: 'Username, verified email, and contact info'
                   },
                   {
+                    icon: <AccountBalanceWalletRounded sx={{ fontSize: 18 }} />,
+                    label: 'Web3 Wallet Linkage',
+                    desc: 'External MetaMask connection for self-custody'
+                  },
+                  {
                     icon: <LockRounded sx={{ fontSize: 18 }} />,
-                    label: 'Security & Verification',
-                    desc: 'Cryptographic master key & DID creation'
+                    label: 'Security & Terms',
+                    desc: 'Cryptographic master key & terms agreement'
                   }
                 ].map((item, index) => {
                   const isDone = activeStep > index;
