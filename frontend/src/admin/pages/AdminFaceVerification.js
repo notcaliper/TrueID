@@ -279,44 +279,54 @@ const AdminFaceVerification = () => {
                         <Typography variant="caption" sx={{ color: t.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           Decentralized Identifier (DID)
                         </Typography>
-                        <Chip
-                          label="W3C ERC-1056"
-                          size="small"
-                          sx={{
-                            height: 18,
-                            fontSize: '0.62rem',
-                            fontWeight: 700,
-                            bgcolor: isLight ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.2)',
-                            color: t.primary,
-                            border: `1px solid ${t.primaryBorder}`
-                          }}
-                        />
+                        {verificationResult.did && (
+                          <Chip
+                            label="W3C ERC-1056"
+                            size="small"
+                            sx={{
+                              height: 18,
+                              fontSize: '0.62rem',
+                              fontWeight: 700,
+                              bgcolor: isLight ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.2)',
+                              color: t.primary,
+                              border: `1px solid ${t.primaryBorder}`
+                            }}
+                          />
+                        )}
                       </Box>
-                      <Tooltip title={copiedField === 'did' ? 'Copied DID!' : 'Copy DID'}>
-                        <IconButton
-                          size="small"
-                          onClick={() => copyToClipboard(verificationResult.did || `did:trueid:${(verificationResult.walletAddress || verificationResult.wallet_address || '0x').toLowerCase()}`, 'did')}
-                          sx={{ color: copiedField === 'did' ? t.success : t.textMuted }}
-                        >
-                          <ContentCopyRounded sx={{ fontSize: 15 }} />
-                        </IconButton>
-                      </Tooltip>
+                      {verificationResult.did && (
+                        <Tooltip title={copiedField === 'did' ? 'Copied DID!' : 'Copy DID'}>
+                          <IconButton
+                            size="small"
+                            onClick={() => copyToClipboard(verificationResult.did, 'did')}
+                            sx={{ color: copiedField === 'did' ? t.success : t.textMuted }}
+                          >
+                            <ContentCopyRounded sx={{ fontSize: 15 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Box>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontFamily: 'monospace',
-                        fontWeight: 700,
-                        color: t.primary,
-                        wordBreak: 'break-all',
-                        bgcolor: isLight ? '#f1f5f9' : 'rgba(0, 0, 0, 0.35)',
-                        p: 1.2,
-                        borderRadius: 1.5,
-                        border: `1px solid ${t.border}`
-                      }}
-                    >
-                      {verificationResult.did || `did:trueid:${(verificationResult.walletAddress || verificationResult.wallet_address || '0x' + verificationResult.id?.toString(16).padStart(40, '0')).toLowerCase()}`}
-                    </Typography>
+                    {verificationResult.did ? (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          color: t.primary,
+                          wordBreak: 'break-all',
+                          bgcolor: isLight ? '#f1f5f9' : 'rgba(0, 0, 0, 0.35)',
+                          p: 1.2,
+                          borderRadius: 1.5,
+                          border: `1px solid ${t.border}`
+                        }}
+                      >
+                        {verificationResult.did}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" sx={{ color: t.textMuted, fontStyle: 'italic', mt: 0.5 }}>
+                        No Decentralized Identifier (DID) enrolled for this citizen
+                      </Typography>
+                    )}
                   </Box>
 
                   {/* Government ID & Sepolia Wallet Grid */}
@@ -327,7 +337,7 @@ const AdminFaceVerification = () => {
                           Government ID / National ID
                         </Typography>
                         <Typography variant="body1" sx={{ fontFamily: 'monospace', fontWeight: 800, color: t.textPrimary, mt: 0.5 }}>
-                          {verificationResult.governmentId || verificationResult.government_id || 'GOV-IND-2026-X89'}
+                          {verificationResult.governmentId || verificationResult.government_id || 'Not Specified'}
                         </Typography>
                       </Box>
                     </Grid>
@@ -350,7 +360,7 @@ const AdminFaceVerification = () => {
                           )}
                         </Box>
                         <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 700, color: t.textSecondary, mt: 0.5, wordBreak: 'break-all' }}>
-                          {verificationResult.walletAddress || verificationResult.wallet_address || '0x71C849B2F2bB6f56A8108dB55f30896944e8C2eD'}
+                          {verificationResult.walletAddress || verificationResult.wallet_address || 'Not Registered'}
                         </Typography>
                       </Box>
                     </Grid>
@@ -385,7 +395,7 @@ const AdminFaceVerification = () => {
                       Email / Communications
                     </Typography>
                     <Typography variant="body2" sx={{ color: t.textSecondary, mt: 0.5, fontWeight: 500 }}>
-                      {verificationResult.email || 'akshaymanbhaw27@gmail.com'} {verificationResult.phone ? `• ${verificationResult.phone}` : ''}
+                      {verificationResult.email || 'No email registered'} {verificationResult.phone ? `• ${verificationResult.phone}` : ''}
                     </Typography>
                   </Box>
                 </Box>

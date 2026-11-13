@@ -2244,7 +2244,6 @@ exports.identifyUserBiometric = async (req, res) => {
 
       if (matched) {
         await db.query('UPDATE biometric_data SET last_verified_at = NOW(), verification_score = $1 WHERE id = $2', [score * 100, row.biometric_id]);
-        const computedDid = row.did || (row.wallet_address ? `did:trueid:${row.wallet_address.toLowerCase()}` : `did:trueid:0x${row.id.toString(16).padStart(40, '0')}`);
         return res.status(200).json({
           success: true,
           matched: true,
@@ -2257,7 +2256,7 @@ exports.identifyUserBiometric = async (req, res) => {
             email: row.email,
             walletAddress: row.wallet_address,
             wallet_address: row.wallet_address,
-            did: computedDid,
+            did: row.did || null,
             verificationStatus: row.verification_status,
             verification_status: row.verification_status,
             facemeshHash: row.facemesh_hash,
@@ -2330,8 +2329,6 @@ exports.identifyUserBiometric = async (req, res) => {
         ]
       );
 
-      const computedDid = finalCandidate.did || (finalCandidate.wallet_address ? `did:trueid:${finalCandidate.wallet_address.toLowerCase()}` : `did:trueid:0x${finalCandidate.id.toString(16).padStart(40, '0')}`);
-
       return res.status(200).json({
         success: true,
         matched: true,
@@ -2345,7 +2342,7 @@ exports.identifyUserBiometric = async (req, res) => {
           phone: finalCandidate.phone,
           walletAddress: finalCandidate.wallet_address,
           wallet_address: finalCandidate.wallet_address,
-          did: computedDid,
+          did: finalCandidate.did || null,
           verificationStatus: finalCandidate.verification_status,
           verification_status: finalCandidate.verification_status,
           facemeshHash: finalCandidate.facemesh_hash,
