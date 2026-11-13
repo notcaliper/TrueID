@@ -189,6 +189,12 @@ export const userAPI = {
     return api.get('/users/verification-status');
   },
 
+  uploadProfessionImage: async (formData) => {
+    return api.post('/profession/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
   getProfessionalRecords: async () => {
     return api.get('/users/professional-records');
   },

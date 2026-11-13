@@ -44,7 +44,8 @@ import {
   CloseRounded,
   DownloadRounded,
   HistoryRounded,
-  FactCheckRounded
+  FactCheckRounded,
+  OpenInNewRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
@@ -66,6 +67,7 @@ const Dashboard = () => {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [proofModalOpen, setProofModalOpen] = useState(false);
+  const [modalCopied, setModalCopied] = useState(false);
   const [selectedProof, setSelectedProof] = useState(null);
   const [recordSearch, setRecordSearch] = useState('');
   // eslint-disable-next-line no-unused-vars
@@ -1097,10 +1099,18 @@ const Dashboard = () => {
                       Verified Documents & Credentials
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#2563eb', fontSize: '0.82rem' }}>
-                      98%
+                      {credentialRecords.length > 0
+                        ? `${Math.round((credentialRecords.filter(r => r.status === 'VERIFIED').length / credentialRecords.length) * 100)}%`
+                        : '100%'}
                     </Typography>
                   </Box>
-                  <LinearProgress variant="determinate" value={98} sx={{ height: 6, borderRadius: 3, bgcolor: isLight ? '#f1f5f9' : '#282a2d', '& .MuiLinearProgress-bar': { bgcolor: '#2563eb' } }} />
+                  <LinearProgress
+                    variant="determinate"
+                    value={credentialRecords.length > 0
+                      ? Math.round((credentialRecords.filter(r => r.status === 'VERIFIED').length / credentialRecords.length) * 100)
+                      : 100}
+                    sx={{ height: 6, borderRadius: 3, bgcolor: isLight ? '#f1f5f9' : '#282a2d', '& .MuiLinearProgress-bar': { bgcolor: '#2563eb' } }}
+                  />
                 </Box>
 
                 <Box>
@@ -1347,12 +1357,56 @@ const Dashboard = () => {
               </Box>
 
               <Box>
-                <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
-                  SHA-256 NOTARY PROOF HASH
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
+                  <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, textTransform: 'uppercase' }}>
+                    {selectedProof.hash && selectedProof.hash.startsWith('0x') ? 'SEPOLIA BLOCKCHAIN TRANSACTION HASH' : 'SHA-256 NOTARY PROOF HASH'}
+                  </Typography>
+                  <Tooltip title={modalCopied ? 'Copied Full Hash!' : 'Copy full hash'}>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedProof.hash);
+                        setModalCopied(true);
+                        setTimeout(() => setModalCopied(false), 2000);
+                      }}
+                      startIcon={modalCopied ? <CheckCircleRounded sx={{ fontSize: 14 }} /> : <ContentCopyRounded sx={{ fontSize: 14 }} />}
+                      sx={{ textTransform: 'none', fontSize: '0.72rem', fontWeight: 700, color: modalCopied ? '#16a34a' : '#2563eb' }}
+                    >
+                      {modalCopied ? 'Copied' : 'Copy Hash'}
+                    </Button>
+                  </Tooltip>
+                </Box>
                 <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isLight ? '#f1f5f9' : '#1e2124', fontFamily: 'monospace', fontSize: '0.8rem', color: '#2563eb', wordBreak: 'break-all' }}>
                   {selectedProof.hash}
                 </Box>
+
+                {selectedProof.hash && selectedProof.hash.startsWith('0x') && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Button
+                      component="a"
+                      href={`https://sepolia.etherscan.io/tx/${selectedProof.hash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      fullWidth
+                      variant="outlined"
+                      endIcon={<OpenInNewRounded sx={{ fontSize: '15px !important' }} />}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        color: isLight ? '#1d4ed8' : '#60a5fa',
+                        borderColor: isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.4)',
+                        bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.08)',
+                        py: 0.8,
+                        '&:hover': {
+                          bgcolor: isLight ? '#dbeafe' : 'rgba(37, 99, 235, 0.18)'
+                        }
+                      }}
+                    >
+                      Verify On-Chain via Sepolia Etherscan Explorer ↗
+                    </Button>
+                  </Box>
+                )}
               </Box>
 
               <Box>
@@ -1390,7 +1444,7 @@ const Dashboard = () => {
     "created": "${selectedProof.created_at ? new Date(selectedProof.created_at).toISOString() : new Date().toISOString()}",
     "verificationMethod": "${identityData.did}#keys-1",
     "proofPurpose": "assertionMethod",
-    "proofValue": "${(selectedProof.hash || selectedProof.transaction_hash || selectedProof.blockchain_tx_hash || '').slice(0, 32)}..."
+    "proofValue": "${selectedProof.hash || selectedProof.transaction_hash || selectedProof.blockchain_tx_hash || ''}"
   }
 }`}
                 </Box>
