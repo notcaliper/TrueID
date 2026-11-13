@@ -72,6 +72,54 @@ const VerifiableCredentials = () => {
   const [submitting, setSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
 
+  const modalInputSx = {
+    '& .MuiOutlinedInput-root': {
+      bgcolor: isLight ? '#f8fafc' : '#141618',
+      borderRadius: 2,
+      color: isLight ? '#0f172a' : '#ffffff',
+      fontSize: '0.875rem',
+      '& fieldset': {
+        borderColor: isLight ? '#e2e8f0' : '#282a2d',
+        transition: 'border-color 0.15s ease'
+      },
+      '&:hover fieldset': {
+        borderColor: isLight ? '#cbd5e1' : '#3f4246'
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: '#2563eb !important'
+      }
+    },
+    '& .MuiInputLabel-root': {
+      color: isLight ? '#64748b' : '#9ca3af',
+      bgcolor: isLight ? '#ffffff' : '#181a1c',
+      px: 0.8,
+      borderRadius: 0.5,
+      zIndex: 2,
+      fontSize: '0.85rem',
+      '&.Mui-focused': {
+        color: '#2563eb !important'
+      }
+    },
+    '& .MuiSelect-icon': {
+      color: isLight ? '#64748b' : '#9ca3af'
+    },
+    '& input::placeholder': {
+      color: isLight ? '#94a3b8' : '#64748b',
+      opacity: 1
+    },
+    '& textarea::placeholder': {
+      color: isLight ? '#94a3b8' : '#64748b',
+      opacity: 1
+    },
+    '& input[type="date"]': {
+      colorScheme: isLight ? 'light' : 'dark'
+    },
+    '& input[type="date"]::-webkit-calendar-picker-indicator': {
+      filter: isLight ? 'none' : 'invert(0.8)',
+      cursor: 'pointer'
+    }
+  };
+
   const fetchRecords = useCallback(async () => {
     setRefreshing(true);
     setError(null);
@@ -866,7 +914,7 @@ const VerifiableCredentials = () => {
           }
         }}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: { xs: 2.5, sm: 3 }, pt: 2.5 }}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 800, color: isLight ? '#0f172a' : '#ffffff' }}>
               Register Verifiable Credential
@@ -880,7 +928,7 @@ const VerifiableCredentials = () => {
           </IconButton>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 2 }}>
+        <DialogContent sx={{ pt: '28px !important', px: { xs: 2.5, sm: 3 }, pb: 2 }}>
           <Grid container spacing={2.5}>
             <Grid size={12}>
               <TextField
@@ -893,12 +941,7 @@ const VerifiableCredentials = () => {
                 placeholder="e.g., Master of Science in Distributed Systems"
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
-                  }
-                }}
+                sx={modalInputSx}
               />
             </Grid>
 
@@ -913,10 +956,29 @@ const VerifiableCredentials = () => {
                 onChange={handleFormChange}
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
+                sx={modalInputSx}
+                SelectProps={{
+                  MenuProps: {
+                    PaperProps: {
+                      sx: {
+                        bgcolor: isLight ? '#ffffff' : '#181a1c',
+                        border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+                        borderRadius: 2,
+                        boxShadow: isLight ? '0 10px 25px -5px rgba(0,0,0,0.1)' : '0 10px 25px -5px rgba(0,0,0,0.5)',
+                        '& .MuiMenuItem-root': {
+                          color: isLight ? '#0f172a' : '#ffffff',
+                          fontSize: '0.85rem',
+                          '&:hover': {
+                            bgcolor: isLight ? '#f1f5f9' : '#21262d'
+                          },
+                          '&.Mui-selected': {
+                            bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.15)',
+                            color: '#2563eb',
+                            fontWeight: 600
+                          }
+                        }
+                      }
+                    }
                   }
                 }}
               >
@@ -938,12 +1000,7 @@ const VerifiableCredentials = () => {
                 placeholder="e.g., University / Organization Name"
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
-                  }
-                }}
+                sx={modalInputSx}
               />
             </Grid>
 
@@ -958,12 +1015,7 @@ const VerifiableCredentials = () => {
                 multiline
                 rows={3}
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
-                  }
-                }}
+                sx={modalInputSx}
               />
             </Grid>
 
@@ -978,12 +1030,7 @@ const VerifiableCredentials = () => {
                 onChange={handleFormChange}
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
-                  }
-                }}
+                sx={modalInputSx}
               />
             </Grid>
 
@@ -997,12 +1044,7 @@ const VerifiableCredentials = () => {
                 onChange={handleFormChange}
                 size="small"
                 InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: isLight ? '#f8fafc' : '#141618',
-                    borderRadius: 2
-                  }
-                }}
+                sx={modalInputSx}
               />
             </Grid>
 
@@ -1020,7 +1062,11 @@ const VerifiableCredentials = () => {
                   bgcolor: isLight ? '#f8fafc' : '#141618',
                   border: `2px dashed ${selectedFile ? '#16a34a' : isLight ? '#cbd5e1' : '#3f4246'}`,
                   cursor: 'pointer',
-                  '&:hover': { bgcolor: isLight ? '#f1f5f9' : '#1e2124' }
+                  transition: 'all 0.15s ease',
+                  '&:hover': {
+                    bgcolor: isLight ? '#f1f5f9' : '#1e2124',
+                    borderColor: '#2563eb'
+                  }
                 }}
               >
                 <input type="file" hidden accept=".pdf,image/*" onChange={handleFileChange} />
@@ -1036,15 +1082,23 @@ const VerifiableCredentials = () => {
           </Grid>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleCloseDialog} sx={{ color: isLight ? '#64748b' : '#9ca3af', textTransform: 'none' }}>
+        <DialogActions sx={{ px: { xs: 2.5, sm: 3 }, pb: 2.5, pt: 1 }}>
+          <Button onClick={handleCloseDialog} sx={{ color: isLight ? '#64748b' : '#9ca3af', textTransform: 'none', fontWeight: 600 }}>
             Cancel
           </Button>
           <Button
             variant="contained"
             disabled={submitting}
             onClick={handleSubmit}
-            sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, px: 3, '&:hover': { bgcolor: '#1d4ed8' } }}
+            sx={{
+              bgcolor: '#2563eb',
+              textTransform: 'none',
+              fontWeight: 700,
+              px: 3,
+              borderRadius: 2,
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+              '&:hover': { bgcolor: '#1d4ed8' }
+            }}
           >
             {submitting ? 'Registering...' : 'Register Claim'}
           </Button>
@@ -1066,19 +1120,19 @@ const VerifiableCredentials = () => {
           }
         }}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: { xs: 2.5, sm: 3 }, pt: 2.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <FactCheckRounded sx={{ color: '#2563eb' }} />
-            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1rem', color: isLight ? '#0f172a' : '#ffffff' }}>
               W3C Cryptographic Proof Verification
             </Typography>
           </Box>
-          <IconButton size="small" onClick={() => setProofModalOpen(false)}>
+          <IconButton size="small" onClick={() => setProofModalOpen(false)} sx={{ color: isLight ? '#64748b' : '#9ca3af' }}>
             <CloseRounded />
           </IconButton>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 2 }}>
+        <DialogContent sx={{ pt: '20px !important', px: { xs: 2.5, sm: 3 }, pb: 2 }}>
           {selectedProof && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Box sx={{ p: 2, borderRadius: 2, bgcolor: isLight ? '#f8fafc' : '#141618', border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}` }}>

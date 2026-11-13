@@ -1392,19 +1392,19 @@ const Dashboard = () => {
           }
         }}
       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: { xs: 2.5, sm: 3 }, pt: 2.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <FactCheckRounded sx={{ color: '#2563eb' }} />
-            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1rem' }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1rem', color: isLight ? '#0f172a' : '#ffffff' }}>
               W3C Cryptographic Proof Verification
             </Typography>
           </Box>
-          <IconButton size="small" onClick={() => setProofModalOpen(false)}>
+          <IconButton size="small" onClick={() => setProofModalOpen(false)} sx={{ color: isLight ? '#64748b' : '#9ca3af' }}>
             <CloseRounded />
           </IconButton>
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 2 }}>
+        <DialogContent sx={{ pt: '20px !important', px: { xs: 2.5, sm: 3 }, pb: 2 }}>
           {selectedProof && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Box sx={{ p: 2, borderRadius: 2, bgcolor: isLight ? '#f8fafc' : '#141618', border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}` }}>
