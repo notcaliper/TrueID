@@ -1446,6 +1446,29 @@ exports.deactivateUser = async (req, res) => {
         logger.warn(`Failed to execute smart contract revocation for deactivated user ${userId}: ${bcError.message}`);
       }
     }
+
+    // Record blockchain revocation transaction if any
+    if (blockchainRevocation && Array.isArray(blockchainRevocation.txHashes)) {
+      for (const txHash of blockchainRevocation.txHashes) {
+        await db.query(
+          `INSERT INTO blockchain_transactions (
+            user_id, transaction_type, transaction_hash, network, chain_id,
+            status, data, created_at, updated_at
+          ) VALUES ($1, 'ATTESTATION_REVOCATION', $2, 'sepolia', 11155111, 'CONFIRMED', $3, NOW(), NOW())
+          ON CONFLICT (transaction_hash) DO NOTHING`,
+          [
+            userId,
+            txHash,
+            JSON.stringify({
+              reason: reason || 'Account deactivated by authority',
+              walletAddress: user.wallet_address,
+              sbtRevoked: blockchainRevocation.sbtRevoked,
+              sbtTokenId: blockchainRevocation.sbtTokenId
+            })
+          ]
+        ).catch(err => logger.warn(`Failed to record revocation tx ${txHash}: ${err.message}`));
+      }
+    }
     
     // Log the deactivation
     await db.query(

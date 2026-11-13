@@ -42,6 +42,7 @@ import {
   LockRounded,
   GppGoodRounded,
   CloseRounded,
+  CancelRounded,
   DownloadRounded,
   HistoryRounded,
   FactCheckRounded,
@@ -170,11 +171,14 @@ const Dashboard = () => {
       const effectiveDid = resolveDid(fetchedUser) || resolveDid(user);
       const effectiveName = fetchedUser?.name || user?.name || user?.full_name || '';
 
-      const verStatus = verRes.status === 'fulfilled' && (verRes.value?.data?.data?.status || verRes.value?.data?.status)
-        ? (verRes.value?.data?.data?.status || verRes.value?.data?.status)
-        : (user?.verification_status || 'PENDING');
       const records = recRes.status === 'fulfilled' && recRes.value?.data?.records ? recRes.value.data.records : [];
       const bcData = bcRes.status === 'fulfilled' ? (bcRes.value?.data?.status || bcRes.value?.data?.data || bcRes.value?.data) : null;
+      const isSuspendedUser = fetchedUser?.is_active === false || user?.is_active === false || Boolean(bcData?.isSuspended);
+      const verStatus = isSuspendedUser 
+        ? 'SUSPENDED' 
+        : (verRes.status === 'fulfilled' && (verRes.value?.data?.data?.status || verRes.value?.data?.status)
+            ? (verRes.value?.data?.data?.status || verRes.value?.data?.status)
+            : (user?.verification_status || 'PENDING'));
 
       setIdentityData(prev => ({
         ...prev,
@@ -183,11 +187,12 @@ const Dashboard = () => {
         walletAddress: effectiveWallet,
         did: effectiveDid,
         verificationStatus: verStatus,
+        isSuspended: isSuspendedUser,
         recordsCount: records.length,
         facemeshStatus: (bioRes.status === 'fulfilled' && (bioRes.value?.data?.hasBiometrics || bioRes.value?.data?.facemeshExists || bioRes.value?.data?.verified)) || user?.facemesh_hash || user?.has_biometrics ? 'Enrolled (SHA-256)' : 'Not Enrolled',
         blockchainTx: bcData?.registrationTxHash || bcData?.transactionHash || user?.blockchain_tx_hash || '',
         contractAddress: bcData?.contractAddress || process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf',
-        sbtTokenId: bcData?.sbtTokenId || (user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : ''),
+        sbtTokenId: bcData?.sbtTokenId || (user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}${isSuspendedUser ? ' (Revoked)' : ''}` : ''),
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
 
@@ -228,9 +233,11 @@ const Dashboard = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const isVerified = identityData.verificationStatus === 'VERIFIED' || user?.verification_status === 'VERIFIED' || Boolean(user?.is_verified);
-  const hasSoulbound = isVerified && Boolean(identityData.sbtTokenId || identityData.blockchainTx || user?.soulbound_token_id || user?.soulbound_badge_minted);
-  const hasFaceVerified = Boolean(identityData.facemeshStatus === 'Enrolled (SHA-256)' || user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics);
+  const isSuspended = user?.is_active === false || identityData.isSuspended || identityData.verificationStatus === 'SUSPENDED';
+  const isRevoked = isSuspended || (identityData.sbtTokenId && identityData.sbtTokenId.includes('Revoked'));
+  const isVerified = !isSuspended && (identityData.verificationStatus === 'VERIFIED' || user?.verification_status === 'VERIFIED' || Boolean(user?.is_verified));
+  const hasSoulbound = !isRevoked && isVerified && Boolean(identityData.sbtTokenId || identityData.blockchainTx || user?.soulbound_token_id || user?.soulbound_badge_minted);
+  const hasFaceVerified = !isSuspended && Boolean(identityData.facemeshStatus === 'Enrolled (SHA-256)' || user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics);
 
   // 4 Core Identity Pillars (Dynamic based on real user state)
   const corePillars = [
@@ -718,10 +725,10 @@ const Dashboard = () => {
                   </Box>
                   <Box>
                     <Typography variant="subtitle2" sx={{ color: '#ffffff', fontWeight: 900, letterSpacing: '0.08em', fontSize: '0.88rem' }}>
-                      TRUEID DIGITAL PASS
+                      {isSuspended ? 'SUSPENDED CITIZEN IDENTITY' : 'TRUEID DIGITAL PASS'}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>
-                      {isVerified ? 'OFFICIAL IDENTITY CARD • VERIFIED CITIZEN' : 'OFFICIAL IDENTITY CARD • PENDING VERIFICATION'}
+                    <Typography variant="caption" sx={{ color: isSuspended ? '#f87171' : '#94a3b8', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>
+                      {isSuspended ? 'ATTESTATION REVOKED • ACCESS SUSPENDED' : (isVerified ? 'OFFICIAL IDENTITY CARD • VERIFIED CITIZEN' : 'OFFICIAL IDENTITY CARD • PENDING VERIFICATION')}
                     </Typography>
                   </Box>
                 </Box>
@@ -742,15 +749,15 @@ const Dashboard = () => {
                   />
                   {identityData.sbtTokenId ? (
                     <Chip
-                      icon={<CheckCircleRounded sx={{ color: '#4ade80 !important', fontSize: '13px !important' }} />}
+                      icon={isRevoked ? <CancelRounded sx={{ color: '#f87171 !important', fontSize: '13px !important' }} /> : <CheckCircleRounded sx={{ color: '#4ade80 !important', fontSize: '13px !important' }} />}
                       label={identityData.sbtTokenId}
                       size="small"
                       sx={{
-                        bgcolor: 'rgba(34, 197, 94, 0.12)',
-                        color: '#4ade80',
+                        bgcolor: isRevoked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.12)',
+                        color: isRevoked ? '#f87171' : '#4ade80',
                         fontWeight: 800,
                         fontSize: '0.68rem',
-                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                        border: `1px solid ${isRevoked ? 'rgba(239, 68, 68, 0.35)' : 'rgba(34, 197, 94, 0.3)'}`,
                         height: 24
                       }}
                     />
@@ -814,8 +821,8 @@ const Dashboard = () => {
                   <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>
                     Badge Token:
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#4ade80', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem' }}>
-                    {identityData.sbtTokenId ? `${identityData.sbtTokenId} (Locked)` : (isVerified ? 'Attestation Confirmed' : 'Attestation Pending')}
+                  <Typography variant="caption" sx={{ color: isRevoked ? '#f87171' : '#4ade80', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem' }}>
+                    {isRevoked ? `${identityData.sbtTokenId || 'SBT-Badge'} (Revoked on Sepolia)` : (identityData.sbtTokenId ? `${identityData.sbtTokenId} (Locked)` : (isVerified ? 'Attestation Confirmed' : 'Attestation Pending'))}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>

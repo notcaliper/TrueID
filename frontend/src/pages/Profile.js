@@ -187,18 +187,19 @@ const Profile = () => {
   const userInitials = displayName ? displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ID';
 
   // 4 Core Identity Pillars (Consistent with Dashboard)
-  const isVerifiedUser = Boolean(user?.is_verified || user?.verification_status === 'VERIFIED' || profileData?.verificationStatus === 'VERIFIED');
-  const hasSoulbound = isVerifiedUser && Boolean(user?.soulbound_token_id || user?.soulbound_badge_minted || user?.blockchain_tx_hash);
-  const hasBiometrics = Boolean(user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics);
+  const isSuspendedUser = Boolean(user?.is_active === false || profileData?.is_active === false || profileData?.verificationStatus === 'SUSPENDED');
+  const isVerifiedUser = !isSuspendedUser && Boolean(user?.is_verified || user?.verification_status === 'VERIFIED' || profileData?.verificationStatus === 'VERIFIED');
+  const hasSoulbound = !isSuspendedUser && isVerifiedUser && Boolean(user?.soulbound_token_id || user?.soulbound_badge_minted || user?.blockchain_tx_hash);
+  const hasBiometrics = !isSuspendedUser && Boolean(user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics);
   const profilePillars = [
     {
       title: 'National KYC Identity',
       idVal: profileData.governmentId || 'Not Registered',
-      status: isVerifiedUser ? 'VERIFIED' : 'PENDING',
-      desc: isVerifiedUser ? 'Identity record officially verified on record' : 'Awaiting identity verification check',
-      tag: isVerifiedUser ? 'Verified' : 'Pending',
-      color: isVerifiedUser ? '#16a34a' : '#d97706',
-      bg: isLight ? (isVerifiedUser ? '#eff6ff' : '#fffbeb') : (isVerifiedUser ? 'rgba(37, 99, 235, 0.12)' : 'rgba(217, 119, 6, 0.12)'),
+      status: isSuspendedUser ? 'SUSPENDED' : (isVerifiedUser ? 'VERIFIED' : 'PENDING'),
+      desc: isSuspendedUser ? 'Identity attestation revoked by authority' : (isVerifiedUser ? 'Identity record officially verified on record' : 'Awaiting identity verification check'),
+      tag: isSuspendedUser ? 'Suspended' : (isVerifiedUser ? 'Verified' : 'Pending'),
+      color: isSuspendedUser ? '#dc2626' : (isVerifiedUser ? '#16a34a' : '#d97706'),
+      bg: isLight ? (isSuspendedUser ? '#fef2f2' : (isVerifiedUser ? '#eff6ff' : '#fffbeb')) : (isSuspendedUser ? 'rgba(220, 38, 38, 0.12)' : (isVerifiedUser ? 'rgba(37, 99, 235, 0.12)' : 'rgba(217, 119, 6, 0.12)')),
       icon: <BadgeRounded sx={{ fontSize: 24 }} />
     },
     {
@@ -223,12 +224,16 @@ const Profile = () => {
     },
     {
       title: 'Soulbound SBT Root',
-      idVal: user?.soulbound_token_id ? `ERC-5192 #${user.soulbound_token_id} (Non-Transferable)` : 'Attestation Pending',
-      status: user?.soulbound_token_id ? 'SEPOLIA LEDGER ANCHORED' : 'AWAITING REGISTRY MINT',
-      desc: `Smart contract ${sbtContractAddress.slice(0, 6)}...${sbtContractAddress.slice(-4)} • ${user?.soulbound_token_id ? 'Attested On-Chain' : 'Sepolia Network'}`,
-      tag: user?.soulbound_token_id ? 'On-Chain SBT' : 'Unminted',
-      color: '#0891b2',
-      bg: isLight ? '#ecfeff' : 'rgba(8, 145, 178, 0.12)',
+      idVal: isSuspendedUser 
+        ? (user?.soulbound_token_id ? `ERC-5192 #${user.soulbound_token_id} (Revoked on-chain)` : 'Revoked')
+        : (user?.soulbound_token_id ? `ERC-5192 #${user.soulbound_token_id} (Non-Transferable)` : 'Attestation Pending'),
+      status: isSuspendedUser ? 'REVOKED ON SEPOLIA' : (user?.soulbound_token_id ? 'SEPOLIA LEDGER ANCHORED' : 'AWAITING REGISTRY MINT'),
+      desc: isSuspendedUser 
+        ? 'Soulbound identity credential revoked on Sepolia smart contract by authority'
+        : `Smart contract ${sbtContractAddress.slice(0, 6)}...${sbtContractAddress.slice(-4)} • ${user?.soulbound_token_id ? 'Attested On-Chain' : 'Sepolia Network'}`,
+      tag: isSuspendedUser ? 'Revoked' : (user?.soulbound_token_id ? 'On-Chain SBT' : 'Unminted'),
+      color: isSuspendedUser ? '#dc2626' : '#0891b2',
+      bg: isLight ? (isSuspendedUser ? '#fef2f2' : '#ecfeff') : (isSuspendedUser ? 'rgba(220, 38, 38, 0.12)' : 'rgba(8, 145, 178, 0.12)'),
       icon: <SecurityRounded sx={{ fontSize: 24 }} />
     }
   ];

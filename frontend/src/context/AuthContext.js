@@ -13,9 +13,12 @@ const normalizeUser = (u) => {
   const tokenId = u.soulbound_token_id || u.soulboundTokenId || '';
   const txHash = u.blockchain_tx_hash || u.blockchainTxHash || '';
   const bioAt = u.biometric_verified_at || u.biometricVerifiedAt || null;
+  const isActive = u.is_active !== undefined ? Boolean(u.is_active) : (u.isActive !== undefined ? Boolean(u.isActive) : true);
 
   return {
     ...u,
+    is_active: isActive,
+    isActive: isActive,
     government_id: govId,
     governmentId: govId,
     wallet_address: wallet,
@@ -117,6 +120,13 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem('user', JSON.stringify(freshUser));
               }
             } catch (profErr) {
+              if (profErr.response?.status === 403 && profErr.response?.data?.suspended) {
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('user');
+                setUser(null);
+                setError('Your citizen account has been suspended by the authority administrator.');
+              }
               // Silent fallback to stored user if offline
             }
           }

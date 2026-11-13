@@ -257,6 +257,7 @@ exports.getUserBlockchainStatus = async (req, res) => {
     // Get full user blockchain status and wallet information
     const userResult = await db.query(
       `SELECT id, wallet_address, is_verified, verification_status,
+              COALESCE(is_active, true) as is_active,
               blockchain_status, blockchain_tx_hash, blockchain_network,
               soulbound_token_id, soulbound_badge_minted, verified_at, created_at
        FROM users WHERE id = $1`,
@@ -314,9 +315,10 @@ exports.getUserBlockchainStatus = async (req, res) => {
     let onChainRegistered = false;
     let onChainVerified = false;
     let onChainTokenId = user.soulbound_token_id ? Number(user.soulbound_token_id) : null;
+    let onChain = null;
     
     try {
-      const onChain = await blockchainService.getOnChainIdentity(walletAddress);
+      onChain = await blockchainService.getOnChainIdentity(walletAddress);
       if (onChain && onChain.isRegisteredOnChain) onChainRegistered = true;
       if (onChain && onChain.isVerifiedOnChain) onChainVerified = true;
       if (onChain && onChain.soulboundTokenId) {
@@ -329,8 +331,10 @@ exports.getUserBlockchainStatus = async (req, res) => {
       logger.warn(`On-chain status check error for ${walletAddress}:`, contractErr.message);
     }
     
+    const isUserActive = user.is_active !== false;
+    const isBadgeValid = onChain ? onChain.isBadgeValid : isUserActive;
     const isRegistered = Boolean(onChainRegistered || user.soulbound_badge_minted || onChainTokenId || user.blockchain_status === 'CONFIRMED');
-    const isIdentityVerified = Boolean(onChainVerified || isDbVerified);
+    const isIdentityVerified = Boolean(isUserActive && isBadgeValid && (onChainVerified || isDbVerified));
 
     // Get recent blockchain transactions
     let recentTransactions = [];
@@ -371,9 +375,11 @@ exports.getUserBlockchainStatus = async (req, res) => {
     );
     const latestTx = recentTransactions.length > 0 ? recentTransactions[0] : null;
     const txHash = user.blockchain_tx_hash || (attestationTx ? attestationTx.transaction_hash : (latestTx ? latestTx.transaction_hash : ''));
-    const sbtTokenId = onChainTokenId 
-      ? `SBT-Token #${onChainTokenId}` 
-      : (user.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : null);
+    let sbtTokenLabel = null;
+    if (onChainTokenId || user.soulbound_token_id) {
+      const tid = onChainTokenId || user.soulbound_token_id;
+      sbtTokenLabel = `SBT-Token #${tid}${(!isBadgeValid || !isUserActive) ? ' (Revoked)' : ''}`;
+    }
 
     let liveConfirmations = 0;
     if (txHash) {
@@ -406,17 +412,23 @@ exports.getUserBlockchainStatus = async (req, res) => {
       } catch (_) {}
     }
 
+    const identityStatus = !isUserActive 
+      ? 'SUSPENDED' 
+      : (isIdentityVerified ? 'VERIFIED' : (isRegistered ? 'REGISTERED' : 'NOT_REGISTERED'));
+
     res.status(200).json({
       status: {
         walletAddress,
         balance,
         isRegistered,
         isVerified: isIdentityVerified,
+        isSuspended: !isUserActive,
+        isBadgeValid,
         network,
-        identityStatus: isIdentityVerified ? 'VERIFIED' : (isRegistered ? 'REGISTERED' : 'NOT_REGISTERED'),
+        identityStatus,
         registrationTxHash: txHash,
         transactionHash: txHash,
-        sbtTokenId: sbtTokenId,
+        sbtTokenId: sbtTokenLabel,
         soulboundBadgeMinted: Boolean(user.soulbound_badge_minted || isRegistered),
         registrationTimestamp: (latestTx && latestTx.created_at) || user.verified_at || user.created_at,
         contractAddress: process.env.SOULBOUND_BADGE_ADDRESS || process.env.CONTRACT_ADDRESS,
