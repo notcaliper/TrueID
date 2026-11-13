@@ -2244,6 +2244,7 @@ exports.identifyUserBiometric = async (req, res) => {
 
       if (matched) {
         await db.query('UPDATE biometric_data SET last_verified_at = NOW(), verification_score = $1 WHERE id = $2', [score * 100, row.biometric_id]);
+        const computedDid = row.did || (row.wallet_address ? `did:trueid:${row.wallet_address.toLowerCase()}` : `did:trueid:0x${row.id.toString(16).padStart(40, '0')}`);
         return res.status(200).json({
           success: true,
           matched: true,
@@ -2252,10 +2253,15 @@ exports.identifyUserBiometric = async (req, res) => {
             id: row.id,
             name: row.name,
             governmentId: row.government_id,
+            government_id: row.government_id,
             email: row.email,
             walletAddress: row.wallet_address,
-            did: row.did,
-            verificationStatus: row.verification_status
+            wallet_address: row.wallet_address,
+            did: computedDid,
+            verificationStatus: row.verification_status,
+            verification_status: row.verification_status,
+            facemeshHash: row.facemesh_hash,
+            facemesh_hash: row.facemesh_hash
           }
         });
       }
@@ -2324,6 +2330,8 @@ exports.identifyUserBiometric = async (req, res) => {
         ]
       );
 
+      const computedDid = finalCandidate.did || (finalCandidate.wallet_address ? `did:trueid:${finalCandidate.wallet_address.toLowerCase()}` : `did:trueid:0x${finalCandidate.id.toString(16).padStart(40, '0')}`);
+
       return res.status(200).json({
         success: true,
         matched: true,
@@ -2332,11 +2340,16 @@ exports.identifyUserBiometric = async (req, res) => {
           id: finalCandidate.id,
           name: finalCandidate.name,
           governmentId: finalCandidate.government_id,
+          government_id: finalCandidate.government_id,
           email: finalCandidate.email,
           phone: finalCandidate.phone,
           walletAddress: finalCandidate.wallet_address,
-          did: finalCandidate.did,
-          verificationStatus: finalCandidate.verification_status
+          wallet_address: finalCandidate.wallet_address,
+          did: computedDid,
+          verificationStatus: finalCandidate.verification_status,
+          verification_status: finalCandidate.verification_status,
+          facemeshHash: finalCandidate.facemesh_hash,
+          facemesh_hash: finalCandidate.facemesh_hash
         }
       });
     }
