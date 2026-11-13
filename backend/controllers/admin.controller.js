@@ -3,6 +3,7 @@
  */
 const jwt = require('jsonwebtoken');
 const argon2 = require('argon2');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -1916,6 +1917,60 @@ exports.updateProfessionalRecordStatus = async (req, res) => {
     try {
       await client.query('BEGIN');
 
+      // Fetch professional record and user details
+      const recQuery = await client.query(
+        `SELECT pr.*, u.wallet_address, u.name as user_name, u.email as user_email,
+                (SELECT facemesh_hash FROM biometric_data WHERE user_id = pr.user_id AND is_active = true LIMIT 1) as biometric_hash
+         FROM professional_records pr
+         JOIN users u ON pr.user_id = u.id
+         WHERE pr.id = $1`,
+        [recordId]
+      );
+
+      if (recQuery.rows.length === 0) {
+        throw new Error('Professional record not found');
+      }
+
+      const existingRecord = recQuery.rows[0];
+      let blockchainResult = null;
+      let onBlockchain = existingRecord.on_blockchain || false;
+      let blockchainTxHash = existingRecord.blockchain_tx_hash || null;
+      let credentialId = existingRecord.credential_id || `urn:uuid:${uuidv4()}`;
+
+      // When approving/verifying, anchor the credential on Ethereum Sepolia and mint Soulbound Credential Badge
+      if (status === 'VERIFIED' && existingRecord.wallet_address) {
+        try {
+          const blockchainService = require('../services/blockchain.service');
+          const credentialHash = existingRecord.data_hash || crypto.createHash('sha256').update(JSON.stringify({
+            userId: existingRecord.user_id,
+            title: existingRecord.title,
+            institution: existingRecord.institution || existingRecord.organization,
+            startDate: existingRecord.start_date,
+            endDate: existingRecord.end_date
+          })).digest('hex');
+
+          logger.info(`Attesting professional record #${recordId} on Sepolia for wallet ${existingRecord.wallet_address}`);
+          blockchainResult = await blockchainService.attestProfessionalCredentialOnChain({
+            subjectAddress: existingRecord.wallet_address,
+            recordId: existingRecord.id,
+            credentialId,
+            recordType: existingRecord.record_type,
+            institution: existingRecord.institution || existingRecord.organization,
+            title: existingRecord.title,
+            credentialHash,
+            biometricHash: existingRecord.biometric_hash || ''
+          });
+
+          if (blockchainResult && blockchainResult.primaryTxHash) {
+            onBlockchain = true;
+            blockchainTxHash = blockchainResult.primaryTxHash;
+            logger.info(`Professional record #${recordId} anchored with tx: ${blockchainTxHash}, tokenId: ${blockchainResult.tokenId}`);
+          }
+        } catch (bcError) {
+          logger.error(`Blockchain attestation failed for professional record ${recordId}:`, bcError);
+        }
+      }
+
       // Update professional record
       const result = await client.query(
         `UPDATE professional_records
@@ -1923,19 +1978,45 @@ exports.updateProfessionalRecordStatus = async (req, res) => {
              verified_by = $2,
              verified_at = NOW(),
              verification_remarks = $3,
+             on_blockchain = $4,
+             blockchain_tx_hash = $5,
+             credential_id = COALESCE(credential_id, $6),
              updated_at = NOW()
-         WHERE id = $4
-         RETURNING id, user_id, title, institution, verification_status`,
-        [status, adminId, notes, recordId]
+         WHERE id = $7
+         RETURNING id, user_id, title, institution, verification_status, on_blockchain, blockchain_tx_hash, credential_id`,
+        [status, adminId, notes, onBlockchain, blockchainTxHash, credentialId, recordId]
       );
-
-      if (result.rows.length === 0) {
-        throw new Error('Professional record not found');
-      }
 
       const record = result.rows[0];
 
-      // Log the action
+      // If blockchain attestation took place, log the transaction in blockchain_transactions
+      if (blockchainResult && blockchainResult.primaryTxHash) {
+        await client.query(
+          `INSERT INTO blockchain_transactions 
+             (user_id, transaction_type, transaction_hash, block_number, status, data)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            record.user_id,
+            'CREDENTIAL_ATTESTATION',
+            blockchainResult.primaryTxHash,
+            blockchainResult.blockNumber || 0,
+            'CONFIRMED',
+            JSON.stringify({
+              recordId: record.id,
+              title: record.title,
+              institution: record.institution,
+              recordType: existingRecord.record_type,
+              credentialId: credentialId,
+              tokenId: blockchainResult.tokenId,
+              txHashes: blockchainResult.txHashes,
+              primaryTxHash: blockchainResult.primaryTxHash,
+              recipient: existingRecord.wallet_address
+            })
+          ]
+        );
+      }
+
+      // Log the action in audit_logs
       await client.query(
         `INSERT INTO audit_logs (
           admin_id,
@@ -1956,7 +2037,10 @@ exports.updateProfessionalRecordStatus = async (req, res) => {
             status,
             notes,
             title: record.title,
-            institution: record.institution
+            institution: record.institution,
+            onBlockchain,
+            blockchainTxHash,
+            tokenId: blockchainResult?.tokenId || null
           }),
           req.ip
         ]
@@ -1965,13 +2049,19 @@ exports.updateProfessionalRecordStatus = async (req, res) => {
       await client.query('COMMIT');
 
       res.status(200).json({
-        message: 'Professional record status updated successfully',
+        message: blockchainResult?.tokenId
+          ? `Professional record verified! Soulbound Credential Token #${blockchainResult.tokenId} minted on Sepolia.`
+          : 'Professional record status updated successfully',
         record: {
           id: record.id,
           status: record.verification_status,
           verifiedAt: new Date(),
-          verifiedBy: adminId
-        }
+          verifiedBy: adminId,
+          onBlockchain: record.on_blockchain,
+          blockchainTxHash: record.blockchain_tx_hash,
+          credentialId: record.credential_id
+        },
+        blockchain: blockchainResult
       });
 
     } catch (error) {

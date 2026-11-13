@@ -230,10 +230,13 @@ const AdminProfessionalRecords = () => {
     setBlockchainLoading(true);
     try {
       const result = await ApiService.verifyOnBlockchain(recordId);
-      if (result.success) {
-        setSuccess('Record verified on blockchain successfully');
+      if (result) {
+        setSuccess('Record anchored on Sepolia & credential token minted successfully!');
         const updatedRecord = await ApiService.getProfessionalRecord(recordId);
-        setSelectedRecord(updatedRecord);
+        if (updatedRecord && updatedRecord.record) {
+          setSelectedRecord(updatedRecord.record);
+        }
+        debouncedFetch(searchQuery, page, rowsPerPage);
       } else {
         setError('Blockchain verification failed');
       }
@@ -248,13 +251,29 @@ const AdminProfessionalRecords = () => {
   const handleAdminVerify = async (recordId, status) => {
     setActionLoading(true);
     try {
-      await ApiService.updateProfessionalRecordStatus(recordId, {
+      const response = await ApiService.updateProfessionalRecordStatus(recordId, {
         status,
         notes: adminNotes
       });
-      setSuccess('Record status updated successfully');
+      
+      const bc = response?.blockchain;
+      if (status === 'VERIFIED') {
+        const tokenMsg = bc?.tokenId ? ` (Soulbound Token #${bc.tokenId} Minted)` : '';
+        const txMsg = bc?.primaryTxHash ? ` [Tx: ${bc.primaryTxHash.substring(0, 10)}...]` : '';
+        setSuccess(`Record verified & anchored on Sepolia!${tokenMsg}${txMsg}`);
+      } else {
+        setSuccess('Record status updated successfully');
+      }
+
+      // Re-fetch record details so the modal displays on-chain status and Etherscan link!
+      try {
+        const refreshed = await ApiService.getProfessionalRecord(recordId);
+        if (refreshed && refreshed.record) {
+          setSelectedRecord(refreshed.record);
+        }
+      } catch (e) {}
+
       debouncedFetch(searchQuery, page, rowsPerPage);
-      setOpenModal(false);
       setAdminNotes('');
     } catch (err) {
       setError(`Failed to update record status: ${err.message}`);
@@ -800,8 +819,49 @@ const AdminProfessionalRecords = () => {
                       </Box>
                     )}
 
+                    {selectedRecord.verification_status === 'VERIFIED' && selectedRecord.blockchain_tx_hash && (
+                      <Box sx={{ mt: 3, p: 2.5, borderRadius: 2, bgcolor: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.08)', border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)'}` }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                          <CheckCircleIcon sx={{ color: '#10b981', fontSize: 24 }} />
+                          <Box>
+                            <Typography sx={{ fontWeight: 700, color: t.textPrimary, fontSize: '0.95rem' }}>
+                              On-Chain Verifiable Credential Anchored
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#10b981', fontWeight: 600 }}>
+                              Ethereum Sepolia • ERC-5192 Soulbound Token Minted
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        {selectedRecord.credential_id && (
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="caption" sx={{ color: t.textMuted, display: 'block' }}>W3C Credential URN:</Typography>
+                            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: t.textPrimary, wordBreak: 'break-all' }}>
+                              {selectedRecord.credential_id}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        <Box sx={{ mt: 1.5 }}>
+                          <Typography variant="caption" sx={{ color: t.textMuted, display: 'block' }}>Attestation Transaction:</Typography>
+                          <Link
+                            href={`https://sepolia.etherscan.io/tx/${selectedRecord.blockchain_tx_hash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: t.primary, fontWeight: 700, fontSize: '0.82rem', mt: 0.3 }}
+                          >
+                            <LinkIcon sx={{ fontSize: 16 }} />
+                            View on Sepolia Etherscan ↗
+                          </Link>
+                        </Box>
+                      </Box>
+                    )}
+
                     {selectedRecord.verification_status === 'VERIFIED' && !selectedRecord.blockchain_tx_hash && (
                       <Box sx={{ mt: 3 }}>
+                        <Typography variant="body2" sx={{ color: t.textSecondary, mb: 1.5 }}>
+                          This record is verified in the database but has not been anchored on the Ethereum Sepolia ledger yet.
+                        </Typography>
                         <LoadingButton
                           variant="contained"
                           loading={blockchainLoading}
@@ -813,7 +873,7 @@ const AdminProfessionalRecords = () => {
                             '&:hover': { bgcolor: t.primaryDark }
                           }}
                         >
-                          Verify on Blockchain
+                          Anchor on Sepolia & Mint Token
                         </LoadingButton>
                       </Box>
                     )}

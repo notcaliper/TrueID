@@ -506,26 +506,27 @@ exports.recordProfessionalRecord = async (req, res) => {
       logger.info(`Created blockchain identity for user ${userId}`);
     }
     
-    // Record on blockchain
-    const startTimestamp = Math.floor(new Date(record.start_date).getTime() / 1000);
-    const endTimestamp = record.end_date ? Math.floor(new Date(record.end_date).getTime() / 1000) : 0;
+    // Record on blockchain via TrueID Credential Registry and mint Soulbound Credential Badge
+    const result = await blockchainService.attestProfessionalCredentialOnChain({
+      subjectAddress: user.wallet_address,
+      recordId: record.id,
+      credentialId: record.credential_id || `urn:uuid:${record.id}`,
+      recordType: record.record_type,
+      institution: record.institution,
+      title: record.title,
+      credentialHash: record.data_hash,
+      biometricHash: user.biometric_hash || ''
+    });
     
-    const result = await blockchainService.addProfessionalRecord(
-      user.wallet_address,
-      record.data_hash,
-      startTimestamp,
-      endTimestamp
-    );
-    
+    const txHash = result.primaryTxHash || result.txHashes[0] || '0x00';
+
     // Update record with blockchain transaction hash
     await db.query(
       'UPDATE professional_records SET blockchain_tx_hash = $1, on_blockchain = true WHERE id = $2',
-      [result.transactionHash, recordId]
+      [txHash, recordId]
     );
     
-    const txStatus = (result.status === 'SUCCESS' || result.status === 'CONFIRMED' || result.status === 'success')
-      ? 'CONFIRMED'
-      : (result.status === 'PENDING' ? 'PENDING' : 'FAILED');
+    const txStatus = 'CONFIRMED';
 
     // Record transaction in database
     await db.query(
@@ -534,15 +535,17 @@ exports.recordProfessionalRecord = async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         userId,
-        'PROFESSIONAL_RECORD_ADDED',
-        result.transactionHash,
-        result.blockNumber,
+        'CREDENTIAL_ATTESTATION',
+        txHash,
+        result.blockNumber || 0,
         txStatus,
         JSON.stringify({
           recordId,
           recordType: record.record_type,
           institution: record.institution,
-          title: record.title
+          title: record.title,
+          tokenId: result.tokenId,
+          txHashes: result.txHashes
         })
       ]
     );

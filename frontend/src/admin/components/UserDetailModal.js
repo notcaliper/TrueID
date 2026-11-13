@@ -805,11 +805,34 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
                             </Typography>
                           )}
 
-                          {r.data_hash && (
-                            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: t.textMuted, fontSize: '0.7rem' }}>
-                              SHA: {r.data_hash.slice(0, 10)}...{r.data_hash.slice(-6)}
-                            </Typography>
-                          )}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                            {r.blockchain_tx_hash && (
+                              <Typography
+                                component="a"
+                                href={`https://sepolia.etherscan.io/tx/${r.blockchain_tx_hash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                variant="caption"
+                                sx={{
+                                  color: t.primary,
+                                  fontWeight: 700,
+                                  fontSize: '0.72rem',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 0.3,
+                                  '&:hover': { textDecoration: 'underline' }
+                                }}
+                              >
+                                Sepolia On-Chain ({r.blockchain_tx_hash.slice(0, 6)}...{r.blockchain_tx_hash.slice(-4)}) ↗
+                              </Typography>
+                            )}
+                            {r.data_hash && (
+                              <Typography variant="caption" sx={{ fontFamily: 'monospace', color: t.textMuted, fontSize: '0.7rem' }}>
+                                SHA: {r.data_hash.slice(0, 10)}...{r.data_hash.slice(-6)}
+                              </Typography>
+                            )}
+                          </Box>
                         </Box>
                       </Box>
                     );
