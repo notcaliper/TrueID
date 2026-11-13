@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 /**
  * Middleware to authenticate user JWT tokens
  */
-exports.authenticateUser = (req, res, next) => {
+exports.authenticateUser = async (req, res, next) => {
   try {
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
@@ -22,6 +22,24 @@ exports.authenticateUser = (req, res, next) => {
     // Check if token is for a user or admin authority
     if (decoded.type !== 'user' && decoded.type !== 'admin') {
       return res.status(403).json({ message: 'Invalid token type for this resource.' });
+    }
+
+    // If regular citizen user, ensure account is active and not suspended
+    if (decoded.type === 'user' && req.app?.locals?.db) {
+      try {
+        const activeCheck = await req.app.locals.db.query(
+          'SELECT COALESCE(is_active, true) as is_active FROM users WHERE id = $1',
+          [decoded.id]
+        );
+        if (activeCheck.rows.length > 0 && activeCheck.rows[0].is_active === false) {
+          return res.status(403).json({
+            message: 'Account has been suspended by authority administrator. Access revoked.',
+            suspended: true
+          });
+        }
+      } catch (dbErr) {
+        req.app?.locals?.logger?.warn?.(`Active check query failed in auth middleware: ${dbErr.message}`);
+      }
     }
     
     // Add user info to request

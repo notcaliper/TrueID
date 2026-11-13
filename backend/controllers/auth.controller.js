@@ -35,6 +35,20 @@ exports.verifyUserBiometric = async (req, res) => {
   }
 
   try {
+    // Check if user is suspended
+    const userActiveCheck = await db.query(
+      'SELECT COALESCE(is_active, true) as is_active FROM users WHERE id = $1',
+      [userId]
+    );
+    if (userActiveCheck.rows.length > 0 && userActiveCheck.rows[0].is_active === false) {
+      return res.status(403).json({
+        success: false,
+        verified: false,
+        message: 'This account has been suspended by the authority administrator.',
+        suspended: true
+      });
+    }
+
     // Check biometric data for user
     const biometricResult = await db.query(
       `SELECT id, facemesh_hash, facemesh_data
@@ -431,6 +445,7 @@ exports.loginUser = async (req, res) => {
     const userResult = await db.query(
       `SELECT u.id, u.username, u.password, u.government_id, u.name, u.email, u.phone, u.wallet_address, u.did,
               u.is_verified, u.verification_status, u.mfa_enabled, u.mfa_secret, u.soulbound_token_id, u.blockchain_tx_hash,
+              COALESCE(u.is_active, true) as is_active,
               b.facemesh_hash, b.last_verified_at as biometric_verified_at
        FROM users u
        LEFT JOIN LATERAL (
@@ -449,6 +464,14 @@ exports.loginUser = async (req, res) => {
     }
 
     const user = userResult.rows[0];
+
+    // Check if account is suspended / deactivated
+    if (user.is_active === false) {
+      return res.status(403).json({
+        message: 'This account has been suspended by the authority administrator. Access revoked.',
+        suspended: true
+      });
+    }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
