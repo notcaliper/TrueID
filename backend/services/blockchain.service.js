@@ -838,7 +838,7 @@ exports.processExpiredBlockchainStatuses = async (db) => {
                       adminWalletAddress,
                       ethers.utils.formatEther(amountToSend),
                       'EXPIRY_REFUND',
-                      'COMPLETED'
+                      'CONFIRMED'
                     ]
                   );
                 }

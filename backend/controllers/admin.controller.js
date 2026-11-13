@@ -581,7 +581,7 @@ exports.verifyUser = async (req, res) => {
                 'VERIFICATION_FUNDING',
                 fundingResult.transactionHash,
                 fundingResult.blockNumber,
-                'SUCCESS',
+                'CONFIRMED',
                 JSON.stringify({
                   amount: amount,
                   from: fundingResult.from,
@@ -687,6 +687,10 @@ exports.verifyUser = async (req, res) => {
                     }
                   
                     // Record blockchain registration only if we actually registered (not for existing identities)
+                    const regStatus = (blockchainRegistrationResult.status === 'SUCCESS' || blockchainRegistrationResult.status === 'CONFIRMED' || blockchainRegistrationResult.status === 'success')
+                      ? 'CONFIRMED'
+                      : (blockchainRegistrationResult.status === 'PENDING' ? 'PENDING' : 'FAILED');
+
                     await client.query(
                       `INSERT INTO blockchain_transactions 
                        (user_id, transaction_type, transaction_hash, block_number, status, data)
@@ -696,7 +700,7 @@ exports.verifyUser = async (req, res) => {
                         'IDENTITY_REGISTRATION',
                         blockchainRegistrationResult.transactionHash,
                         blockchainRegistrationResult.blockNumber,
-                        blockchainRegistrationResult.status,
+                        regStatus,
                         JSON.stringify({
                           biometricHash: biometricHash,
                           registeredBy: 'SYSTEM_AUTOMATIC',

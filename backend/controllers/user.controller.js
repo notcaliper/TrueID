@@ -966,7 +966,7 @@ exports.transferToBlockchain = async (req, res) => {
             user.wallet_address,
             process.env.CONTRACT_ADDRESS,
             'IDENTITY_REGISTRATION',
-            'COMPLETED'
+            'CONFIRMED'
           ]
         );
         

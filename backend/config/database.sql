@@ -236,7 +236,7 @@ CREATE TABLE IF NOT EXISTS blockchain_transactions (
     expires_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT blockchain_transactions_status_check CHECK (status IN ('PENDING', 'CONFIRMED', 'FAILED'))
+    CONSTRAINT blockchain_transactions_status_check CHECK (status IN ('PENDING', 'CONFIRMED', 'FAILED', 'SUCCESS', 'COMPLETED'))
 );
 
 CREATE TABLE IF NOT EXISTS soulbound_badges (

@@ -87,6 +87,10 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
       [result.transactionHash, result.network, biometricData.id]
     );
     
+    const regStatus = (result.status === 'SUCCESS' || result.status === 'CONFIRMED' || result.status === 'success')
+      ? 'CONFIRMED'
+      : (result.status === 'PENDING' ? 'PENDING' : 'FAILED');
+
     // Record transaction in database
     await db.query(
       `INSERT INTO blockchain_transactions 
@@ -97,7 +101,7 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
         'IDENTITY_REGISTRATION',
         result.transactionHash,
         result.blockNumber,
-        result.status,
+        regStatus,
         result.network,
         JSON.stringify({
           walletAddress: user.wallet_address,
@@ -495,6 +499,10 @@ exports.recordProfessionalRecord = async (req, res) => {
       [result.transactionHash, recordId]
     );
     
+    const txStatus = (result.status === 'SUCCESS' || result.status === 'CONFIRMED' || result.status === 'success')
+      ? 'CONFIRMED'
+      : (result.status === 'PENDING' ? 'PENDING' : 'FAILED');
+
     // Record transaction in database
     await db.query(
       `INSERT INTO blockchain_transactions 
@@ -505,7 +513,7 @@ exports.recordProfessionalRecord = async (req, res) => {
         'PROFESSIONAL_RECORD_ADDED',
         result.transactionHash,
         result.blockNumber,
-        result.status,
+        txStatus,
         JSON.stringify({
           recordId,
           recordType: record.record_type,
@@ -734,7 +742,7 @@ exports.recordUserProfessionalRecord = async (req, res) => {
           user.wallet_address,
           process.env.CONTRACT_ADDRESS,
           'PROFESSIONAL_RECORD',
-          'COMPLETED',
+          'CONFIRMED',
           recordId
         ]
       );
