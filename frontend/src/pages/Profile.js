@@ -41,7 +41,8 @@ import {
   GppGoodRounded,
   KeyRounded,
   VpnKeyRounded,
-  FactCheckRounded
+  FactCheckRounded,
+  AccessTimeRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
@@ -186,7 +187,9 @@ const Profile = () => {
   const userInitials = displayName ? displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'ID';
 
   // 4 Core Identity Pillars (Consistent with Dashboard)
-  const isVerifiedUser = user?.is_verified || user?.verification_status === 'VERIFIED';
+  const isVerifiedUser = Boolean(user?.is_verified || user?.verification_status === 'VERIFIED' || profileData?.verificationStatus === 'VERIFIED');
+  const hasSoulbound = Boolean(user?.soulbound_token_id || user?.soulbound_badge_minted || user?.blockchain_tx_hash);
+  const hasBiometrics = Boolean(user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics);
   const profilePillars = [
     {
       title: 'National KYC Identity',
@@ -324,7 +327,7 @@ const Profile = () => {
                   width: 22,
                   height: 22,
                   borderRadius: '50%',
-                  bgcolor: '#16a34a',
+                  bgcolor: isVerifiedUser ? '#16a34a' : '#d97706',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -332,7 +335,11 @@ const Profile = () => {
                   color: '#ffffff'
                 }}
               >
-                <CheckCircleRounded sx={{ fontSize: 14 }} />
+                {isVerifiedUser ? (
+                  <CheckCircleRounded sx={{ fontSize: 14 }} />
+                ) : (
+                  <AccessTimeRounded sx={{ fontSize: 13 }} />
+                )}
               </Box>
             </Box>
 
@@ -343,13 +350,31 @@ const Profile = () => {
                 </Typography>
 
                 <Chip
-                  label="SOULBOUND VERIFIED"
+                  label={
+                    isVerifiedUser
+                      ? (hasSoulbound ? 'SOULBOUND VERIFIED' : 'VERIFIED CITIZEN')
+                      : (profileData.verificationStatus === 'REJECTED' ? 'REJECTED' : 'PENDING VERIFICATION')
+                  }
                   size="small"
-                  icon={<GppGoodRounded sx={{ fontSize: '14px !important', color: '#16a34a !important' }} />}
+                  icon={
+                    isVerifiedUser ? (
+                      <GppGoodRounded sx={{ fontSize: '14px !important', color: '#16a34a !important' }} />
+                    ) : (
+                      <AccessTimeRounded sx={{ fontSize: '14px !important', color: (isLight ? '#b45309 !important' : '#fbbf24 !important') }} />
+                    )
+                  }
                   sx={{
-                    bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)',
-                    color: isLight ? '#16a34a' : '#4ade80',
-                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)'}`,
+                    bgcolor: isVerifiedUser
+                      ? (isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)')
+                      : (isLight ? '#fffbeb' : 'rgba(217, 119, 6, 0.15)'),
+                    color: isVerifiedUser
+                      ? (isLight ? '#16a34a' : '#4ade80')
+                      : (isLight ? '#b45309' : '#fbbf24'),
+                    border: `1px solid ${
+                      isVerifiedUser
+                        ? (isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)')
+                        : (isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.3)')
+                    }`,
                     fontWeight: 700,
                     fontSize: '0.72rem',
                     height: 24
@@ -390,18 +415,37 @@ const Profile = () => {
                     height: 26
                   }}
                 />
-                <Chip
-                  label="FaceMesh 68 Enclave"
-                  size="small"
-                  sx={{
-                    bgcolor: isLight ? '#f1f5f9' : '#1e2124',
-                    color: isLight ? '#334155' : '#cbd5e1',
-                    border: `1px solid ${isLight ? '#e2e8f0' : '#32363a'}`,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    height: 26
-                  }}
-                />
+
+                {hasBiometrics ? (
+                  <Chip
+                    label="FaceMesh 68 Enclave"
+                    size="small"
+                    icon={<CheckCircleRounded sx={{ fontSize: '13px !important', color: '#16a34a !important' }} />}
+                    sx={{
+                      bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.12)',
+                      color: isLight ? '#16a34a' : '#4ade80',
+                      border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)'}`,
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                ) : (
+                  <Chip
+                    label="Face: Not Enrolled"
+                    size="small"
+                    icon={<AccessTimeRounded sx={{ fontSize: '13px !important', color: isLight ? '#b45309 !important' : '#f59e0b !important' }} />}
+                    sx={{
+                      bgcolor: isLight ? '#fffbeb' : 'rgba(217, 119, 6, 0.1)',
+                      color: isLight ? '#b45309' : '#f59e0b',
+                      border: `1px solid ${isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.2)'}`,
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                )}
+
                 <Chip
                   label={mfaEnabled ? "2FA Protected" : "MFA Disabled"}
                   size="small"
@@ -445,8 +489,8 @@ const Profile = () => {
               <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block' }}>
                 CITIZEN STANDING
               </Typography>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#16a34a' }}>
-                Tier 1 Verified Citizen
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: isVerifiedUser ? '#16a34a' : '#d97706' }}>
+                {isVerifiedUser ? 'Tier 1 Verified Citizen' : 'Pending Verification'}
               </Typography>
             </Box>
 

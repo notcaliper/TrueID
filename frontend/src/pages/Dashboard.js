@@ -45,7 +45,9 @@ import {
   DownloadRounded,
   HistoryRounded,
   FactCheckRounded,
-  OpenInNewRounded
+  OpenInNewRounded,
+  AccessTimeRounded,
+  PendingRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
@@ -227,55 +229,59 @@ const Dashboard = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // 4 Core Identity Pillars (Simple English)
+  const isVerified = identityData.verificationStatus === 'VERIFIED' || Boolean(user?.is_verified);
+  const hasSoulbound = Boolean(identityData.sbtTokenId || identityData.blockchainTx || user?.soulbound_token_id || user?.soulbound_badge_minted);
+  const hasFaceVerified = Boolean(identityData.facemeshStatus === 'Enrolled (SHA-256)' || user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics);
+
+  // 4 Core Identity Pillars (Dynamic based on real user state)
   const corePillars = [
     {
       title: 'National ID Card',
-      idVal: identityData.governmentId,
-      status: 'VERIFIED & APPROVED',
-      desc: 'Government identity record confirmed and approved by official notary',
-      tag: 'Official Approval',
+      idVal: identityData.governmentId || 'Not Assigned',
+      status: isVerified ? 'VERIFIED & APPROVED' : (identityData.verificationStatus === 'REJECTED' ? 'APPLICATION REJECTED' : 'PENDING NOTARY REVIEW'),
+      desc: isVerified ? 'Government identity record confirmed and approved by official notary' : 'Application submitted, awaiting authorized notary officer review',
+      tag: isVerified ? 'Official Approval' : 'Under Review',
       linkText: 'View ID Details',
       linkTo: '/profile',
       icon: <BadgeRounded sx={{ fontSize: 24 }} />,
-      color: '#2563eb',
-      bg: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.12)'
+      color: isVerified ? '#2563eb' : '#d97706',
+      bg: isLight ? (isVerified ? '#eff6ff' : '#fffbeb') : (isVerified ? 'rgba(37, 99, 235, 0.12)' : 'rgba(217, 119, 6, 0.12)')
     },
     {
       title: 'Face Verification',
-      idVal: 'Face Match Active',
-      status: 'FACE SCAN PASSED',
-      desc: 'Real-time camera face check passed and securely stored on your device',
-      tag: 'Device Secured',
+      idVal: hasFaceVerified ? 'Face Match Active' : 'Scan Required',
+      status: hasFaceVerified ? 'FACE SCAN PASSED' : 'NOT ENROLLED',
+      desc: hasFaceVerified ? 'Real-time camera face check passed and securely stored on your device' : 'Perform live 3D FaceMesh scan to verify biometrics and liveness',
+      tag: hasFaceVerified ? 'Device Secured' : 'Action Required',
       linkText: 'Open Face Scan',
       linkTo: '/biometric-verification',
       icon: <FingerprintRounded sx={{ fontSize: 24 }} />,
-      color: '#7c3aed',
-      bg: isLight ? '#f5f3ff' : 'rgba(124, 58, 237, 0.12)'
+      color: hasFaceVerified ? '#7c3aed' : '#d97706',
+      bg: isLight ? (hasFaceVerified ? '#f5f3ff' : '#fffbeb') : (hasFaceVerified ? 'rgba(124, 58, 237, 0.12)' : 'rgba(217, 119, 6, 0.12)')
     },
     {
       title: 'Blockchain Record',
-      idVal: 'Permanent Digital Badge',
-      status: 'SAVED ON BLOCKCHAIN',
-      desc: 'Your verified identity badge is permanently recorded on the blockchain network',
-      tag: 'Permanent Record',
+      idVal: hasSoulbound ? (identityData.sbtTokenId || 'Permanent Digital Badge') : 'Pending Verification',
+      status: hasSoulbound ? 'SAVED ON BLOCKCHAIN' : 'NOT MINTED',
+      desc: hasSoulbound ? 'Your verified identity badge is permanently recorded on the blockchain network' : 'Permanent digital badge will be minted on Ethereum Sepolia upon notary approval',
+      tag: hasSoulbound ? 'Permanent Record' : 'Awaiting Approval',
       linkText: 'View on Blockchain',
       linkTo: '/blockchain-status',
       icon: <SecurityRounded sx={{ fontSize: 24 }} />,
-      color: '#16a34a',
-      bg: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.12)'
+      color: hasSoulbound ? '#16a34a' : '#64748b',
+      bg: isLight ? (hasSoulbound ? '#f0fdf4' : '#f8fafc') : (hasSoulbound ? 'rgba(22, 163, 74, 0.12)' : 'rgba(100, 116, 139, 0.12)')
     },
     {
       title: 'Verified Documents',
-      idVal: '4 Approved Documents',
-      status: 'ALL VERIFIED',
-      desc: 'College degrees, work experience, certificates, and ID papers',
-      tag: 'Approved Papers',
+      idVal: credentialRecords.length > 0 ? `${credentialRecords.length} Document${credentialRecords.length === 1 ? '' : 's'}` : '0 Documents',
+      status: credentialRecords.length > 0 ? `${credentialRecords.filter(r => r.status === 'VERIFIED').length} of ${credentialRecords.length} VERIFIED` : 'NO DOCUMENTS',
+      desc: credentialRecords.length > 0 ? 'College degrees, work experience, certificates, and ID papers' : 'Upload credentials or degrees to add verified claims to your identity',
+      tag: credentialRecords.length > 0 ? (credentialRecords.every(r => r.status === 'VERIFIED') ? 'All Verified' : 'In Review') : 'None Uploaded',
       linkText: 'View Documents',
       linkTo: '/professional-records',
       icon: <SchoolRounded sx={{ fontSize: 24 }} />,
-      color: '#0891b2',
-      bg: isLight ? '#ecfeff' : 'rgba(8, 145, 178, 0.12)'
+      color: credentialRecords.length > 0 ? '#0891b2' : '#64748b',
+      bg: isLight ? (credentialRecords.length > 0 ? '#ecfeff' : '#f8fafc') : (credentialRecords.length > 0 ? 'rgba(8, 145, 178, 0.12)' : 'rgba(100, 116, 139, 0.12)')
     }
   ];
 
@@ -375,7 +381,7 @@ const Dashboard = () => {
                   width: 22,
                   height: 22,
                   borderRadius: '50%',
-                  bgcolor: '#16a34a',
+                  bgcolor: isVerified ? '#16a34a' : '#d97706',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -383,7 +389,11 @@ const Dashboard = () => {
                   color: '#ffffff'
                 }}
               >
-                <CheckCircleRounded sx={{ fontSize: 14 }} />
+                {isVerified ? (
+                  <CheckCircleRounded sx={{ fontSize: 14 }} />
+                ) : (
+                  <AccessTimeRounded sx={{ fontSize: 13 }} />
+                )}
               </Box>
             </Box>
 
@@ -394,13 +404,31 @@ const Dashboard = () => {
                 </Typography>
 
                 <Chip
-                  label="SOULBOUND VERIFIED"
+                  label={
+                    isVerified
+                      ? (hasSoulbound ? 'SOULBOUND VERIFIED' : 'VERIFIED CITIZEN')
+                      : (identityData.verificationStatus === 'REJECTED' ? 'REJECTED' : 'PENDING VERIFICATION')
+                  }
                   size="small"
-                  icon={<GppGoodRounded sx={{ fontSize: '14px !important', color: '#16a34a !important' }} />}
+                  icon={
+                    isVerified ? (
+                      <GppGoodRounded sx={{ fontSize: '14px !important', color: '#16a34a !important' }} />
+                    ) : (
+                      <AccessTimeRounded sx={{ fontSize: '14px !important', color: (isLight ? '#b45309 !important' : '#fbbf24 !important') }} />
+                    )
+                  }
                   sx={{
-                    bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)',
-                    color: isLight ? '#16a34a' : '#4ade80',
-                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)'}`,
+                    bgcolor: isVerified
+                      ? (isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)')
+                      : (isLight ? '#fffbeb' : 'rgba(217, 119, 6, 0.15)'),
+                    color: isVerified
+                      ? (isLight ? '#16a34a' : '#4ade80')
+                      : (isLight ? '#b45309' : '#fbbf24'),
+                    border: `1px solid ${
+                      isVerified
+                        ? (isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)')
+                        : (isLight ? '#fde68a' : 'rgba(245, 158, 11, 0.3)')
+                    }`,
                     fontWeight: 700,
                     fontSize: '0.72rem',
                     height: 24
@@ -427,7 +455,7 @@ const Dashboard = () => {
                 </Tooltip>
               </Box>
 
-              {/* Key Identity Attribute Badges */}
+              {/* Key Identity Attribute Badges (Dynamic based on real verified state) */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
                 <Chip
                   label={`Gov ID: ${identityData.governmentId}`}
@@ -441,30 +469,66 @@ const Dashboard = () => {
                     height: 26
                   }}
                 />
-                <Chip
-                  label="Blockchain Badge"
-                  size="small"
-                  sx={{
-                    bgcolor: isLight ? '#f1f5f9' : '#1e2124',
-                    color: isLight ? '#334155' : '#cbd5e1',
-                    border: `1px solid ${isLight ? '#e2e8f0' : '#32363a'}`,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    height: 26
-                  }}
-                />
-                <Chip
-                  label="Face Verified"
-                  size="small"
-                  sx={{
-                    bgcolor: isLight ? '#f1f5f9' : '#1e2124',
-                    color: isLight ? '#334155' : '#cbd5e1',
-                    border: `1px solid ${isLight ? '#e2e8f0' : '#32363a'}`,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    height: 26
-                  }}
-                />
+
+                {hasSoulbound ? (
+                  <Chip
+                    label={identityData.sbtTokenId ? identityData.sbtTokenId : "Blockchain Badge"}
+                    size="small"
+                    icon={<LanRounded sx={{ fontSize: '13px !important', color: '#38bdf8 !important' }} />}
+                    sx={{
+                      bgcolor: isLight ? '#eff6ff' : 'rgba(56, 189, 248, 0.12)',
+                      color: isLight ? '#1d4ed8' : '#38bdf8',
+                      border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(56, 189, 248, 0.3)'}`,
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                ) : (
+                  <Chip
+                    label="Badge: Not Minted"
+                    size="small"
+                    sx={{
+                      bgcolor: isLight ? '#f8fafc' : '#141618',
+                      color: isLight ? '#94a3b8' : '#64748b',
+                      border: `1px solid ${isLight ? '#e2e8f0' : '#282a2d'}`,
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                )}
+
+                {hasFaceVerified ? (
+                  <Chip
+                    label="Face Verified"
+                    size="small"
+                    icon={<CheckCircleRounded sx={{ fontSize: '13px !important', color: '#16a34a !important' }} />}
+                    sx={{
+                      bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.12)',
+                      color: isLight ? '#16a34a' : '#4ade80',
+                      border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)'}`,
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                ) : (
+                  <Chip
+                    label="Face: Not Enrolled"
+                    size="small"
+                    icon={<AccessTimeRounded sx={{ fontSize: '13px !important', color: isLight ? '#b45309 !important' : '#f59e0b !important' }} />}
+                    sx={{
+                      bgcolor: isLight ? '#fffbeb' : 'rgba(217, 119, 6, 0.1)',
+                      color: isLight ? '#b45309' : '#f59e0b',
+                      border: `1px solid ${isLight ? '#fef3c7' : 'rgba(245, 158, 11, 0.2)'}`,
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      height: 26
+                    }}
+                  />
+                )}
+
                 <Chip
                   label="Privacy Protected"
                   size="small"
@@ -658,7 +722,7 @@ const Dashboard = () => {
                       TRUEID DIGITAL PASS
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>
-                      OFFICIAL IDENTITY CARD • VERIFIED CITIZEN
+                      {isVerified ? 'OFFICIAL IDENTITY CARD • VERIFIED CITIZEN' : 'OFFICIAL IDENTITY CARD • PENDING VERIFICATION'}
                     </Typography>
                   </Box>
                 </Box>
