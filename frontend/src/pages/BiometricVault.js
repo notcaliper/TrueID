@@ -205,7 +205,7 @@ const BiometricVault = () => {
             {refreshing ? 'Syncing Enclave...' : 'Sync Biometrics'}
           </Button>
           <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280' }}>
-            • Last Scan: {biometricStats.lastScan}
+            • Last Scan: {biometricStats.lastScan || 'Verified in Registry'}
           </Typography>
         </Box>
       </Box>

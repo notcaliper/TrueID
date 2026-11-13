@@ -159,10 +159,7 @@ const AdminLayout = () => {
 
             <Button
               startIcon={<ArrowBackRounded />}
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
+              onClick={() => navigate('/')}
               variant="outlined"
               size="small"
               sx={{

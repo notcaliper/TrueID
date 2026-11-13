@@ -557,7 +557,7 @@ const BiometricVerification = ({
       )}
 
       <Grid container spacing={2} justifyContent="center" sx={{ mb: 3 }}>
-        <Grid item xs={12} md={10}>
+        <Grid size={{ xs: 12, md: 10 }}>
           <Box 
             sx={{ 
               position: 'relative', 

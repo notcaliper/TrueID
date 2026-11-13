@@ -19,15 +19,18 @@ exports.authenticateUser = (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Check if token is for a user (not admin)
-    if (decoded.type !== 'user') {
+    // Check if token is for a user or admin authority
+    if (decoded.type !== 'user' && decoded.type !== 'admin') {
       return res.status(403).json({ message: 'Invalid token type for this resource.' });
     }
     
     // Add user info to request
+    const targetUserId = (req.query && req.query.userId) || (req.body && req.body.userId) || decoded.id;
     req.user = {
-      id: decoded.id,
-      governmentId: decoded.governmentId
+      id: targetUserId,
+      governmentId: decoded.governmentId,
+      isAdmin: decoded.type === 'admin',
+      type: decoded.type
     };
     
     next();

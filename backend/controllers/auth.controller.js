@@ -75,9 +75,9 @@ exports.verifyUserBiometric = async (req, res) => {
       // Record in biometric_verifications table
       try {
         await db.query(
-          `INSERT INTO biometric_verifications (user_id, biometric_data_id, success, confidence_score, verification_method, ip_address, created_at)
-           VALUES ($1, $2, true, $3, 'FACEMESH_LIVENESS', $4, NOW())`,
-          [userId, storedRow.id, similarityScore * 100, req.ip]
+          `INSERT INTO biometric_verifications (user_id, biometric_data_id, success, verification_score, liveness_detected, attempt_metadata, created_at)
+           VALUES ($1, $2, true, $3, true, $4, NOW())`,
+          [userId, storedRow.id, similarityScore * 100, JSON.stringify({ ip_address: req.ip, verification_method: 'FACEMESH_LIVENESS' })]
         );
       } catch (err) {
         logger.warn('Failed to insert into biometric_verifications:', err.message);
