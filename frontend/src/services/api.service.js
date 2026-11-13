@@ -259,8 +259,8 @@ export const walletAPI = {
       data: {
         address: resolvedAddress,
         did: user.did || (resolvedAddress ? `did:trueid:${resolvedAddress}` : ''),
-        balance: '0.0000',
-        network: 'Ethereum Sepolia Testnet'
+        balance: status.balance || '0.0000',
+        network: status.network || 'Ethereum Sepolia Testnet'
       }
     };
   },

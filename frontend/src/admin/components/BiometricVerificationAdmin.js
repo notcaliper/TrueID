@@ -632,7 +632,7 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
               Government ID: <strong style={{ color: t.primary }}>{userInfo.governmentId || userInfo.government_id}</strong> • Status: <strong style={{ color: '#10b981' }}>{userInfo.verificationStatus || 'VERIFIED'}</strong>
             </Typography>
             <Typography variant="caption" sx={{ fontFamily: 'monospace', color: t.textMuted, wordBreak: 'break-all' }}>
-              DID: {userInfo.did || `did:trueid:${userInfo.walletAddress || userInfo.wallet_address}`}
+              DID: {userInfo.did || (userInfo.walletAddress || userInfo.wallet_address ? `did:trueid:${(userInfo.walletAddress || userInfo.wallet_address).toLowerCase()}` : 'No DID provisioned')}
             </Typography>
           </Box>
         </Alert>

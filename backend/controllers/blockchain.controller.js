@@ -375,9 +375,18 @@ exports.getUserBlockchainStatus = async (req, res) => {
       liveConfirmations = 1;
     }
 
+    let balance = '0.0000';
+    if (walletAddress) {
+      try {
+        const walletService = require('../services/wallet.service');
+        balance = await walletService.getBalance(walletAddress);
+      } catch (_) {}
+    }
+
     res.status(200).json({
       status: {
         walletAddress,
+        balance,
         isRegistered,
         isVerified: isIdentityVerified,
         network,
