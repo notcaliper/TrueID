@@ -6,6 +6,14 @@ const router = express.Router();
 const { authenticateUser } = require('../middleware/auth.middleware');
 const { professionalRecordRules, validate } = require('../middleware/validation.middleware');
 const userController = require('../controllers/user.controller');
+const authController = require('../controllers/auth.controller');
+
+/**
+ * @route POST /api/users/verify-biometric
+ * @desc Verify citizen biometric facemesh data
+ * @access Public / Authenticated
+ */
+router.post('/verify-biometric', authController.verifyUserBiometric);
 
 /**
  * @route GET /api/users/profile

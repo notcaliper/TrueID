@@ -174,7 +174,15 @@ export const userAPI = {
   },
 
   getBiometricStatus: async () => {
-    return api.get('/users/verification-status');
+    return api.get('/users/biometric-status');
+  },
+
+  updateFacemesh: async (data) => {
+    return api.put('/users/update-facemesh', data);
+  },
+
+  verifyBiometric: async (data) => {
+    return api.post('/users/verify-biometric', data);
   },
 
   getProfessionVerificationStatus: async () => {

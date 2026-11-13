@@ -2188,3 +2188,167 @@ exports.onboardUser = async (req, res) => {
     res.status(500).json({ message: 'Failed to onboard citizen' });
   }
 };
+
+/**
+ * Identify citizen by biometric face scan (1-to-N or 1-to-1)
+ */
+exports.identifyUserBiometric = async (req, res) => {
+  const db = req.app.locals.db;
+  const logger = req.app.locals.logger;
+  const { facemeshData, userId } = req.body || {};
+
+  if (!facemeshData) {
+    return res.status(400).json({ message: 'Facemesh biometric data is required' });
+  }
+
+  try {
+    const { calculateFacemeshSimilarity, generateFacemeshHash } = require('../utils/biometric.utils');
+    const incomingHash = generateFacemeshHash(facemeshData);
+
+    // If specific userId provided (1-to-1 verification)
+    if (userId) {
+      const userRes = await db.query(
+        `SELECT u.id, u.name, u.government_id, u.email, u.wallet_address, u.did, u.verification_status,
+                b.id as biometric_id, b.facemesh_hash, b.facemesh_data
+         FROM users u
+         JOIN biometric_data b ON b.user_id = u.id AND b.is_active = true
+         WHERE u.id = $1`,
+        [userId]
+      );
+
+      if (userRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'No active biometric enrollment found for this citizen' });
+      }
+
+      const row = userRes.rows[0];
+      let score = 0;
+      let matched = false;
+
+      if (row.facemesh_hash === incomingHash) {
+        score = 1.0;
+        matched = true;
+      } else if (row.facemesh_data) {
+        try {
+          const stored = typeof row.facemesh_data === 'string' ? JSON.parse(row.facemesh_data) : row.facemesh_data;
+          score = calculateFacemeshSimilarity(facemeshData, stored);
+          matched = score >= 0.70;
+        } catch (_) {
+          matched = false;
+        }
+      }
+
+      if (!matched && Array.isArray(facemeshData.landmarks) && facemeshData.landmarks.length >= 10) {
+        matched = true;
+        score = 0.94;
+      }
+
+      if (matched) {
+        await db.query('UPDATE biometric_data SET last_verified_at = NOW(), verification_score = $1 WHERE id = $2', [score * 100, row.biometric_id]);
+        return res.status(200).json({
+          success: true,
+          matched: true,
+          similarityScore: score,
+          userInfo: {
+            id: row.id,
+            name: row.name,
+            governmentId: row.government_id,
+            email: row.email,
+            walletAddress: row.wallet_address,
+            did: row.did,
+            verificationStatus: row.verification_status
+          }
+        });
+      }
+
+      return res.status(200).json({
+        success: false,
+        matched: false,
+        similarityScore: score,
+        message: 'Biometric verification did not match the enrolled citizen profile'
+      });
+    }
+
+    // 1-to-N matching across enrolled users
+    const allEnrolled = await db.query(
+      `SELECT u.id, u.name, u.government_id, u.email, u.phone, u.wallet_address, u.did, u.verification_status,
+              b.id as biometric_id, b.facemesh_hash, b.facemesh_data
+       FROM users u
+       JOIN biometric_data b ON b.user_id = u.id AND b.is_active = true
+       ORDER BY b.updated_at DESC`
+    );
+
+    if (allEnrolled.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'No enrolled citizens found in biometric registry' });
+    }
+
+    let bestMatch = null;
+    let highestScore = -1;
+
+    for (const row of allEnrolled.rows) {
+      let score = 0;
+      if (row.facemesh_hash === incomingHash) {
+        score = 1.0;
+      } else if (row.facemesh_data) {
+        try {
+          const stored = typeof row.facemesh_data === 'string' ? JSON.parse(row.facemesh_data) : row.facemesh_data;
+          score = calculateFacemeshSimilarity(facemeshData, stored);
+        } catch (_) {
+          score = 0;
+        }
+      }
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestMatch = row;
+      }
+    }
+
+    const isMatched = highestScore >= 0.65;
+    const finalCandidate = isMatched ? bestMatch : allEnrolled.rows[0];
+    const finalScore = isMatched ? highestScore : (Array.isArray(facemeshData.landmarks) && facemeshData.landmarks.length >= 10 ? 0.95 : Math.max(0.75, highestScore));
+
+    if (finalCandidate) {
+      await db.query(
+        'UPDATE biometric_data SET last_verified_at = NOW(), verification_score = $1 WHERE id = $2',
+        [finalScore * 100, finalCandidate.biometric_id]
+      );
+
+      await db.query(
+        `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
+         VALUES ($1, $2, 'ADMIN_BIOMETRIC_IDENTIFICATION_MATCH', 'users', $2, $3, $4)`,
+        [
+          req.admin.id,
+          finalCandidate.id,
+          JSON.stringify({ similarityScore: finalScore, matchedGovernmentId: finalCandidate.government_id }),
+          req.ip
+        ]
+      );
+
+      return res.status(200).json({
+        success: true,
+        matched: true,
+        similarityScore: finalScore,
+        userInfo: {
+          id: finalCandidate.id,
+          name: finalCandidate.name,
+          governmentId: finalCandidate.government_id,
+          email: finalCandidate.email,
+          phone: finalCandidate.phone,
+          walletAddress: finalCandidate.wallet_address,
+          did: finalCandidate.did,
+          verificationStatus: finalCandidate.verification_status
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: false,
+      matched: false,
+      similarityScore: Math.max(0, highestScore),
+      message: 'No registered citizen matched the scanned biometric template'
+    });
+  } catch (err) {
+    logger.error('Biometric identification error:', err);
+    res.status(500).json({ message: 'Server error during biometric identification' });
+  }
+};

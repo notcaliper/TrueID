@@ -236,16 +236,18 @@ export const AuthProvider = ({ children }) => {
       });
 
       const response = await authAPI.verifyBiometric(requestData);
-      console.log('Biometric verification response:', response);
+      const data = response?.data || response;
+      console.log('Biometric verification response:', data);
 
-      if (response.success) {
+      if (data && (data.success || data.verified)) {
         return {
           success: true,
-          verified: response.verified,
-          message: response.message
+          verified: data.verified !== undefined ? data.verified : true,
+          similarityScore: data.similarityScore,
+          message: data.message
         };
       } else {
-        throw new Error(response.error || 'Verification failed');
+        throw new Error(data?.error || data?.message || 'Verification failed');
       }
     } catch (err) {
       const errorMessage = err.message || 'Biometric verification failed.';

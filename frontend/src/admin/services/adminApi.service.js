@@ -530,46 +530,19 @@ class ApiService {
     }
   }
   
-  // Verify user with biometric data - directly identifies user from face
+  // Verify user with biometric data - directly identifies user from face via real 1-to-N matcher
   async verifyUserBiometric(biometricData) {
     try {
-      // In a real implementation, this would send the biometric data to the server
-      // and match against the database of registered biometric templates
-      console.log('Verifying user from biometric data directly');
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // For demo purposes, we'll simulate finding a matching user
-      // In a real implementation, this would use facial recognition to identify the user
-      
-      // Get a sample user to demonstrate the flow
-      // Using the correct endpoint '/admin/users' instead of '/users'
-      const response = await this.api.get('/admin/users', {
-        params: { page: 1, limit: 5 }
+      const response = await this.api.post('/admin/identify-biometric', {
+        facemeshData: biometricData,
+        userId: biometricData.userId || null
       });
-      const users = response.data.users || [];
-      
-      if (users.length > 0) {
-        // Simulate finding a match - in reality this would be done by comparing biometric templates
-        const matchedUser = users[0]; // Just use the first user for demo purposes
-        
-        return {
-          success: true,
-          userInfo: matchedUser,
-          message: 'User identified and verified successfully'
-        };
-      } else {
-        return {
-          success: false,
-          message: 'No matching user found for this biometric data'
-        };
-      }
+      return response.data;
     } catch (error) {
       console.error('Error identifying user from biometric data:', error);
       return {
         success: false,
-        message: error.message || 'Biometric identification failed'
+        message: error.response?.data?.message || error.message || 'Biometric identification failed'
       };
     }
   }

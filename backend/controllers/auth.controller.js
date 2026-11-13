@@ -17,10 +17,20 @@ const { generateFacemeshHash, calculateFacemeshSimilarity, isFacemeshSimilar } =
 exports.verifyUserBiometric = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
-  const { userId, facemeshData } = req.body;
 
-  if (!userId || !facemeshData) {
-    return res.status(400).json({ message: 'User ID and facemesh data are required' });
+  let tokenUserId = req.user?.id;
+  if (!tokenUserId && req.headers.authorization?.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(req.headers.authorization.split(' ')[1], process.env.JWT_SECRET);
+      tokenUserId = decoded.id;
+    } catch (_) {}
+  }
+
+  const userId = req.body.userId || tokenUserId;
+  const facemeshData = req.body.facemeshData || req.body;
+
+  if (!userId || !facemeshData || (!facemeshData.landmarks && !facemeshData.imageData && !facemeshData.biometricHash)) {
+    return res.status(400).json({ success: false, verified: false, message: 'User ID and biometric facemesh data are required' });
   }
 
   try {
@@ -93,13 +103,14 @@ exports.verifyUserBiometric = async (req, res) => {
     );
 
     return res.status(200).json({
+      success: isMatch,
       verified: isMatch,
       similarityScore: Math.round(similarityScore * 100) / 100,
       message: isMatch ? 'Biometric verification successful' : 'Biometric verification failed: facial feature mismatch'
     });
   } catch (error) {
     logger.error('Biometric verification error:', error);
-    res.status(500).json({ message: 'Server error during biometric verification' });
+    res.status(500).json({ success: false, verified: false, message: 'Server error during biometric verification' });
   }
 };
 
