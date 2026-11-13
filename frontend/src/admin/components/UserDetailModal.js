@@ -35,7 +35,10 @@ import {
   CheckCircleRounded,
   AccountBalanceWalletRounded,
   WorkspacePremiumRounded,
-  HistoryRounded
+  HistoryRounded,
+  VisibilityRounded,
+  DownloadRounded,
+  DescriptionRounded
 } from '@mui/icons-material';
 
 const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
@@ -53,6 +56,14 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
   const [userActivityLogs, setUserActivityLogs] = useState([]);
   const [copiedField, setCopiedField] = useState(null);
   const [actionReason, setActionReason] = useState('');
+  const [previewDoc, setPreviewDoc] = useState(null);
+
+  const getFullDocUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const backendBase = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+    return `${backendBase}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
 
   useEffect(() => {
     fetchUserDetails();
@@ -701,13 +712,104 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
               {professionalRecords.length === 0 ? (
                 <Typography variant="body2" sx={{ color: t.textMuted }}>No professional records registered.</Typography>
               ) : (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {professionalRecords.map((r, i) => (
-                    <Box key={r.id || i} sx={{ p: 1.5, borderRadius: 1.5, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: t.textPrimary }}>{r.title}</Typography>
-                      <Typography variant="caption" sx={{ color: t.primary, fontWeight: 600 }}>{r.organization || r.institution} • {r.record_type || 'Credential'}</Typography>
-                    </Box>
-                  ))}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {professionalRecords.map((r, i) => {
+                    const docUrl = r.document_url ? getFullDocUrl(r.document_url) : '';
+                    const isPdf = docUrl && docUrl.toLowerCase().endsWith('.pdf');
+                    const isVerifiedRec = r.verification_status === 'VERIFIED' || r.is_verified;
+
+                    return (
+                      <Box key={r.id || i} sx={{ p: 2, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: t.textPrimary, fontSize: '0.92rem' }}>{r.title}</Typography>
+                            <Typography variant="caption" sx={{ color: t.primary, fontWeight: 600 }}>
+                              {r.institution || r.organization} • {r.record_type || 'Credential'}
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label={r.verification_status || (isVerifiedRec ? 'VERIFIED' : 'PENDING')}
+                            size="small"
+                            sx={{
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              bgcolor: isVerifiedRec ? t.successBg : t.warningBg,
+                              color: isVerifiedRec ? t.successText : t.warningText,
+                              border: `1px solid ${isVerifiedRec ? t.successBorder : t.warningBorder}`
+                            }}
+                          />
+                        </Box>
+
+                        {r.description && (
+                          <Typography variant="caption" sx={{ color: t.textSecondary, mt: 0.8, display: 'block' }}>
+                            {r.description}
+                          </Typography>
+                        )}
+
+                        {/* Document & Hash Action Bar */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5, pt: 1.2, borderTop: `1px solid ${t.border}`, flexWrap: 'wrap', gap: 1 }}>
+                          {docUrl ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<VisibilityRounded sx={{ fontSize: '15px !important' }} />}
+                                onClick={() => setPreviewDoc({ url: docUrl, title: r.title, type: isPdf ? 'pdf' : 'image' })}
+                                sx={{
+                                  fontSize: '0.74rem',
+                                  textTransform: 'none',
+                                  fontWeight: 700,
+                                  borderColor: t.primaryBorder,
+                                  color: t.primary,
+                                  bgcolor: t.primaryBg,
+                                  py: 0.3,
+                                  px: 1.2
+                                }}
+                              >
+                                View Document
+                              </Button>
+                              <Button
+                                size="small"
+                                component="a"
+                                href={docUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                startIcon={<OpenInNewRounded sx={{ fontSize: '14px !important' }} />}
+                                sx={{
+                                  fontSize: '0.74rem',
+                                  textTransform: 'none',
+                                  fontWeight: 600,
+                                  color: t.textSecondary,
+                                  py: 0.3
+                                }}
+                              >
+                                Open Tab ↗
+                              </Button>
+                              <IconButton
+                                component="a"
+                                href={docUrl}
+                                download
+                                size="small"
+                                sx={{ color: t.textSecondary, p: 0.4 }}
+                              >
+                                <DownloadRounded sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Box>
+                          ) : (
+                            <Typography variant="caption" sx={{ color: t.textMuted, fontStyle: 'italic' }}>
+                              No document uploaded
+                            </Typography>
+                          )}
+
+                          {r.data_hash && (
+                            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: t.textMuted, fontSize: '0.7rem' }}>
+                              SHA: {r.data_hash.slice(0, 10)}...{r.data_hash.slice(-6)}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    );
+                  })}
                 </Box>
               )}
             </Box>
@@ -841,6 +943,82 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
           Close Dossier
         </Button>
       </DialogActions>
+
+      {/* Document Preview Dialog */}
+      <Dialog
+        open={Boolean(previewDoc)}
+        onClose={() => setPreviewDoc(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: isLight ? '#ffffff' : '#181a1c',
+            border: `1px solid ${t.border}`,
+            borderRadius: 3
+          }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: 3, pt: 2.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DescriptionRounded sx={{ color: t.primary }} />
+            <Typography variant="h6" sx={{ fontWeight: 800, color: t.textPrimary, fontSize: '1.05rem' }}>
+              {previewDoc?.title || 'Credential Supporting Document'}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {previewDoc?.url && (
+              <Button
+                component="a"
+                href={previewDoc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                size="small"
+                startIcon={<OpenInNewRounded sx={{ fontSize: 14 }} />}
+                sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600, color: t.primary }}
+              >
+                Open in New Tab
+              </Button>
+            )}
+            <IconButton size="small" onClick={() => setPreviewDoc(null)} sx={{ color: t.textMuted }}>
+              <CloseRounded />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: isLight ? '#f8fafc' : '#141618', minHeight: 400 }}>
+          {previewDoc?.type === 'pdf' ? (
+            <Box
+              component="iframe"
+              src={previewDoc.url}
+              title={previewDoc.title || 'Document Preview'}
+              sx={{ width: '100%', height: '70vh', border: 'none', borderRadius: 1.5 }}
+            />
+          ) : (
+            <Box
+              component="img"
+              src={previewDoc?.url}
+              alt={previewDoc?.title || 'Document Preview'}
+              sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 1.5 }}
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setPreviewDoc(null)} sx={{ color: t.textMuted, textTransform: 'none' }}>
+            Close
+          </Button>
+          {previewDoc?.url && (
+            <Button
+              component="a"
+              href={previewDoc.url}
+              download
+              variant="contained"
+              startIcon={<DownloadRounded />}
+              sx={{ bgcolor: t.primary, textTransform: 'none', fontWeight: 700 }}
+            >
+              Download File
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 };

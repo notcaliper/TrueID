@@ -404,10 +404,11 @@ exports.getUserById = async (req, res) => {
     const recordsResult = await db.query(
       `SELECT id, record_type, institution, title, description, 
               start_date, end_date, is_current, is_verified, 
+              document_url, data_hash, blockchain_tx_hash, verification_status,
               created_at, updated_at
        FROM professional_records
        WHERE user_id = $1
-       ORDER BY start_date DESC`,
+       ORDER BY created_at DESC`,
       [id]
     );
     

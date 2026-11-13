@@ -84,6 +84,13 @@ const AdminProfessionalRecords = () => {
   const [previewDocType, setPreviewDocType] = useState(null);
   const [hashDetails, setHashDetails] = useState(null);
 
+  const getFullDocUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const backendBase = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+    return `${backendBase}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
@@ -670,35 +677,67 @@ const AdminProfessionalRecords = () => {
                 <Typography variant="h6" sx={{ color: t.textPrimary, fontWeight: 700, mb: 2 }}>Linked Documents</Typography>
                 {linkedDocuments.length > 0 ? (
                   <List>
-                    {linkedDocuments.map((doc) => (
-                      <ListItem key={doc.id} sx={{ bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}`, borderRadius: 2, mb: 1 }}>
-                        <ListItemText
-                          primary={<Typography sx={{ color: t.textPrimary, fontWeight: 600 }}>{doc.original_name}</Typography>}
-                          secondary={
-                            <Box sx={{ mt: 0.5 }}>
-                              <Typography variant="body2" sx={{ color: t.textSecondary }}>
-                                Status: <StatusChip status={doc.verification_status} />
+                    {linkedDocuments.map((doc) => {
+                      const fileName = doc.original_name || doc.fileName || (doc.file_url ? doc.file_url.split('/').pop() : 'Attached Document');
+                      const rawUrl = doc.file_url || doc.fileUrl;
+                      const fullUrl = getFullDocUrl(rawUrl);
+                      const isPdf = (doc.mime_type || doc.mimeType || '').includes('pdf') || (fullUrl && fullUrl.toLowerCase().endsWith('.pdf'));
+
+                      return (
+                        <ListItem key={doc.id} sx={{ bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}`, borderRadius: 2, mb: 1.5, p: 2 }}>
+                          <ListItemText
+                            primary={
+                              <Typography sx={{ color: t.textPrimary, fontWeight: 700, fontSize: '0.95rem' }}>
+                                {fileName}
                               </Typography>
-                              <Typography variant="caption" sx={{ color: t.textMuted, fontFamily: 'monospace', display: 'block', mt: 0.5 }}>
-                                Hash: {doc.file_hash || 'Not available'}
-                              </Typography>
-                              {doc.blockchain_tx_hash && (
-                                <Typography variant="caption" sx={{ color: t.primary, fontFamily: 'monospace', display: 'block' }}>
-                                  TX: {doc.blockchain_tx_hash}
+                            }
+                            secondary={
+                              <Box sx={{ mt: 0.8 }}>
+                                <Typography variant="body2" sx={{ color: t.textSecondary }}>
+                                  Status: <StatusChip status={doc.verification_status || doc.verificationStatus || 'PENDING'} />
                                 </Typography>
-                              )}
-                            </Box>
-                          }
-                        />
-                        <ListItemSecondaryAction>
-                          <Tooltip title="Download">
-                            <IconButton edge="end" href={doc.file_url} download sx={{ color: t.primary }}>
-                              <DownloadIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                    ))}
+                                <Typography variant="caption" sx={{ color: t.textMuted, fontFamily: 'monospace', display: 'block', mt: 0.5 }}>
+                                  Hash: {doc.file_hash || doc.fileHash || 'Not available'}
+                                </Typography>
+                                {doc.blockchain_tx_hash && (
+                                  <Typography variant="caption" sx={{ color: t.primary, fontFamily: 'monospace', display: 'block' }}>
+                                    TX: {doc.blockchain_tx_hash}
+                                  </Typography>
+                                )}
+                              </Box>
+                            }
+                          />
+                          <ListItemSecondaryAction sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {fullUrl && (
+                              <>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={<VisibilityIcon sx={{ fontSize: '15px !important' }} />}
+                                  onClick={() => {
+                                    setPreviewDocUrl(fullUrl);
+                                    setPreviewDocType(isPdf ? 'pdf' : 'image');
+                                  }}
+                                  sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.75rem', borderColor: t.primaryBorder, color: t.primary, bgcolor: t.primaryBg }}
+                                >
+                                  Preview
+                                </Button>
+                                <Tooltip title="Open in New Tab">
+                                  <IconButton component="a" href={fullUrl} target="_blank" rel="noopener noreferrer" sx={{ color: t.primary }}>
+                                    <LinkIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Download">
+                                  <IconButton component="a" href={fullUrl} download sx={{ color: t.primary }}>
+                                    <DownloadIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            )}
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                      );
+                    })}
                   </List>
                 ) : (
                   <Box sx={{ textAlign: 'center', py: 4, color: t.textMuted }}>
@@ -786,6 +825,82 @@ const AdminProfessionalRecords = () => {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Document Preview Dialog */}
+      <Dialog
+        open={Boolean(previewDocUrl)}
+        onClose={() => {
+          setPreviewDocUrl(null);
+          setPreviewDocType(null);
+        }}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: isLight ? '#ffffff' : '#181a1c',
+            border: `1px solid ${t.border}`,
+            borderRadius: 3
+          }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: 3, pt: 2.5 }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: t.textPrimary, fontSize: '1.05rem' }}>
+            Credential Supporting Document Preview
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {previewDocUrl && (
+              <Button
+                component="a"
+                href={previewDocUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                size="small"
+                startIcon={<LinkIcon sx={{ fontSize: 15 }} />}
+                sx={{ textTransform: 'none', fontSize: '0.75rem', fontWeight: 600, color: t.primary }}
+              >
+                Open in New Tab
+              </Button>
+            )}
+            <IconButton size="small" onClick={() => { setPreviewDocUrl(null); setPreviewDocType(null); }} sx={{ color: t.textMuted }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: isLight ? '#f8fafc' : '#141618', minHeight: 400 }}>
+          {previewDocType === 'pdf' ? (
+            <Box
+              component="iframe"
+              src={previewDocUrl}
+              title="Document Preview"
+              sx={{ width: '100%', height: '70vh', border: 'none', borderRadius: 1.5 }}
+            />
+          ) : (
+            <Box
+              component="img"
+              src={previewDocUrl}
+              alt="Document Preview"
+              sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 1.5 }}
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => { setPreviewDocUrl(null); setPreviewDocType(null); }} sx={{ color: t.textMuted, textTransform: 'none' }}>
+            Close Preview
+          </Button>
+          {previewDocUrl && (
+            <Button
+              component="a"
+              href={previewDocUrl}
+              download
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              sx={{ bgcolor: t.primary, textTransform: 'none', fontWeight: 700 }}
+            >
+              Download File
+            </Button>
+          )}
+        </DialogActions>
       </Dialog>
 
       {/* Snackbar for messages */}
