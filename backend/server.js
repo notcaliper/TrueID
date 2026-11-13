@@ -16,7 +16,10 @@ const app = express();
 const PORT = config.PORT || 5000;
 
 // Security & Parsing
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
+}));
 app.use(express.json());
 
 // CORS configuration
@@ -122,9 +125,20 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/gdpr', gdprRoutes);
 
 // Storage directory
-const uploadDir = path.join(__dirname, 'uploads/documents');
-fs.mkdirSync(uploadDir, { recursive: true });
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadDir = path.join(__dirname, 'uploads');
+fs.mkdirSync(path.join(uploadDir, 'documents'), { recursive: true });
+
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+}, express.static(uploadDir));
+
+app.use('/public', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+}, express.static(path.join(__dirname, '..', 'public')));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

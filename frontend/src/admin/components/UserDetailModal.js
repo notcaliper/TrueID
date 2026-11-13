@@ -57,6 +57,7 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
   const [copiedField, setCopiedField] = useState(null);
   const [actionReason, setActionReason] = useState('');
   const [previewDoc, setPreviewDoc] = useState(null);
+  const [previewDocError, setPreviewDocError] = useState(false);
 
   const getFullDocUrl = (url) => {
     if (!url) return '';
@@ -754,7 +755,10 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
                                 size="small"
                                 variant="outlined"
                                 startIcon={<VisibilityRounded sx={{ fontSize: '15px !important' }} />}
-                                onClick={() => setPreviewDoc({ url: docUrl, title: r.title, type: isPdf ? 'pdf' : 'image' })}
+                                onClick={() => {
+                                  setPreviewDocError(false);
+                                  setPreviewDoc({ url: docUrl, title: r.title, type: isPdf ? 'pdf' : 'image' });
+                                }}
                                 sx={{
                                   fontSize: '0.74rem',
                                   textTransform: 'none',
@@ -947,7 +951,10 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
       {/* Document Preview Dialog */}
       <Dialog
         open={Boolean(previewDoc)}
-        onClose={() => setPreviewDoc(null)}
+        onClose={() => {
+          setPreviewDoc(null);
+          setPreviewDocError(false);
+        }}
         maxWidth="md"
         fullWidth
         PaperProps={{
@@ -979,17 +986,66 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
                 Open in New Tab
               </Button>
             )}
-            <IconButton size="small" onClick={() => setPreviewDoc(null)} sx={{ color: t.textMuted }}>
+            <IconButton size="small" onClick={() => { setPreviewDoc(null); setPreviewDocError(false); }} sx={{ color: t.textMuted }}>
               <CloseRounded />
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: isLight ? '#f8fafc' : '#141618', minHeight: 400 }}>
-          {previewDoc?.type === 'pdf' ? (
+        <DialogContent sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: isLight ? '#f8fafc' : '#141618', minHeight: 400 }}>
+          {previewDocError ? (
+            <Box sx={{ textAlign: 'center', py: 4, px: 2, maxWidth: 500 }}>
+              <Box sx={{
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                bgcolor: isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 2,
+                border: `1px solid ${isLight ? '#fecaca' : 'rgba(239, 68, 68, 0.25)'}`
+              }}>
+                <DescriptionRounded sx={{ fontSize: 32, color: '#ef4444' }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: t.textPrimary, mb: 1, fontSize: '1rem' }}>
+                Inline Preview Unavailable
+              </Typography>
+              <Typography variant="body2" sx={{ color: t.textSecondary, mb: 3, lineHeight: 1.6, fontSize: '0.85rem' }}>
+                The document could not be rendered inline directly (file may be in an external format, not physically stored on this server, or restricted by cross-origin security). You can still access the file directly.
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                <Button
+                  component="a"
+                  href={previewDoc?.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="outlined"
+                  size="small"
+                  startIcon={<OpenInNewRounded />}
+                  sx={{ textTransform: 'none', fontWeight: 600, color: t.primary, borderColor: t.primaryBorder }}
+                >
+                  Open in New Tab
+                </Button>
+                <Button
+                  component="a"
+                  href={previewDoc?.url}
+                  download
+                  variant="contained"
+                  size="small"
+                  startIcon={<DownloadRounded />}
+                  sx={{ bgcolor: t.primary, textTransform: 'none', fontWeight: 700 }}
+                >
+                  Download File
+                </Button>
+              </Box>
+            </Box>
+          ) : previewDoc?.type === 'pdf' ? (
             <Box
               component="iframe"
               src={previewDoc.url}
               title={previewDoc.title || 'Document Preview'}
+              onError={() => setPreviewDocError(true)}
               sx={{ width: '100%', height: '70vh', border: 'none', borderRadius: 1.5 }}
             />
           ) : (
@@ -997,12 +1053,13 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
               component="img"
               src={previewDoc?.url}
               alt={previewDoc?.title || 'Document Preview'}
-              sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 1.5 }}
+              onError={() => setPreviewDocError(true)}
+              sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 1.5, boxShadow: isLight ? '0 4px 12px rgba(0,0,0,0.08)' : '0 4px 16px rgba(0,0,0,0.4)' }}
             />
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setPreviewDoc(null)} sx={{ color: t.textMuted, textTransform: 'none' }}>
+          <Button onClick={() => { setPreviewDoc(null); setPreviewDocError(false); }} sx={{ color: t.textMuted, textTransform: 'none' }}>
             Close
           </Button>
           {previewDoc?.url && (

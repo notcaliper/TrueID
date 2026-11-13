@@ -44,7 +44,8 @@ import {
   Fingerprint as FingerprintIcon,
   Link as LinkIcon,
   Close as CloseIcon,
-  WorkspacePremiumRounded
+  WorkspacePremiumRounded,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 import { LoadingButton } from '@mui/lab';
 import ApiService from '../services/adminApi.service';
@@ -82,6 +83,7 @@ const AdminProfessionalRecords = () => {
   const [tabValue, setTabValue] = useState(0);
   const [previewDocUrl, setPreviewDocUrl] = useState(null);
   const [previewDocType, setPreviewDocType] = useState(null);
+  const [previewDocError, setPreviewDocError] = useState(false);
   const [hashDetails, setHashDetails] = useState(null);
 
   const getFullDocUrl = (url) => {
@@ -715,6 +717,7 @@ const AdminProfessionalRecords = () => {
                                   size="small"
                                   startIcon={<VisibilityIcon sx={{ fontSize: '15px !important' }} />}
                                   onClick={() => {
+                                    setPreviewDocError(false);
                                     setPreviewDocUrl(fullUrl);
                                     setPreviewDocType(isPdf ? 'pdf' : 'image');
                                   }}
@@ -833,6 +836,7 @@ const AdminProfessionalRecords = () => {
         onClose={() => {
           setPreviewDocUrl(null);
           setPreviewDocType(null);
+          setPreviewDocError(false);
         }}
         maxWidth="md"
         fullWidth
@@ -845,9 +849,12 @@ const AdminProfessionalRecords = () => {
         }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, px: 3, pt: 2.5 }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: t.textPrimary, fontSize: '1.05rem' }}>
-            Credential Supporting Document Preview
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DescriptionIcon sx={{ color: t.primary, fontSize: 20 }} />
+            <Typography variant="h6" sx={{ fontWeight: 800, color: t.textPrimary, fontSize: '1.05rem' }}>
+              Credential Supporting Document Preview
+            </Typography>
+          </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {previewDocUrl && (
               <Button
@@ -862,17 +869,66 @@ const AdminProfessionalRecords = () => {
                 Open in New Tab
               </Button>
             )}
-            <IconButton size="small" onClick={() => { setPreviewDocUrl(null); setPreviewDocType(null); }} sx={{ color: t.textMuted }}>
+            <IconButton size="small" onClick={() => { setPreviewDocUrl(null); setPreviewDocType(null); setPreviewDocError(false); }} sx={{ color: t.textMuted }}>
               <CloseIcon />
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: isLight ? '#f8fafc' : '#141618', minHeight: 400 }}>
-          {previewDocType === 'pdf' ? (
+        <DialogContent sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: isLight ? '#f8fafc' : '#141618', minHeight: 400 }}>
+          {previewDocError ? (
+            <Box sx={{ textAlign: 'center', py: 4, px: 2, maxWidth: 500 }}>
+              <Box sx={{
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                bgcolor: isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 2,
+                border: `1px solid ${isLight ? '#fecaca' : 'rgba(239, 68, 68, 0.25)'}`
+              }}>
+                <DescriptionIcon sx={{ fontSize: 32, color: '#ef4444' }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: t.textPrimary, mb: 1, fontSize: '1rem' }}>
+                Inline Preview Unavailable
+              </Typography>
+              <Typography variant="body2" sx={{ color: t.textSecondary, mb: 3, lineHeight: 1.6, fontSize: '0.85rem' }}>
+                The document could not be rendered inline directly (file may be in an external format, not physically stored on this server, or restricted by cross-origin security). You can still access the file directly.
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                <Button
+                  component="a"
+                  href={previewDocUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="outlined"
+                  size="small"
+                  startIcon={<LinkIcon />}
+                  sx={{ textTransform: 'none', fontWeight: 600, color: t.primary, borderColor: t.primaryBorder }}
+                >
+                  Open in New Tab
+                </Button>
+                <Button
+                  component="a"
+                  href={previewDocUrl}
+                  download
+                  variant="contained"
+                  size="small"
+                  startIcon={<DownloadIcon />}
+                  sx={{ bgcolor: t.primary, textTransform: 'none', fontWeight: 700 }}
+                >
+                  Download File
+                </Button>
+              </Box>
+            </Box>
+          ) : previewDocType === 'pdf' ? (
             <Box
               component="iframe"
               src={previewDocUrl}
               title="Document Preview"
+              onError={() => setPreviewDocError(true)}
               sx={{ width: '100%', height: '70vh', border: 'none', borderRadius: 1.5 }}
             />
           ) : (
@@ -880,12 +936,13 @@ const AdminProfessionalRecords = () => {
               component="img"
               src={previewDocUrl}
               alt="Document Preview"
-              sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 1.5 }}
+              onError={() => setPreviewDocError(true)}
+              sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 1.5, boxShadow: isLight ? '0 4px 12px rgba(0,0,0,0.08)' : '0 4px 16px rgba(0,0,0,0.4)' }}
             />
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => { setPreviewDocUrl(null); setPreviewDocType(null); }} sx={{ color: t.textMuted, textTransform: 'none' }}>
+          <Button onClick={() => { setPreviewDocUrl(null); setPreviewDocType(null); setPreviewDocError(false); }} sx={{ color: t.textMuted, textTransform: 'none' }}>
             Close Preview
           </Button>
           {previewDocUrl && (
