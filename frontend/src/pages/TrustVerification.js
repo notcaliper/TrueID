@@ -7,7 +7,9 @@ import {
   Card,
   Button,
   Chip,
-  LinearProgress
+  LinearProgress,
+  Tooltip,
+  IconButton
 } from '@mui/material';
 import {
   RefreshRounded,
@@ -16,7 +18,9 @@ import {
   FingerprintRounded,
   GppGoodRounded,
   BadgeRounded,
-  CheckRounded
+  CheckRounded,
+  OpenInNewRounded,
+  ContentCopyRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
@@ -27,8 +31,16 @@ const TrustVerification = () => {
   const { isLight } = useColorMode();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [copiedHash, setCopiedHash] = useState(null);
   // eslint-disable-next-line no-unused-vars
   const [error, setError] = useState(null);
+
+  const handleCopyHash = (text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedHash(text);
+    setTimeout(() => setCopiedHash(null), 2000);
+  };
 
   const [verificationData, setVerificationData] = useState({
     status: user?.verification_status || 'PENDING',
@@ -54,10 +66,11 @@ const TrustVerification = () => {
     setError(null);
 
     try {
-      const [response, recordsRes, bioRes] = await Promise.allSettled([
+      const [response, recordsRes, bioRes, bcRes] = await Promise.allSettled([
         userAPI.getVerificationStatus(),
         userAPI.getProfessionalRecords(),
-        userAPI.getBiometricStatus()
+        userAPI.getBiometricStatus(),
+        userAPI.getBlockchainStatus()
       ]);
 
       const rawData = response.status === 'fulfilled' ? (response.value?.data?.data || response.value?.data || {}) : {};
@@ -71,6 +84,10 @@ const TrustVerification = () => {
       const bioVerifiedAt = rawData?.biometricVerifiedAt || bioData?.lastVerified || user?.biometric_verified_at || '';
       const walletAddr = rawData?.walletAddress || rawData?.wallet_address || user?.wallet_address || '';
       const userDid = rawData?.did || user?.did || (walletAddr ? `did:trueid:${walletAddr}` : '');
+
+      const bcData = bcRes.status === 'fulfilled' ? (bcRes.value?.data?.status || bcRes.value?.data || {}) : {};
+      const txHash = rawData?.blockchainTxHash || rawData?.blockchain_tx_hash || bcData?.registrationTxHash || bcData?.transactionHash || user?.blockchain_tx_hash || '';
+      const contractAddr = rawData?.contractAddress || bcData?.contractAddress || process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf';
 
       setVerificationData(prev => ({
         ...prev,
@@ -86,8 +103,8 @@ const TrustVerification = () => {
         walletAddress: walletAddr,
         did: userDid,
         soulboundTokenId: rawData?.soulboundTokenId || rawData?.soulbound_token_id || user?.soulbound_token_id || '',
-        blockchainTxHash: rawData?.blockchainTxHash || rawData?.blockchain_tx_hash || user?.blockchain_tx_hash || '',
-        contractAddress: rawData?.contractAddress || process.env.REACT_APP_CONTRACT_ADDRESS || '',
+        blockchainTxHash: txHash,
+        contractAddress: contractAddr,
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
     } catch (err) {
@@ -174,7 +191,9 @@ const TrustVerification = () => {
       desc: 'Government ID card, citizen documents, and account details submitted and verified.',
       timestamp: verificationData.submittedAt || 'Completed',
       authority: verificationData.verifiedBy || 'Identity Registry',
-      proofHash: activeDid ? (activeDid.length > 28 ? `${activeDid.slice(0, 18)}...${activeDid.slice(-6)}` : activeDid) : (activeWallet ? `${activeWallet.slice(0, 10)}...${activeWallet.slice(-6)}` : (verificationData.governmentId ? `ID:${verificationData.governmentId} (Attested)` : 'Document Verified')),
+      hashLabel: 'Attestation DID:',
+      proofHash: activeDid || (activeWallet ? `did:trueid:${activeWallet}` : (verificationData.governmentId ? `ID:${verificationData.governmentId} (Attested)` : 'Document Verified')),
+      fullHash: activeDid || (activeWallet ? `did:trueid:${activeWallet}` : ''),
       completed: true,
       status: 'VERIFIED'
     },
@@ -189,9 +208,9 @@ const TrustVerification = () => {
         ? (verificationData.biometricVerifiedAt ? (verificationData.biometricVerifiedAt.includes('T') ? verificationData.biometricVerifiedAt : new Date(verificationData.biometricVerifiedAt).toISOString()) : (verificationData.submittedAt || 'Verified'))
         : 'Pending Enrollment',
       authority: 'Device Camera Verification',
-      proofHash: hasBiometrics
-        ? (activeFacemeshHash ? `${activeFacemeshHash.slice(0, 10)}...${activeFacemeshHash.slice(-8)}` : '0x68b3...enrolled')
-        : 'Awaiting Optical Scan',
+      hashLabel: '3D FaceMesh Landmark Root:',
+      proofHash: hasBiometrics ? (activeFacemeshHash || '0x68b3...enrolled') : 'Awaiting Optical Scan',
+      fullHash: hasBiometrics ? activeFacemeshHash : '',
       completed: hasBiometrics,
       status: hasBiometrics ? 'VERIFIED' : 'PENDING'
     },
@@ -202,7 +221,11 @@ const TrustVerification = () => {
       desc: 'Authorized notary reviewed your details against government records and approved your application.',
       timestamp: verificationData.verifiedAt || (isVerified ? 'Completed' : 'Pending Review'),
       authority: verificationData.verifiedBy || 'Notary Officer',
-      proofHash: activeWallet ? `${activeWallet.slice(0, 10)}...${activeWallet.slice(-6)}` : (isVerified ? 'Officer Attested' : 'Awaiting Review'),
+      hashLabel: 'Officer Attested Wallet:',
+      proofHash: activeWallet || (isVerified ? 'Officer Attested' : 'Awaiting Review'),
+      fullHash: activeWallet || '',
+      explorerUrl: activeWallet ? `https://sepolia.etherscan.io/address/${activeWallet}` : null,
+      explorerLabel: 'View Wallet on Sepolia Etherscan ↗',
       completed: isVerified,
       status: isVerified ? 'VERIFIED' : 'IN REVIEW'
     },
@@ -213,9 +236,16 @@ const TrustVerification = () => {
       desc: 'Your permanent digital identity badge was created on the blockchain network.',
       timestamp: verificationData.verifiedAt || (isVerified ? 'Anchored' : 'Pending'),
       authority: 'Ethereum Sepolia Network',
-      proofHash: activeTokenId
-        ? `Soulbound Token #${activeTokenId}`
-        : (activeTxHash ? `${activeTxHash.slice(0, 10)}...${activeTxHash.slice(-6)}` : (isVerified ? 'Badge Anchored' : 'Pending Mint')),
+      hashLabel: 'Full Transaction Hash:',
+      badge: activeTokenId ? `Soulbound Badge #${activeTokenId}` : (isVerified ? 'Soulbound Attested' : null),
+      proofHash: activeTxHash || (isVerified ? 'Badge Anchored on Sepolia' : 'Pending Mint'),
+      fullHash: activeTxHash || '',
+      explorerUrl: activeTxHash
+        ? `https://sepolia.etherscan.io/tx/${activeTxHash}`
+        : (verificationData.contractAddress ? `https://sepolia.etherscan.io/address/${verificationData.contractAddress}` : 'https://sepolia.etherscan.io'),
+      explorerLabel: activeTxHash
+        ? `View Transaction on Sepolia Etherscan (${activeTxHash.slice(0, 10)}...${activeTxHash.slice(-6)}) ↗`
+        : 'View Soulbound Badge Contract on Sepolia Etherscan ↗',
       completed: isVerified,
       status: isVerified ? 'SAVED' : 'WAITING'
     }
@@ -614,19 +644,96 @@ const TrustVerification = () => {
                     {step.desc}
                   </Typography>
 
-                  <Box sx={{ pl: 5.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.72rem' }}>
-                        Proof Hash:
-                      </Typography>
-                      <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#2563eb', fontWeight: 600, fontSize: '0.75rem' }}>
-                        {step.proofHash}
+                  <Box sx={{ pl: 5.5, display: 'flex', flexDirection: 'column', gap: 1.2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', maxWidth: { xs: '100%', md: '75%' } }}>
+                        <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.72rem', fontWeight: 700 }}>
+                          {step.hashLabel || 'Proof Hash:'}
+                        </Typography>
+
+                        {step.badge && (
+                          <Chip
+                            label={step.badge}
+                            size="small"
+                            sx={{
+                              bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.15)',
+                              color: '#2563eb',
+                              fontWeight: 700,
+                              fontSize: '0.68rem',
+                              height: 20
+                            }}
+                          />
+                        )}
+
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontFamily: 'monospace',
+                            color: '#2563eb',
+                            fontWeight: 600,
+                            fontSize: '0.75rem',
+                            wordBreak: 'break-all',
+                            bgcolor: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.04)',
+                            px: 0.8,
+                            py: 0.3,
+                            borderRadius: 1
+                          }}
+                        >
+                          {step.proofHash}
+                        </Typography>
+
+                        {step.fullHash && (
+                          <Tooltip title={copiedHash === step.fullHash ? 'Copied full hash!' : 'Copy full hash'}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleCopyHash(step.fullHash)}
+                              sx={{
+                                p: 0.4,
+                                color: copiedHash === step.fullHash ? '#16a34a' : (isLight ? '#64748b' : '#9ca3af'),
+                                '&:hover': { color: '#2563eb' }
+                              }}
+                            >
+                              {copiedHash === step.fullHash ? <CheckRounded sx={{ fontSize: 13 }} /> : <ContentCopyRounded sx={{ fontSize: 13 }} />}
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
+
+                      <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.72rem', flexShrink: 0 }}>
+                        Timestamp: {step.timestamp}
                       </Typography>
                     </Box>
 
-                    <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.72rem' }}>
-                      Timestamp: {step.timestamp}
-                    </Typography>
+                    {/* Direct Etherscan Sepolia Testnet Path */}
+                    {step.explorerUrl && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pt: 0.5 }}>
+                        <Button
+                          component="a"
+                          href={step.explorerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          size="small"
+                          endIcon={<OpenInNewRounded sx={{ fontSize: '13px !important' }} />}
+                          sx={{
+                            textTransform: 'none',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            color: isLight ? '#1d4ed8' : '#60a5fa',
+                            bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.12)',
+                            border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.3)'}`,
+                            borderRadius: 1.5,
+                            px: 1.5,
+                            py: 0.4,
+                            '&:hover': {
+                              bgcolor: isLight ? '#dbeafe' : 'rgba(37, 99, 235, 0.22)',
+                              textDecoration: 'none'
+                            }
+                          }}
+                        >
+                          {step.explorerLabel || 'View on Sepolia Etherscan Testnet'}
+                        </Button>
+                      </Box>
+                    )}
                   </Box>
                 </Box>
               ))}
