@@ -58,10 +58,6 @@ exports.verifyUserBiometric = async (req, res) => {
     if (!isMatch && storedData) {
       similarityScore = calculateFacemeshSimilarity(facemeshData, storedData);
       isMatch = similarityScore >= 0.70;
-    } else if (!isMatch) {
-      // If legacy registration had no stored raw landmarks, check live landmark structure validity
-      isMatch = (Array.isArray(facemeshData.landmarks) && facemeshData.landmarks.length >= 10);
-      similarityScore = isMatch ? 0.92 : 0.0;
     }
 
     // Update biometric verification timestamp and status if matched

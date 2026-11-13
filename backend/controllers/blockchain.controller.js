@@ -350,7 +350,7 @@ exports.getUserBlockchainStatus = async (req, res) => {
     const txHash = user.blockchain_tx_hash || (latestTx ? latestTx.transaction_hash : '');
     const sbtTokenId = user.soulbound_token_id 
       ? `SBT-Token #${user.soulbound_token_id}` 
-      : (isRegistered ? 'SBT-Token #1' : '');
+      : null;
 
     let liveConfirmations = 0;
     if (txHash) {

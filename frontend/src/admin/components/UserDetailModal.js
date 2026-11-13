@@ -564,13 +564,13 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
                   Decentralized Identifier (DID)
                 </Typography>
                 <Tooltip title={copiedField === 'did' ? 'Copied!' : 'Copy DID'}>
-                  <IconButton size="small" onClick={() => copyToClipboard(userData.did || `did:trueid:${userData.wallet_address?.toLowerCase()}`, 'did')} sx={{ color: copiedField === 'did' ? t.success : t.textMuted }}>
+                  <IconButton size="small" onClick={() => copyToClipboard(userData.did || (userData.wallet_address ? `did:trueid:${userData.wallet_address.toLowerCase()}` : ''), 'did')} sx={{ color: copiedField === 'did' ? t.success : t.textMuted }}>
                     <ContentCopyRounded sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
               </Box>
               <Typography variant="body2" sx={{ fontFamily: 'monospace', color: t.primary, fontWeight: 700, wordBreak: 'break-all' }}>
-                {userData.did || `did:trueid:${userData.wallet_address?.toLowerCase() || '0x'}`}
+                {userData.did || (userData.wallet_address ? `did:trueid:${userData.wallet_address.toLowerCase()}` : 'No DID provisioned')}
               </Typography>
             </Box>
 

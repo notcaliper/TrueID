@@ -88,7 +88,7 @@ const Dashboard = () => {
       enclaveStatus: 'Protected',
       blockchainTx: user?.blockchain_tx_hash || '',
       contractAddress: process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf',
-      sbtTokenId: user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : (user?.is_verified ? 'SBT-Token #1' : ''),
+      sbtTokenId: user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : '',
       lastSync: ''
     };
   });
@@ -184,7 +184,7 @@ const Dashboard = () => {
         facemeshStatus: bioRes.status === 'fulfilled' && bioRes.value?.data?.hasBiometrics ? 'Enrolled (SHA-256)' : (user?.facemesh_hash ? 'Enrolled (SHA-256)' : 'Not Enrolled'),
         blockchainTx: bcData?.registrationTxHash || bcData?.transactionHash || user?.blockchain_tx_hash || '',
         contractAddress: bcData?.contractAddress || process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf',
-        sbtTokenId: bcData?.sbtTokenId || (user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : (user?.is_verified ? 'SBT-Token #1' : '')),
+        sbtTokenId: bcData?.sbtTokenId || (user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : ''),
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
 
@@ -675,19 +675,21 @@ const Dashboard = () => {
                       height: 24
                     }}
                   />
-                  <Chip
-                    icon={<CheckCircleRounded sx={{ color: '#4ade80 !important', fontSize: '13px !important' }} />}
-                    label={identityData.sbtTokenId || 'ERC-5192 SBT #1'}
-                    size="small"
-                    sx={{
-                      bgcolor: 'rgba(34, 197, 94, 0.12)',
-                      color: '#4ade80',
-                      fontWeight: 800,
-                      fontSize: '0.68rem',
-                      border: '1px solid rgba(34, 197, 94, 0.3)',
-                      height: 24
-                    }}
-                  />
+                  {identityData.sbtTokenId ? (
+                    <Chip
+                      icon={<CheckCircleRounded sx={{ color: '#4ade80 !important', fontSize: '13px !important' }} />}
+                      label={identityData.sbtTokenId}
+                      size="small"
+                      sx={{
+                        bgcolor: 'rgba(34, 197, 94, 0.12)',
+                        color: '#4ade80',
+                        fontWeight: 800,
+                        fontSize: '0.68rem',
+                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                        height: 24
+                      }}
+                    />
+                  ) : null}
                 </Box>
               </Box>
 
@@ -726,7 +728,7 @@ const Dashboard = () => {
                       CITIZEN FULL NAME
                     </Typography>
                     <Typography variant="h5" sx={{ color: '#ffffff', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                      {identityData.name || 'Akshay Manbhaw'}
+                      {identityData.name || 'Citizen'}
                     </Typography>
                   </Box>
                 </Box>
@@ -736,7 +738,7 @@ const Dashboard = () => {
                     NATIONAL CITIZEN IDENTIFIER
                   </Typography>
                   <Typography variant="h5" sx={{ color: '#38bdf8', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '0.06em', textShadow: '0 0 16px rgba(56, 189, 248, 0.45)', lineHeight: 1.1 }}>
-                    {identityData.governmentId || 'JIFPM9413P'}
+                    {identityData.governmentId || 'Not Assigned'}
                   </Typography>
                 </Box>
               </Box>
@@ -748,7 +750,7 @@ const Dashboard = () => {
                     Badge Token:
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#4ade80', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem' }}>
-                    {identityData.sbtTokenId || 'SBT-Token #1'} (Locked)
+                    {identityData.sbtTokenId ? `${identityData.sbtTokenId} (Locked)` : 'Attestation Pending'}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
@@ -1271,11 +1273,13 @@ const Dashboard = () => {
             Scan with any authorized TrueID Notary or border kiosk to cryptographically verify citizenship.
           </Typography>
 
-          <Chip
-            label={identityData.sbtTokenId || 'ERC-5192 SBT #1'}
-            size="small"
-            sx={{ bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 800, fontSize: '0.72rem' }}
-          />
+          {identityData.sbtTokenId && (
+            <Chip
+              label={identityData.sbtTokenId}
+              size="small"
+              sx={{ bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 800, fontSize: '0.72rem' }}
+            />
+          )}
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 2 }}>

@@ -199,7 +199,7 @@ const BlockchainLedger = () => {
     },
     {
       title: 'Digital ID Badge',
-      value: blockchainData.sbtTokenId || (blockchainData.isRegistered ? 'SBT-Token #1' : 'Pending Mint'),
+      value: blockchainData.sbtTokenId || (blockchainData.isRegistered ? 'Attested On-Chain' : 'Pending Mint'),
       sub: 'Permanent & Non-transferable',
       icon: <ShieldRounded sx={{ color: '#0ea5e9', fontSize: 20 }} />,
       color: '#0ea5e9',

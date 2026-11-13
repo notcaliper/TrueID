@@ -100,9 +100,7 @@ const calculateFacemeshSimilarity = (data1, data2) => {
   const lm2 = Array.isArray(data2.landmarks) ? data2.landmarks : (data2.facemesh_data?.landmarks || []);
 
   if (lm1.length === 0 || lm2.length === 0) {
-    // If only image data or simulated presence exists, evaluate image / presence validity
-    if (data1.imageData && data2.imageData) return 0.85;
-    return 0.5;
+    return 0;
   }
 
   const norm1 = normalizeLandmarks(lm1);

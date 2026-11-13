@@ -2237,11 +2237,6 @@ exports.identifyUserBiometric = async (req, res) => {
         }
       }
 
-      if (!matched && Array.isArray(facemeshData.landmarks) && facemeshData.landmarks.length >= 10) {
-        matched = true;
-        score = 0.94;
-      }
-
       if (matched) {
         await db.query('UPDATE biometric_data SET last_verified_at = NOW(), verification_score = $1 WHERE id = $2', [score * 100, row.biometric_id]);
         return res.status(200).json({
@@ -2308,9 +2303,19 @@ exports.identifyUserBiometric = async (req, res) => {
       }
     }
 
-    const isMatched = highestScore >= 0.65;
-    const finalCandidate = isMatched ? bestMatch : allEnrolled.rows[0];
-    const finalScore = isMatched ? highestScore : (Array.isArray(facemeshData.landmarks) && facemeshData.landmarks.length >= 10 ? 0.95 : Math.max(0.75, highestScore));
+    const isMatched = highestScore >= 0.65 && bestMatch !== null;
+
+    if (!isMatched) {
+      return res.status(200).json({
+        success: false,
+        matched: false,
+        similarityScore: Math.max(0, highestScore),
+        message: 'No registered citizen matched the scanned biometric template'
+      });
+    }
+
+    const finalCandidate = bestMatch;
+    const finalScore = highestScore;
 
     if (finalCandidate) {
       await db.query(

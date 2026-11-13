@@ -629,8 +629,10 @@ exports.getBiometricStatus = async (req, res) => {
     // Add biometric details if they exist
     if (hasBiometricData) {
       const biometricData = biometricResult.rows[0];
+      responseData.facemeshHash = biometricData.facemesh_hash;
       responseData.biometricDetails = {
         id: biometricData.id,
+        facemeshHash: biometricData.facemesh_hash,
         createdAt: biometricData.created_at,
         updatedAt: biometricData.updated_at,
         verificationStatus: biometricData.verification_status,

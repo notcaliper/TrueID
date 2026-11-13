@@ -797,7 +797,7 @@ const Profile = () => {
                       SHA-256 NOTARY AUDIT HASH
                     </Typography>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#2563eb', fontSize: '0.78rem', wordBreak: 'break-all', mt: 0.3 }}>
-                      {user?.biometric_hash || user?.wallet_address || 'Not Enrolled'}
+                      {user?.facemesh_hash || user?.biometric_hash || 'Not Enrolled'}
                     </Typography>
                   </Box>
                 </Box>
