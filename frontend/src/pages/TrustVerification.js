@@ -39,6 +39,13 @@ const TrustVerification = () => {
     verifiedAt: '',
     verifiedBy: '',
     verifiedRecordsCount: 0,
+    hasBiometrics: Boolean(user?.facemesh_hash || user?.has_biometrics),
+    facemeshHash: user?.facemesh_hash || '',
+    biometricVerifiedAt: user?.biometric_verified_at || '',
+    walletAddress: user?.wallet_address || '',
+    did: user?.did || '',
+    soulboundTokenId: user?.soulbound_token_id || '',
+    blockchainTxHash: user?.blockchain_tx_hash || '',
     contractAddress: process.env.REACT_APP_CONTRACT_ADDRESS || '',
     lastSync: ''
   });
@@ -48,9 +55,10 @@ const TrustVerification = () => {
     setError(null);
 
     try {
-      const [response, recordsRes] = await Promise.allSettled([
+      const [response, recordsRes, bioRes] = await Promise.allSettled([
         userAPI.getVerificationStatus(),
-        userAPI.getProfessionalRecords()
+        userAPI.getProfessionalRecords(),
+        userAPI.getBiometricStatus()
       ]);
 
       const rawData = response.status === 'fulfilled' ? (response.value?.data?.data || response.value?.data || {}) : {};
@@ -58,14 +66,28 @@ const TrustVerification = () => {
       const records = recordsRes.status === 'fulfilled' ? (recordsRes.value?.data?.records || recordsRes.value?.data || []) : [];
       const verifiedCount = Array.isArray(records) ? records.filter(r => r.verification_status === 'VERIFIED').length : 0;
 
+      const bioData = bioRes.status === 'fulfilled' ? (bioRes.value?.data || {}) : {};
+      const hasBio = Boolean(rawData?.hasBiometrics || rawData?.has_biometrics || bioData?.facemeshExists || bioData?.hasBiometrics || bioData?.verified || user?.facemesh_hash || user?.has_biometrics);
+      const faceHash = rawData?.facemeshHash || rawData?.facemesh_hash || bioData?.facemeshHash || bioData?.facemesh_hash || user?.facemesh_hash || '';
+      const bioVerifiedAt = rawData?.biometricVerifiedAt || bioData?.lastVerified || user?.biometric_verified_at || '';
+      const walletAddr = rawData?.walletAddress || rawData?.wallet_address || user?.wallet_address || '';
+      const userDid = rawData?.did || user?.did || (walletAddr ? `did:trueid:${walletAddr}` : '');
+
       setVerificationData(prev => ({
         ...prev,
         status: status,
-        governmentId: user?.government_id || rawData?.government_id || '',
+        governmentId: user?.government_id || rawData?.government_id || rawData?.governmentId || '',
         verifiedBy: rawData?.verifiedBy || 'TrueID Identity Notary Authority',
-        submittedAt: rawData?.submittedAt || prev.submittedAt,
-        verifiedAt: rawData?.verifiedAt || prev.verifiedAt,
+        submittedAt: rawData?.submittedAt || prev.submittedAt || user?.createdAt || '',
+        verifiedAt: rawData?.verifiedAt || prev.verifiedAt || '',
         verifiedRecordsCount: verifiedCount,
+        hasBiometrics: hasBio,
+        facemeshHash: faceHash,
+        biometricVerifiedAt: bioVerifiedAt,
+        walletAddress: walletAddr,
+        did: userDid,
+        soulboundTokenId: rawData?.soulboundTokenId || rawData?.soulbound_token_id || user?.soulbound_token_id || '',
+        blockchainTxHash: rawData?.blockchainTxHash || rawData?.blockchain_tx_hash || user?.blockchain_tx_hash || '',
         contractAddress: rawData?.contractAddress || process.env.REACT_APP_CONTRACT_ADDRESS || '',
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
@@ -81,18 +103,33 @@ const TrustVerification = () => {
   }, [fetchVerificationStatus]);
 
   const isVerified = verificationData.status === 'VERIFIED';
-  const trustScorePercentage = isVerified ? 100 : 0;
+  const hasBiometrics = Boolean(verificationData.hasBiometrics || user?.facemesh_hash || user?.has_biometrics);
+  const activeFacemeshHash = verificationData.facemeshHash || user?.facemesh_hash || '';
+  const activeWallet = verificationData.walletAddress || user?.wallet_address || '';
+  const activeDid = verificationData.did || user?.did || (activeWallet ? `did:trueid:${activeWallet}` : '');
+  const activeTokenId = verificationData.soulboundTokenId || user?.soulbound_token_id || '';
+  const activeTxHash = verificationData.blockchainTxHash || user?.blockchain_tx_hash || '';
+
+  // Dynamic mathematically weighted Trust Score Percentage
+  const trustScorePercentage = Math.min(100, Math.round(
+    (isVerified ? 35 : (verificationData.governmentId ? 25 : 0)) +
+    (hasBiometrics ? 25 : 0) +
+    (verificationData.verifiedRecordsCount > 0 ? 20 : (isVerified ? 20 : 0)) +
+    (isVerified ? 20 : 10)
+  ));
 
   // 4 Core Trust Pillar Metrics
   const trustPillars = [
     {
       title: 'Overall Trust Score',
       value: `${trustScorePercentage}%`,
-      status: isVerified ? 'EXCELLENT STANDING' : 'PENDING REVIEW',
+      status: trustScorePercentage >= 80 ? 'EXCELLENT STANDING' : (trustScorePercentage >= 50 ? 'GOOD STANDING' : 'PENDING REVIEW'),
       desc: isVerified ? 'Highest Compliance Standing • Verified' : 'Awaiting identity verification attestations',
       tag: isVerified ? 'Verified Citizen' : 'Citizen Applicant',
-      color: isVerified ? '#16a34a' : '#d97706',
-      bg: isLight ? (isVerified ? '#f0fdf4' : '#fffbeb') : (isVerified ? 'rgba(22, 163, 74, 0.12)' : 'rgba(217, 119, 6, 0.12)'),
+      color: trustScorePercentage >= 80 ? '#16a34a' : (trustScorePercentage >= 50 ? '#2563eb' : '#d97706'),
+      bg: isLight
+        ? (trustScorePercentage >= 80 ? '#f0fdf4' : (trustScorePercentage >= 50 ? '#eff6ff' : '#fffbeb'))
+        : (trustScorePercentage >= 80 ? 'rgba(22, 163, 74, 0.12)' : (trustScorePercentage >= 50 ? 'rgba(37, 99, 235, 0.12)' : 'rgba(217, 119, 6, 0.12)')),
       icon: <VerifiedUserRounded sx={{ fontSize: 24 }} />
     },
     {
@@ -107,27 +144,29 @@ const TrustVerification = () => {
     },
     {
       title: '3D FaceMesh Liveness',
-      value: user?.facemesh_hash ? 'Enrolled Active' : 'Pending Scan',
-      status: user?.facemesh_hash ? 'HARDWARE ENCLAVE SECURE' : 'PENDING BIOMETRIC',
-      desc: user?.facemesh_hash ? 'Facial geometry matched with high confidence' : 'No biometric vectors enrolled',
-      tag: 'ZK Liveness',
-      color: '#7c3aed',
-      bg: isLight ? '#f5f3ff' : 'rgba(124, 58, 237, 0.12)',
+      value: hasBiometrics ? 'Enrolled Active' : 'Pending Scan',
+      status: hasBiometrics ? 'HARDWARE ENCLAVE SECURE' : 'PENDING BIOMETRIC',
+      desc: hasBiometrics ? 'Facial geometry matched with high confidence' : 'No biometric vectors enrolled',
+      tag: hasBiometrics ? 'ZK Liveness' : 'Pending',
+      color: hasBiometrics ? '#7c3aed' : '#d97706',
+      bg: isLight
+        ? (hasBiometrics ? '#f5f3ff' : '#fffbeb')
+        : (hasBiometrics ? 'rgba(124, 58, 237, 0.12)' : 'rgba(217, 119, 6, 0.12)'),
       icon: <FingerprintRounded sx={{ fontSize: 24 }} />
     },
     {
       title: 'Blockchain Record',
-      value: user?.soulbound_token_id ? `Badge #${user.soulbound_token_id}` : (isVerified ? 'Badge Anchored' : 'Pending Mint'),
+      value: activeTokenId ? `Badge #${activeTokenId}` : (isVerified ? 'Badge Anchored' : 'Pending Mint'),
       status: isVerified ? 'VERIFIED & RECORDED' : 'AWAITING MINING',
       desc: 'Smart contract record permanently anchored on Ethereum Sepolia',
-      tag: 'Permanent',
+      tag: isVerified ? 'Permanent' : 'Pending',
       color: '#0891b2',
       bg: isLight ? '#ecfeff' : 'rgba(8, 145, 178, 0.12)',
       icon: <SecurityRounded sx={{ fontSize: 24 }} />
     }
   ];
 
-  // 4 Attestation Stages in Pipeline (Simple English)
+  // 4 Attestation Stages in Pipeline (Dynamic and mathematically backed)
   const pipelineSteps = [
     {
       id: 1,
@@ -136,7 +175,7 @@ const TrustVerification = () => {
       desc: 'Government ID card, citizen documents, and account details submitted and verified.',
       timestamp: verificationData.submittedAt || 'Completed',
       authority: verificationData.verifiedBy || 'Identity Registry',
-      proofHash: verificationData.governmentId || 'ID Document Verified',
+      proofHash: activeDid ? (activeDid.length > 28 ? `${activeDid.slice(0, 18)}...${activeDid.slice(-6)}` : activeDid) : (activeWallet ? `${activeWallet.slice(0, 10)}...${activeWallet.slice(-6)}` : (verificationData.governmentId ? `ID:${verificationData.governmentId} (Attested)` : 'Document Verified')),
       completed: true,
       status: 'VERIFIED'
     },
@@ -144,21 +183,27 @@ const TrustVerification = () => {
       id: 2,
       stepNum: '02',
       title: 'Camera Face Verification',
-      desc: 'Live camera scan matched your face against your ID photo. Real person check passed.',
-      timestamp: 'Completed',
+      desc: hasBiometrics
+        ? 'Live camera scan matched your face against your ID photo. Real person check passed.'
+        : 'Awaiting 3D FaceMesh live optical scan to verify biological liveness.',
+      timestamp: hasBiometrics
+        ? (verificationData.biometricVerifiedAt ? (verificationData.biometricVerifiedAt.includes('T') ? verificationData.biometricVerifiedAt : new Date(verificationData.biometricVerifiedAt).toISOString()) : (verificationData.submittedAt || 'Verified'))
+        : 'Pending Enrollment',
       authority: 'Device Camera Verification',
-      proofHash: user?.facemesh_hash ? `${user.facemesh_hash.slice(0, 10)}...` : 'Biometrics Active',
-      completed: Boolean(user?.facemesh_hash),
-      status: user?.facemesh_hash ? 'VERIFIED' : 'PENDING'
+      proofHash: hasBiometrics
+        ? (activeFacemeshHash ? `${activeFacemeshHash.slice(0, 10)}...${activeFacemeshHash.slice(-8)}` : '0x68b3...enrolled')
+        : 'Awaiting Optical Scan',
+      completed: hasBiometrics,
+      status: hasBiometrics ? 'VERIFIED' : 'PENDING'
     },
     {
       id: 3,
       stepNum: '03',
       title: 'Official Officer Review',
       desc: 'Authorized notary reviewed your details against government records and approved your application.',
-      timestamp: verificationData.verifiedAt || (isVerified ? 'Completed' : 'Pending'),
+      timestamp: verificationData.verifiedAt || (isVerified ? 'Completed' : 'Pending Review'),
       authority: verificationData.verifiedBy || 'Notary Officer',
-      proofHash: user?.wallet_address ? `${user.wallet_address.slice(0, 8)}...${user.wallet_address.slice(-6)}` : 'Officer Signature',
+      proofHash: activeWallet ? `${activeWallet.slice(0, 10)}...${activeWallet.slice(-6)}` : (isVerified ? 'Officer Attested' : 'Awaiting Review'),
       completed: isVerified,
       status: isVerified ? 'VERIFIED' : 'IN REVIEW'
     },
@@ -169,26 +214,66 @@ const TrustVerification = () => {
       desc: 'Your permanent digital identity badge was created on the blockchain network.',
       timestamp: verificationData.verifiedAt || (isVerified ? 'Anchored' : 'Pending'),
       authority: 'Ethereum Sepolia Network',
-      proofHash: user?.soulbound_token_id ? `Soulbound Token #${user.soulbound_token_id}` : (user?.blockchain_tx_hash ? `${user.blockchain_tx_hash.slice(0, 10)}...` : 'Pending Mint'),
+      proofHash: activeTokenId
+        ? `Soulbound Token #${activeTokenId}`
+        : (activeTxHash ? `${activeTxHash.slice(0, 10)}...${activeTxHash.slice(-6)}` : (isVerified ? 'Badge Anchored' : 'Pending Mint')),
       completed: isVerified,
       status: isVerified ? 'SAVED' : 'WAITING'
     }
   ];
 
+  const completedStepsCount = pipelineSteps.filter(s => s.completed).length;
+
   // Trust Score Factor Breakdown
   const trustFactors = [
-    { name: 'Government ID Validity', weight: '35%', score: 100, color: '#16a34a' },
-    { name: 'Live Face Match', weight: '25%', score: 100, color: '#16a34a' },
-    { name: verificationData.verifiedRecordsCount > 0 ? `Verified Credentials (${verificationData.verifiedRecordsCount} items)` : 'Verified Credentials', weight: '20%', score: verificationData.verifiedRecordsCount > 0 ? 100 : 80, color: verificationData.verifiedRecordsCount > 0 ? '#16a34a' : '#64748b' },
-    { name: 'Account History & Good Standing', weight: '20%', score: 100, color: '#16a34a' }
+    {
+      name: 'Government ID Validity',
+      weight: '35%',
+      score: isVerified ? 100 : (verificationData.governmentId ? 85 : 0),
+      color: isVerified || verificationData.governmentId ? '#16a34a' : '#d97706'
+    },
+    {
+      name: 'Live Face Match',
+      weight: '25%',
+      score: hasBiometrics ? 100 : 0,
+      color: hasBiometrics ? '#16a34a' : '#d97706'
+    },
+    {
+      name: verificationData.verifiedRecordsCount > 0 ? `Verified Credentials (${verificationData.verifiedRecordsCount} items)` : 'Verified Credentials',
+      weight: '20%',
+      score: verificationData.verifiedRecordsCount > 0 ? 100 : (isVerified ? 100 : 70),
+      color: verificationData.verifiedRecordsCount > 0 || isVerified ? '#16a34a' : '#64748b'
+    },
+    {
+      name: 'Account History & Good Standing',
+      weight: '20%',
+      score: 100,
+      color: '#16a34a'
+    }
   ];
 
   // Citizen Privileges
   const citizenPrivileges = [
-    { title: 'Airport E-Gate Pass', state: 'UNLOCKED', desc: 'Fast-track through airport and border automated gates' },
-    { title: 'Secure Online Banking', state: 'UNLOCKED', desc: 'Verify high-value transactions with one tap' },
-    { title: 'Digital Citizen Voting', state: 'UNLOCKED', desc: 'Vote securely in official government and local ballots' },
-    { title: 'Private Document Sharing', state: 'UNLOCKED', desc: 'Prove age or citizenship without showing your full name or address' }
+    {
+      title: 'Airport E-Gate Pass',
+      state: isVerified && hasBiometrics ? 'UNLOCKED' : 'LOCKED',
+      desc: 'Fast-track through airport and border automated gates'
+    },
+    {
+      title: 'Secure Online Banking',
+      state: isVerified ? 'UNLOCKED' : 'LOCKED',
+      desc: 'Verify high-value transactions with one tap'
+    },
+    {
+      title: 'Digital Citizen Voting',
+      state: isVerified ? 'UNLOCKED' : 'LOCKED',
+      desc: 'Vote securely in official government and local ballots'
+    },
+    {
+      title: 'Private Document Sharing',
+      state: isVerified ? 'UNLOCKED' : 'LOCKED',
+      desc: 'Prove age or citizenship without showing your full name or address'
+    }
   ];
 
   return (
@@ -280,13 +365,17 @@ const TrustVerification = () => {
                 </Typography>
 
                 <Chip
-                  label="COMPLIANCE TIER 1"
+                  label={trustScorePercentage >= 80 ? "COMPLIANCE TIER 1" : (trustScorePercentage >= 50 ? "COMPLIANCE TIER 2" : "COMPLIANCE PENDING")}
                   size="small"
-                  icon={<GppGoodRounded sx={{ fontSize: '14px !important', color: '#16a34a !important' }} />}
+                  icon={<GppGoodRounded sx={{ fontSize: '14px !important', color: `${trustScorePercentage >= 80 ? '#16a34a' : (trustScorePercentage >= 50 ? '#2563eb' : '#d97706')} !important` }} />}
                   sx={{
-                    bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)',
-                    color: '#16a34a',
-                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)'}`,
+                    bgcolor: isLight
+                      ? (trustScorePercentage >= 80 ? '#f0fdf4' : (trustScorePercentage >= 50 ? '#eff6ff' : '#fffbeb'))
+                      : (trustScorePercentage >= 80 ? 'rgba(22, 163, 74, 0.15)' : (trustScorePercentage >= 50 ? 'rgba(37, 99, 235, 0.15)' : 'rgba(217, 119, 6, 0.15)')),
+                    color: trustScorePercentage >= 80 ? '#16a34a' : (trustScorePercentage >= 50 ? '#2563eb' : '#d97706'),
+                    border: `1px solid ${isLight
+                      ? (trustScorePercentage >= 80 ? '#bbf7d0' : (trustScorePercentage >= 50 ? '#bfdbfe' : '#fde68a'))
+                      : (trustScorePercentage >= 80 ? 'rgba(34, 197, 94, 0.3)' : (trustScorePercentage >= 50 ? 'rgba(37, 99, 235, 0.3)' : 'rgba(217, 119, 6, 0.3)'))}`,
                     fontWeight: 700,
                     fontSize: '0.72rem',
                     height: 24
@@ -367,15 +456,15 @@ const TrustVerification = () => {
               CALCULATED TRUST INDEX
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 0.5, my: 0.2 }}>
-              <Typography variant="h3" sx={{ fontWeight: 800, color: '#16a34a', letterSpacing: '-0.03em', lineHeight: 1 }}>
+              <Typography variant="h3" sx={{ fontWeight: 800, color: trustScorePercentage >= 80 ? '#16a34a' : (trustScorePercentage >= 50 ? '#2563eb' : '#d97706'), letterSpacing: '-0.03em', lineHeight: 1 }}>
                 {trustScorePercentage}%
               </Typography>
               <Typography variant="body2" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700 }}>
                 / 100
               </Typography>
             </Box>
-            <Typography variant="caption" sx={{ color: isLight ? '#16a34a' : '#4ade80', fontWeight: 700, display: 'block' }}>
-              Tier 1 Identity Clearance
+            <Typography variant="caption" sx={{ color: trustScorePercentage >= 80 ? (isLight ? '#16a34a' : '#4ade80') : (trustScorePercentage >= 50 ? '#2563eb' : '#d97706'), fontWeight: 700, display: 'block' }}>
+              {trustScorePercentage >= 80 ? 'Tier 1 Identity Clearance' : (trustScorePercentage >= 50 ? 'Tier 2 Provisional Clearance' : 'Tier 3 Citizen Applicant')}
             </Typography>
             <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.7rem' }}>
               Audited by: {(verificationData.verifiedBy || 'TrueID Identity Registry').slice(0, 24)}...
@@ -475,9 +564,19 @@ const TrustVerification = () => {
                 </Typography>
               </Box>
               <Chip
-                label="4 of 4 Completed"
+                label={`${completedStepsCount} of ${pipelineSteps.length} Completed`}
                 size="small"
-                sx={{ bgcolor: isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)', color: '#16a34a', fontWeight: 800, fontSize: '0.72rem' }}
+                sx={{
+                  bgcolor: completedStepsCount === pipelineSteps.length
+                    ? (isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)')
+                    : (isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.15)'),
+                  color: completedStepsCount === pipelineSteps.length ? '#16a34a' : '#2563eb',
+                  border: `1px solid ${completedStepsCount === pipelineSteps.length
+                    ? (isLight ? '#bbf7d0' : 'rgba(34, 197, 94, 0.3)')
+                    : (isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.3)')}`,
+                  fontWeight: 800,
+                  fontSize: '0.72rem'
+                }}
               />
             </Box>
 

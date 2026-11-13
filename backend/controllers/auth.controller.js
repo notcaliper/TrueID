@@ -102,6 +102,10 @@ exports.verifyUserBiometric = async (req, res) => {
       success: isMatch,
       verified: isMatch,
       similarityScore: Math.round(similarityScore * 100) / 100,
+      facemeshHash: storedHash,
+      facemesh_hash: storedHash,
+      hasBiometrics: true,
+      has_biometrics: true,
       message: isMatch ? 'Biometric verification successful' : 'Biometric verification failed: facial feature mismatch'
     });
   } catch (error) {
@@ -357,11 +361,19 @@ exports.loginUser = async (req, res) => {
   }
 
   try {
-    // Get user by username (including MFA fields)
+    // Get user by username (including MFA fields, blockchain token, and biometric status)
     const userResult = await db.query(
       `SELECT u.id, u.username, u.password, u.government_id, u.name, u.email, u.phone, u.wallet_address, u.did,
-              u.is_verified, u.verification_status, u.mfa_enabled, u.mfa_secret
+              u.is_verified, u.verification_status, u.mfa_enabled, u.mfa_secret, u.soulbound_token_id, u.blockchain_tx_hash,
+              b.facemesh_hash, b.last_verified_at as biometric_verified_at
        FROM users u
+       LEFT JOIN LATERAL (
+         SELECT facemesh_hash, last_verified_at
+         FROM biometric_data
+         WHERE user_id = u.id AND is_active = true
+         ORDER BY created_at DESC
+         LIMIT 1
+       ) b ON true
        WHERE u.username = $1 OR u.email = $1`,
       [username]
     );
@@ -482,7 +494,16 @@ exports.loginUser = async (req, res) => {
         is_verified: user.is_verified,
         isVerified: user.is_verified,
         verification_status: user.verification_status,
-        verificationStatus: user.verification_status
+        verificationStatus: user.verification_status,
+        soulbound_token_id: user.soulbound_token_id || '',
+        soulboundTokenId: user.soulbound_token_id || '',
+        blockchain_tx_hash: user.blockchain_tx_hash || '',
+        facemesh_hash: user.facemesh_hash || '',
+        facemeshHash: user.facemesh_hash || '',
+        has_biometrics: Boolean(user.facemesh_hash),
+        hasBiometrics: Boolean(user.facemesh_hash),
+        biometric_verified_at: user.biometric_verified_at || null,
+        biometricVerifiedAt: user.biometric_verified_at || null
       },
       tokens
     });

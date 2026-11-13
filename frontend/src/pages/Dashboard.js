@@ -181,7 +181,7 @@ const Dashboard = () => {
         did: effectiveDid,
         verificationStatus: verStatus,
         recordsCount: records.length,
-        facemeshStatus: bioRes.status === 'fulfilled' && bioRes.value?.data?.hasBiometrics ? 'Enrolled (SHA-256)' : (user?.facemesh_hash ? 'Enrolled (SHA-256)' : 'Not Enrolled'),
+        facemeshStatus: (bioRes.status === 'fulfilled' && (bioRes.value?.data?.hasBiometrics || bioRes.value?.data?.facemeshExists || bioRes.value?.data?.verified)) || user?.facemesh_hash || user?.has_biometrics ? 'Enrolled (SHA-256)' : 'Not Enrolled',
         blockchainTx: bcData?.registrationTxHash || bcData?.transactionHash || user?.blockchain_tx_hash || '',
         contractAddress: bcData?.contractAddress || process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf',
         sbtTokenId: bcData?.sbtTokenId || (user?.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : ''),

@@ -8,13 +8,29 @@ const normalizeUser = (u) => {
   const govId = u.government_id || u.governmentId || '';
   const wallet = u.wallet_address || u.walletAddress || '';
   const did = u.did || (wallet ? `did:trueid:${wallet}` : '');
+  const faceHash = u.facemesh_hash || u.facemeshHash || u.biometric_hash || '';
+  const hasBio = Boolean(u.has_biometrics || u.hasBiometrics || u.hasBiometricData || faceHash);
+  const tokenId = u.soulbound_token_id || u.soulboundTokenId || '';
+  const txHash = u.blockchain_tx_hash || u.blockchainTxHash || '';
+  const bioAt = u.biometric_verified_at || u.biometricVerifiedAt || null;
+
   return {
     ...u,
     government_id: govId,
     governmentId: govId,
     wallet_address: wallet,
     walletAddress: wallet,
-    did: did
+    did: did,
+    facemesh_hash: faceHash,
+    facemeshHash: faceHash,
+    has_biometrics: hasBio,
+    hasBiometrics: hasBio,
+    soulbound_token_id: tokenId,
+    soulboundTokenId: tokenId,
+    blockchain_tx_hash: txHash,
+    blockchainTxHash: txHash,
+    biometric_verified_at: bioAt,
+    biometricVerifiedAt: bioAt
   };
 };
 
@@ -257,6 +273,19 @@ export const AuthProvider = ({ children }) => {
       console.log('Biometric verification response:', data);
 
       if (data && (data.success || data.verified)) {
+        setUser(prev => {
+          if (!prev) return prev;
+          const updated = normalizeUser({
+            ...prev,
+            has_biometrics: true,
+            hasBiometrics: true,
+            facemesh_hash: data.facemeshHash || prev.facemesh_hash,
+            facemeshHash: data.facemeshHash || prev.facemeshHash,
+            biometric_verified_at: new Date().toISOString()
+          });
+          localStorage.setItem('user', JSON.stringify(updated));
+          return updated;
+        });
         return {
           success: true,
           verified: data.verified !== undefined ? data.verified : true,

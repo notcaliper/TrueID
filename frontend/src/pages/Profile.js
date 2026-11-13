@@ -200,10 +200,10 @@ const Profile = () => {
     },
     {
       title: '3D FaceMesh Biometrics',
-      idVal: user?.facemesh_hash ? 'Enrolled Active Enclave' : 'Not Enrolled',
-      status: user?.facemesh_hash ? 'LIVENESS VERIFIED' : 'PENDING SCAN',
-      desc: user?.facemesh_hash ? 'Hardware secured facial geometry vector active' : 'No biometric vectors enrolled yet',
-      tag: user?.facemesh_hash ? 'Enrolled' : 'Not Enrolled',
+      idVal: (user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics) ? 'Enrolled Active Enclave' : 'Not Enrolled',
+      status: (user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics) ? 'LIVENESS VERIFIED' : 'PENDING SCAN',
+      desc: (user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics) ? 'Hardware secured facial geometry vector active' : 'No biometric vectors enrolled yet',
+      tag: (user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics) ? 'Enrolled' : 'Not Enrolled',
       color: '#7c3aed',
       bg: isLight ? '#f5f3ff' : 'rgba(124, 58, 237, 0.12)',
       icon: <FingerprintRounded sx={{ fontSize: 24 }} />

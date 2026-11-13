@@ -29,8 +29,8 @@ exports.getUserProfile = async (req, res) => {
   try {
     // Get user details
     const userResult = await db.query(
-      `SELECT id, name, government_id, email, phone, wallet_address, avax_address, did,
-              is_verified, verification_status, created_at, updated_at
+      `SELECT id, name, username, government_id, email, phone, wallet_address, avax_address, did,
+              is_verified, verification_status, soulbound_token_id, blockchain_tx_hash, created_at, updated_at
        FROM users
        WHERE id = $1`,
       [userId]
@@ -42,15 +42,19 @@ exports.getUserProfile = async (req, res) => {
     
     const user = userResult.rows[0];
     
-    // Get biometric data status (not the actual data)
+    // Get biometric data details
     const biometricResult = await db.query(
-      `SELECT COUNT(*) as count
+      `SELECT id, facemesh_hash, is_active, verification_status, last_verified_at, created_at
        FROM biometric_data
-       WHERE user_id = $1 AND is_active = true`,
+       WHERE user_id = $1 AND is_active = true
+       ORDER BY created_at DESC
+       LIMIT 1`,
       [userId]
     );
     
-    const hasBiometricData = parseInt(biometricResult.rows[0].count) > 0;
+    const latestBio = biometricResult.rows[0] || null;
+    const hasBiometricData = Boolean(latestBio && latestBio.facemesh_hash);
+    const facemeshHash = latestBio?.facemesh_hash || null;
     
     // Get professional records count
     const recordsResult = await db.query(
@@ -68,6 +72,7 @@ exports.getUserProfile = async (req, res) => {
     res.status(200).json({
       user: {
         id: user.id,
+        username: user.username,
         name: user.name,
         government_id: user.government_id,
         governmentId: user.government_id,
@@ -80,10 +85,22 @@ exports.getUserProfile = async (req, res) => {
         isVerified: user.is_verified,
         verification_status: user.verification_status,
         verificationStatus: user.verification_status,
+        soulbound_token_id: user.soulbound_token_id,
+        soulboundTokenId: user.soulbound_token_id,
+        blockchain_tx_hash: user.blockchain_tx_hash,
+        facemesh_hash: facemeshHash,
+        facemeshHash: facemeshHash,
+        has_biometrics: hasBiometricData,
+        hasBiometrics: hasBiometricData,
+        biometric_verified_at: latestBio?.last_verified_at || latestBio?.created_at || null,
+        biometricVerifiedAt: latestBio?.last_verified_at || latestBio?.created_at || null,
         createdAt: user.created_at,
         updatedAt: user.updated_at
       },
       hasBiometricData,
+      hasBiometrics: hasBiometricData,
+      facemeshHash,
+      facemesh_hash: facemeshHash,
       professionalRecordsCount
     });
   } catch (error) {
@@ -180,7 +197,8 @@ exports.getVerificationStatus = async (req, res) => {
   
   try {
     const result = await db.query(
-      `SELECT u.is_verified, u.verification_status, u.verification_notes, u.verified_at, u.created_at,
+      `SELECT u.id, u.name, u.government_id, u.wallet_address, u.did, u.is_verified, u.verification_status,
+              u.verification_notes, u.verified_at, u.created_at, u.soulbound_token_id, u.blockchain_tx_hash,
               a.username as verified_by
        FROM users u
        LEFT JOIN admins a ON u.verified_by = a.id
@@ -192,8 +210,23 @@ exports.getVerificationStatus = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Format the response to match what the frontend expects
     const userData = result.rows[0];
+    
+    // Fetch active biometric data
+    const bioResult = await db.query(
+      `SELECT id, facemesh_hash, is_active, verification_status, last_verified_at, created_at
+       FROM biometric_data
+       WHERE user_id = $1 AND is_active = true
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+    
+    const bioData = bioResult.rows[0] || null;
+    const hasBiometrics = Boolean(bioData && bioData.facemesh_hash);
+    const facemeshHash = bioData?.facemesh_hash || null;
+    const userWallet = userData.wallet_address || '';
+    const userDid = userData.did || (userWallet ? `did:trueid:${userWallet}` : '');
     
     res.status(200).json({
       data: {
@@ -201,7 +234,21 @@ exports.getVerificationStatus = async (req, res) => {
         submittedAt: userData.created_at,
         verifiedAt: userData.verified_at,
         rejectionReason: userData.verification_notes,
-        verifiedBy: userData.verified_by
+        verifiedBy: userData.verified_by || 'TrueID Identity Notary Authority',
+        governmentId: userData.government_id,
+        government_id: userData.government_id,
+        walletAddress: userWallet,
+        wallet_address: userWallet,
+        did: userDid,
+        soulboundTokenId: userData.soulbound_token_id,
+        soulbound_token_id: userData.soulbound_token_id,
+        blockchainTxHash: userData.blockchain_tx_hash,
+        blockchain_tx_hash: userData.blockchain_tx_hash,
+        hasBiometrics,
+        has_biometrics: hasBiometrics,
+        facemeshHash,
+        facemesh_hash: facemeshHash,
+        biometricVerifiedAt: bioData?.last_verified_at || bioData?.created_at || null
       }
     });
   } catch (error) {
@@ -621,7 +668,9 @@ exports.getBiometricStatus = async (req, res) => {
     const responseData = {
       verified: isVerified,
       facemeshExists: hasBiometricData,
-      lastVerified: verificationStats.last_successful_verification || null,
+      hasBiometrics: hasBiometricData,
+      hasBiometricData: hasBiometricData,
+      lastVerified: verificationStats.last_successful_verification || (hasBiometricData ? biometricResult.rows[0].last_verified_at || biometricResult.rows[0].created_at : null),
       verificationCount: parseInt(verificationStats.total_verifications) || 0,
       successfulVerifications: parseInt(verificationStats.successful_verifications) || 0
     };
@@ -630,14 +679,19 @@ exports.getBiometricStatus = async (req, res) => {
     if (hasBiometricData) {
       const biometricData = biometricResult.rows[0];
       responseData.facemeshHash = biometricData.facemesh_hash;
+      responseData.facemesh_hash = biometricData.facemesh_hash;
       responseData.biometricDetails = {
         id: biometricData.id,
         facemeshHash: biometricData.facemesh_hash,
+        facemesh_hash: biometricData.facemesh_hash,
         createdAt: biometricData.created_at,
         updatedAt: biometricData.updated_at,
         verificationStatus: biometricData.verification_status,
         verificationScore: biometricData.verification_score
       };
+    } else {
+      responseData.facemeshHash = null;
+      responseData.facemesh_hash = null;
     }
     
     res.status(200).json(responseData);
