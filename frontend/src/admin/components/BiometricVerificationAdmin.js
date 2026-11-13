@@ -454,9 +454,13 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
 
       if (result.success && result.userInfo) {
         setVerificationStatus('success');
-        setUserInfo(result.userInfo);
+        const userPayload = {
+          ...result.userInfo,
+          similarityScore: result.similarityScore
+        };
+        setUserInfo(userPayload);
         if (onVerificationComplete) {
-          onVerificationComplete(result.userInfo);
+          onVerificationComplete(userPayload);
         }
       } else {
         setVerificationStatus('failed');

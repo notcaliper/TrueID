@@ -4,6 +4,7 @@
  */
 const blockchainService = require('../services/blockchain.service');
 const ethers = require('ethers');
+const crypto = require('crypto');
 
 /**
  * Record user identity on blockchain
@@ -60,8 +61,14 @@ exports.recordIdentityOnBlockchain = async (req, res) => {
     
     const biometricData = biometricResult.rows[0];
     
-    // Generate a hash for professional data (placeholder)
-    const professionalDataHash = 'professional_data_hash_placeholder';
+    // Fetch actual professional credentials or compute canonical zero-state hash
+    const profResult = await db.query(
+      'SELECT id, record_type, institution, data_hash FROM professional_records WHERE user_id = $1 ORDER BY id ASC',
+      [userId]
+    );
+    const professionalDataHash = profResult.rows.length > 0
+      ? crypto.createHash('sha256').update(JSON.stringify(profResult.rows)).digest('hex')
+      : crypto.createHash('sha256').update(`trueid:user:${userId}:credentials`).digest('hex');
     
     // Log network being used
     logger.info(`Recording identity on Ethereum Sepolia blockchain for user ${userId}`);

@@ -58,6 +58,7 @@ const Profile = () => {
   const { user, setUser } = useAuth();
   const { isLight } = useColorMode();
   const theme = useTheme();
+  const sbtContractAddress = process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf';
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -219,10 +220,10 @@ const Profile = () => {
     },
     {
       title: 'Soulbound SBT Root',
-      idVal: 'ERC-5192 #002 (Non-Transferable)',
-      status: 'SEPOLIA LEDGER ANCHORED',
-      desc: 'Smart contract 0x266B...816E • 16 Block Confirmations',
-      tag: 'On-Chain SBT',
+      idVal: user?.soulbound_token_id ? `ERC-5192 #${user.soulbound_token_id} (Non-Transferable)` : 'Attestation Pending',
+      status: user?.soulbound_token_id ? 'SEPOLIA LEDGER ANCHORED' : 'AWAITING REGISTRY MINT',
+      desc: `Smart contract ${sbtContractAddress.slice(0, 6)}...${sbtContractAddress.slice(-4)} • ${user?.soulbound_token_id ? 'Attested On-Chain' : 'Sepolia Network'}`,
+      tag: user?.soulbound_token_id ? 'On-Chain SBT' : 'Unminted',
       color: '#0891b2',
       bg: isLight ? '#ecfeff' : 'rgba(8, 145, 178, 0.12)',
       icon: <SecurityRounded sx={{ fontSize: 24 }} />

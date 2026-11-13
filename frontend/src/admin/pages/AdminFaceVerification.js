@@ -212,7 +212,7 @@ const AdminFaceVerification = () => {
                     Citizen Identity Authenticated
                   </Typography>
                   <Typography variant="caption" sx={{ color: t.successText, fontWeight: 700 }}>
-                    FaceMesh biometric vectors matched with 99.4% confidence score
+                    FaceMesh biometric vectors matched with {verificationResult.similarityScore ? `${(verificationResult.similarityScore * 100).toFixed(1)}%` : 'high'} confidence score
                   </Typography>
                 </Box>
               </Box>

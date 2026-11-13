@@ -152,10 +152,10 @@ exports.registerUser = async (req, res) => {
   const { username, password, governmentId, email, phone, facemeshData, walletAddress } = req.body;
   const name = (req.body.name || `${req.body.firstName || ''} ${req.body.lastName || ''}`).trim();
   
-  // If username is not provided, generate one based on name or a random identifier
+  // If username is not provided, generate one based on name or a cryptographic identifier
   const userUsername = username || 
-    (name ? `user_${name.toLowerCase().replace(/[^a-z0-9]/g, '')}${Math.floor(Math.random() * 10000)}` : 
-    `user${Math.floor(Math.random() * 100000)}`);
+    (name ? `user_${name.toLowerCase().replace(/[^a-z0-9]/g, '')}${crypto.randomInt(1000, 9999)}` : 
+    `user${crypto.randomInt(10000, 99999)}`);
   
   // Password is now required
   if (!password) {
@@ -210,6 +210,8 @@ exports.registerUser = async (req, res) => {
       }
     }
     
+    const userDid = userWalletAddress ? `did:trueid:${userWalletAddress}` : null;
+
     // Insert user
     const userResult = await db.query(
       `INSERT INTO users (
@@ -222,13 +224,14 @@ exports.registerUser = async (req, res) => {
         wallet_address,
         avax_address,
         avax_private_key,
+        did,
         blockchain_network,
         is_verified,
         verification_status,
         created_at,
         updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'sepolia', $10, $11, NOW(), NOW())
-      RETURNING id, username, name, government_id, email, phone, wallet_address, avax_address, is_verified, verification_status`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'sepolia', $11, $12, NOW(), NOW())
+      RETURNING id, username, name, government_id, email, phone, wallet_address, avax_address, did, is_verified, verification_status`,
       [
         userUsername,
         hashedPassword,
@@ -239,6 +242,7 @@ exports.registerUser = async (req, res) => {
         userWalletAddress, // wallet_address
         userWalletAddress, // legacy avax_address
         avaxPrivateKey,
+        userDid,
         false, // is_verified
         'PENDING' // verification_status
       ]
@@ -355,7 +359,7 @@ exports.loginUser = async (req, res) => {
   try {
     // Get user by username (including MFA fields)
     const userResult = await db.query(
-      `SELECT u.id, u.username, u.password, u.government_id, u.name, u.email, u.phone, u.wallet_address, 
+      `SELECT u.id, u.username, u.password, u.government_id, u.name, u.email, u.phone, u.wallet_address, u.did,
               u.is_verified, u.verification_status, u.mfa_enabled, u.mfa_secret
        FROM users u
        WHERE u.username = $1 OR u.email = $1`,
@@ -456,7 +460,11 @@ exports.loginUser = async (req, res) => {
 
     // Return user data and token
     const userWallet = user.wallet_address || '';
-    const userDid = user.did || (userWallet ? `did:trueid:${userWallet}` : '');
+    let userDid = user.did;
+    if (!userDid && userWallet) {
+      userDid = `did:trueid:${userWallet}`;
+      await db.query('UPDATE users SET did = $1 WHERE id = $2', [userDid, user.id]).catch(() => {});
+    }
     
     res.status(200).json({
       message: 'Login successful',

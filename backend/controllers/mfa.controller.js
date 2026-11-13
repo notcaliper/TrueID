@@ -352,7 +352,11 @@ exports.verifyMFALogin = async (req, res) => {
     );
 
     const mfaWallet = session.wallet_address || '';
-    const mfaDid = session.did || (mfaWallet ? `did:trueid:${mfaWallet}` : '');
+    let mfaDid = session.did;
+    if (!mfaDid && mfaWallet) {
+      mfaDid = `did:trueid:${mfaWallet}`;
+      await db.query('UPDATE users SET did = $1 WHERE id = $2', [mfaDid, session.user_id]).catch(() => {});
+    }
 
     res.status(200).json({
       success: true,

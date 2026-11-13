@@ -91,8 +91,20 @@ const VerifiableCredentials = () => {
     fetchRecords();
   }, [fetchRecords]);
 
-  const generateRandomHash = () =>
-    '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+  const sbtContractAddress = process.env.REACT_APP_SOULBOUND_BADGE_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x6f4d27d80f84ce44eFecF9A1eAd6A5e6489ae9Bf';
+  const credentialContractAddress = process.env.REACT_APP_CREDENTIAL_REGISTRY_ADDRESS || process.env.REACT_APP_CONTRACT_ADDRESS || '0x13b46Af37e8cc566446647deD8b6A0b4b7CE54B2';
+
+  const computeSha256 = async (data) => {
+    let buffer;
+    if (data instanceof Blob || data instanceof File) {
+      buffer = await data.arrayBuffer();
+    } else {
+      buffer = new TextEncoder().encode(typeof data === 'string' ? data : JSON.stringify(data));
+    }
+    const hashBuf = await window.crypto.subtle.digest('SHA-256', buffer);
+    const hashArr = Array.from(new Uint8Array(hashBuf));
+    return '0x' + hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
 
   const handleOpenDialog = () => {
     setRecordForm({
@@ -102,7 +114,7 @@ const VerifiableCredentials = () => {
       description: '',
       start_date: '',
       end_date: '',
-      data_hash: generateRandomHash()
+      data_hash: ''
     });
     setSelectedFile(null);
     setOpenDialog(true);
@@ -119,9 +131,16 @@ const VerifiableCredentials = () => {
     }));
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      try {
+        const hash = await computeSha256(file);
+        setRecordForm(prev => ({ ...prev, data_hash: hash }));
+      } catch (err) {
+        console.warn('Cryptographic hash computation notice:', err);
+      }
     }
   };
 
@@ -137,6 +156,9 @@ const VerifiableCredentials = () => {
         throw new Error('Please upload a supporting credential document (PDF or image).');
       }
 
+      // Compute cryptographic SHA-256 hash of document
+      const fileHash = recordForm.data_hash || await computeSha256(selectedFile);
+
       const payload = {
         title: recordForm.title,
         institution: recordForm.institution,
@@ -144,7 +166,7 @@ const VerifiableCredentials = () => {
         description: recordForm.description,
         startDate: recordForm.start_date,
         endDate: recordForm.end_date || null,
-        dataHash: recordForm.data_hash,
+        dataHash: fileHash,
       };
 
       const addRes = await userAPI.addProfessionalRecord(payload);
@@ -158,15 +180,8 @@ const VerifiableCredentials = () => {
         }
       }
 
-      // Add to local state
-      const newRec = {
-        id: `REC-${Date.now()}`,
-        ...recordForm,
-        verification_status: 'PENDING',
-        on_blockchain: false,
-        blockchain_tx_hash: null
-      };
-      setRecords(prev => [newRec, ...prev]);
+      // Authoritative refetch from database
+      await fetchRecords();
 
       handleCloseDialog();
       setSuccess('Credential successfully registered and submitted for authority notary attestation.');
@@ -276,7 +291,7 @@ const VerifiableCredentials = () => {
       title: 'Ethereum Sepolia Ledger',
       value: `${onChainCount} Anchored`,
       status: 'SMART CONTRACT BOUND',
-      desc: 'Soulbound registry contract 0x266B...816E • Tamper-proof',
+      desc: `Soulbound registry ${sbtContractAddress.slice(0, 6)}...${sbtContractAddress.slice(-4)} • Tamper-proof`,
       tag: 'On-Chain SBT',
       color: '#0891b2',
       bg: isLight ? '#ecfeff' : 'rgba(8, 145, 178, 0.12)',
@@ -499,7 +514,7 @@ const VerifiableCredentials = () => {
               100% Official Verification Rate
             </Typography>
             <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.7rem' }}>
-              Smart Contract: 0x266B...816E
+              Registry: {credentialContractAddress.slice(0, 6)}...{credentialContractAddress.slice(-4)}
             </Typography>
           </Box>
         </Box>
