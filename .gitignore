@@ -135,4 +135,8 @@ backend/blockchain/cache/
 typechain/
 typechain-types/
 
+# Uploaded documents
+uploads/
+backend/uploads/
+
 
