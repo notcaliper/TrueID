@@ -32,7 +32,7 @@ import LoadingScreen from './components/LoadingScreen';
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   
   if (loading) {
     return <LoadingScreen />;
@@ -40,6 +40,11 @@ const ProtectedRoute = ({ children }) => {
   
   if (!isAuthenticated()) {
     return <Navigate to="/login" />;
+  }
+  
+  // If authenticated user is an admin, navigate to the Authority Admin Portal
+  if (user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.isAdmin)) {
+    return <Navigate to="/admin" replace />;
   }
   
   return children;
