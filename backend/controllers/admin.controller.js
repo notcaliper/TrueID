@@ -796,8 +796,11 @@ exports.verifyUser = async (req, res) => {
           const bioHash = biometricRow.rows[0]?.facemesh_hash || '';
           const attestRes = await blockchainService.attestCitizenOnChain(targetAddress, bioHash);
           if (attestRes.success && attestRes.txHashes && attestRes.txHashes.length > 0) {
-            const primaryTx = attestRes.txHashes[0];
-            await client.query('UPDATE users SET blockchain_tx_hash = $1 WHERE id = $2', [primaryTx, id]);
+            const primaryTx = attestRes.sbtTxHash || attestRes.identityTxHash || attestRes.txHashes[0];
+            await client.query(
+              'UPDATE users SET blockchain_tx_hash = $1, soulbound_token_id = COALESCE($2, soulbound_token_id), soulbound_badge_minted = true WHERE id = $3',
+              [primaryTx, attestRes.tokenId || null, id]
+            );
             await client.query(
               `INSERT INTO audit_logs (admin_id, user_id, action, entity_type, entity_id, details, ip_address)
                VALUES ($1, $2, 'USER_BLOCKCHAIN_ATTESTED', 'users', $2, $3, $4)`,

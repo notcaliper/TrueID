@@ -310,20 +310,26 @@ exports.getUserBlockchainStatus = async (req, res) => {
       logger.warn('Error fetching biometric root hash:', bioErr);
     }
 
-    // Get on-chain blockchain status
+    // Get on-chain blockchain status & Soulbound Badge token ID
     let onChainRegistered = false;
     let onChainVerified = false;
+    let onChainTokenId = user.soulbound_token_id ? Number(user.soulbound_token_id) : null;
     
     try {
-      onChainRegistered = await blockchainService.isIdentityRegistered(walletAddress);
-      if (onChainRegistered) {
-        onChainVerified = await blockchainService.isIdentityVerified(walletAddress);
+      const onChain = await blockchainService.getOnChainIdentity(walletAddress);
+      if (onChain && onChain.isRegisteredOnChain) onChainRegistered = true;
+      if (onChain && onChain.isVerifiedOnChain) onChainVerified = true;
+      if (onChain && onChain.soulboundTokenId) {
+        onChainTokenId = Number(onChain.soulboundTokenId);
+        if (!user.soulbound_token_id) {
+          await db.query('UPDATE users SET soulbound_token_id = $1, soulbound_badge_minted = true WHERE id = $2', [onChainTokenId, userId]);
+        }
       }
     } catch (contractErr) {
       logger.warn(`On-chain status check error for ${walletAddress}:`, contractErr.message);
     }
     
-    const isRegistered = Boolean(onChainRegistered || user.soulbound_badge_minted || user.blockchain_status === 'CONFIRMED');
+    const isRegistered = Boolean(onChainRegistered || user.soulbound_badge_minted || onChainTokenId || user.blockchain_status === 'CONFIRMED');
     const isIdentityVerified = Boolean(onChainVerified || isDbVerified);
 
     // Get recent blockchain transactions
@@ -357,11 +363,17 @@ exports.getUserBlockchainStatus = async (req, res) => {
       }
     }
     
+    // Prefer actual attestation / registration tx over generic funding transfer
+    const attestationTx = recentTransactions.find(t => 
+      t.transaction_type === 'IDENTITY_REGISTRATION' || 
+      t.transaction_type === 'SOULBOUND_BADGE_MINT' || 
+      t.transaction_type === 'ATTESTATION'
+    );
     const latestTx = recentTransactions.length > 0 ? recentTransactions[0] : null;
-    const txHash = user.blockchain_tx_hash || (latestTx ? latestTx.transaction_hash : '');
-    const sbtTokenId = user.soulbound_token_id 
-      ? `SBT-Token #${user.soulbound_token_id}` 
-      : null;
+    const txHash = user.blockchain_tx_hash || (attestationTx ? attestationTx.transaction_hash : (latestTx ? latestTx.transaction_hash : ''));
+    const sbtTokenId = onChainTokenId 
+      ? `SBT-Token #${onChainTokenId}` 
+      : (user.soulbound_token_id ? `SBT-Token #${user.soulbound_token_id}` : null);
 
     let liveConfirmations = 0;
     if (txHash) {

@@ -815,7 +815,7 @@ const Dashboard = () => {
                     Badge Token:
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#4ade80', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem' }}>
-                    {identityData.sbtTokenId ? `${identityData.sbtTokenId} (Locked)` : 'Attestation Pending'}
+                    {identityData.sbtTokenId ? `${identityData.sbtTokenId} (Locked)` : (isVerified ? 'Attestation Confirmed' : 'Attestation Pending')}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
@@ -836,7 +836,7 @@ const Dashboard = () => {
                 {identityData.blockchainTx && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>
-                      Mint Tx:
+                      Attestation Tx:
                     </Typography>
                     <Tooltip title={identityData.blockchainTx} arrow>
                       <Typography
@@ -850,7 +850,7 @@ const Dashboard = () => {
                         {identityData.blockchainTx.slice(0, 8)}...{identityData.blockchainTx.slice(-6)}
                       </Typography>
                     </Tooltip>
-                    <Tooltip title="Copy Mint Tx Hash">
+                    <Tooltip title="Copy Attestation Tx Hash">
                       <IconButton
                         size="small"
                         onClick={() => {
