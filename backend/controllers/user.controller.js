@@ -350,7 +350,7 @@ exports.getProfessionalRecords = async (req, res) => {
     const result = await db.query(
       `SELECT id, record_type, institution, title, description, 
               start_date, end_date, is_current, verification_status, 
-              verified_by, verified_at, blockchain_tx_hash, 
+              verified_by, verified_at, blockchain_tx_hash, on_blockchain, data_hash,
               created_at, updated_at
        FROM professional_records
        WHERE user_id = $1
@@ -361,6 +361,7 @@ exports.getProfessionalRecords = async (req, res) => {
     // Transform the records to ensure consistent field names and status
     const records = result.rows.map(record => ({
       ...record,
+      on_blockchain: Boolean(record.on_blockchain || record.blockchain_tx_hash),
       verification_status: record.verification_status || (record.is_verified ? 'VERIFIED' : 'PENDING')
     }));
     

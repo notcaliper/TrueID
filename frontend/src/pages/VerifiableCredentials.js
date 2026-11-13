@@ -35,7 +35,8 @@ import {
   RefreshRounded,
   GppGoodRounded,
   FactCheckRounded,
-  BadgeRounded
+  BadgeRounded,
+  OpenInNewRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';
@@ -724,9 +725,9 @@ const VerifiableCredentials = () => {
                           </Typography>
 
                           {(record.blockchain_tx_hash || record.data_hash) && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                               <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 600 }}>
-                                On-Chain Hash:
+                                {record.blockchain_tx_hash ? 'Transaction Hash:' : 'Proof Hash:'}
                               </Typography>
                               <Typography
                                 variant="caption"
@@ -737,20 +738,50 @@ const VerifiableCredentials = () => {
                                   px: 0.8,
                                   py: 0.3,
                                   borderRadius: 1,
-                                  fontSize: '0.72rem'
+                                  fontSize: '0.73rem',
+                                  wordBreak: 'break-all',
+                                  fontWeight: 600
                                 }}
                               >
-                                {(record.blockchain_tx_hash || record.data_hash || '').slice(0, 12)}...{(record.blockchain_tx_hash || record.data_hash || '').slice(-8)}
+                                {record.blockchain_tx_hash || record.data_hash}
                               </Typography>
-                              <Tooltip title={copiedHash === `hash-${record.id}` ? 'Copied Hash!' : 'Copy Hash'}>
+                              <Tooltip title={copiedHash === `hash-${record.id}` ? 'Copied Full Hash!' : 'Copy full hash'}>
                                 <IconButton
                                   size="small"
                                   onClick={() => copyToClipboard(record.blockchain_tx_hash || record.data_hash, `hash-${record.id}`)}
-                                  sx={{ color: copiedHash === `hash-${record.id}` ? '#16a34a' : isLight ? '#64748b' : '#8b949e', p: 0.3 }}
+                                  sx={{ color: copiedHash === `hash-${record.id}` ? '#16a34a' : (isLight ? '#64748b' : '#8b949e'), p: 0.3 }}
                                 >
-                                  <ContentCopyRounded sx={{ fontSize: 14 }} />
+                                  {copiedHash === `hash-${record.id}` ? <CheckCircleRounded sx={{ fontSize: 14 }} /> : <ContentCopyRounded sx={{ fontSize: 14 }} />}
                                 </IconButton>
                               </Tooltip>
+
+                              {record.blockchain_tx_hash && (
+                                <Button
+                                  component="a"
+                                  href={`https://sepolia.etherscan.io/tx/${record.blockchain_tx_hash}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  size="small"
+                                  endIcon={<OpenInNewRounded sx={{ fontSize: '13px !important' }} />}
+                                  sx={{
+                                    textTransform: 'none',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    color: isLight ? '#1d4ed8' : '#60a5fa',
+                                    bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.12)',
+                                    border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.3)'}`,
+                                    borderRadius: 1.5,
+                                    px: 1.2,
+                                    py: 0.25,
+                                    '&:hover': {
+                                      bgcolor: isLight ? '#dbeafe' : 'rgba(37, 99, 235, 0.22)',
+                                      textDecoration: 'none'
+                                    }
+                                  }}
+                                >
+                                  View on Sepolia Etherscan ↗
+                                </Button>
+                              )}
                             </Box>
                           )}
                         </Box>
@@ -774,15 +805,19 @@ const VerifiableCredentials = () => {
                         />
 
                         <Chip
-                          icon={<SecurityRounded sx={{ fontSize: '13px !important', color: '#2563eb !important' }} />}
-                          label={record.on_blockchain ? 'ON-CHAIN' : 'OFF-CHAIN'}
+                          icon={<SecurityRounded sx={{ fontSize: '13px !important', color: `${(record.on_blockchain || record.blockchain_tx_hash) ? '#2563eb' : '#64748b'} !important` }} />}
+                          label={(record.on_blockchain || record.blockchain_tx_hash) ? 'ON-CHAIN' : 'OFF-CHAIN'}
                           size="small"
                           sx={{
                             fontWeight: 700,
                             fontSize: '0.7rem',
-                            bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.15)',
-                            color: '#2563eb',
-                            border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.3)'}`
+                            bgcolor: (record.on_blockchain || record.blockchain_tx_hash)
+                              ? (isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.15)')
+                              : (isLight ? '#f1f5f9' : '#1e2124'),
+                            color: (record.on_blockchain || record.blockchain_tx_hash) ? '#2563eb' : (isLight ? '#64748b' : '#9ca3af'),
+                            border: `1px solid ${(record.on_blockchain || record.blockchain_tx_hash)
+                              ? (isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.3)')
+                              : (isLight ? '#e2e8f0' : '#32363a')}`
                           }}
                         />
                       </Box>
@@ -1059,12 +1094,53 @@ const VerifiableCredentials = () => {
               </Box>
 
               <Box>
-                <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, display: 'block' }}>
-                  SHA-256 NOTARY PROOF HASH
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.8 }}>
+                  <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700, textTransform: 'uppercase' }}>
+                    {selectedProof.blockchain_tx_hash ? 'SEPOLIA BLOCKCHAIN TRANSACTION HASH' : 'SHA-256 NOTARY PROOF HASH'}
+                  </Typography>
+                  <Tooltip title={copiedHash === 'modal-proof' ? 'Copied Full Hash!' : 'Copy full hash'}>
+                    <Button
+                      size="small"
+                      onClick={() => copyToClipboard(selectedProof.blockchain_tx_hash || selectedProof.data_hash, 'modal-proof')}
+                      startIcon={copiedHash === 'modal-proof' ? <CheckCircleRounded sx={{ fontSize: 14 }} /> : <ContentCopyRounded sx={{ fontSize: 14 }} />}
+                      sx={{ textTransform: 'none', fontSize: '0.72rem', fontWeight: 700, color: copiedHash === 'modal-proof' ? '#16a34a' : '#2563eb' }}
+                    >
+                      {copiedHash === 'modal-proof' ? 'Copied' : 'Copy Hash'}
+                    </Button>
+                  </Tooltip>
+                </Box>
                 <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isLight ? '#f1f5f9' : '#1e2124', fontFamily: 'monospace', fontSize: '0.8rem', color: '#2563eb', wordBreak: 'break-all' }}>
                   {selectedProof.blockchain_tx_hash || selectedProof.data_hash || 'Verified on Ethereum Sepolia'}
                 </Box>
+
+                {/* Direct Link to Etherscan Testnet in Modal */}
+                {selectedProof.blockchain_tx_hash && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Button
+                      component="a"
+                      href={`https://sepolia.etherscan.io/tx/${selectedProof.blockchain_tx_hash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      fullWidth
+                      variant="outlined"
+                      endIcon={<OpenInNewRounded sx={{ fontSize: '15px !important' }} />}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        color: isLight ? '#1d4ed8' : '#60a5fa',
+                        borderColor: isLight ? '#bfdbfe' : 'rgba(37, 99, 235, 0.4)',
+                        bgcolor: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.08)',
+                        py: 0.8,
+                        '&:hover': {
+                          bgcolor: isLight ? '#dbeafe' : 'rgba(37, 99, 235, 0.18)'
+                        }
+                      }}
+                    >
+                      Verify On-Chain via Sepolia Etherscan Explorer ↗
+                    </Button>
+                  </Box>
+                )}
               </Box>
 
               <Box>
@@ -1103,7 +1179,7 @@ const VerifiableCredentials = () => {
     "created": "${selectedProof.created_at || new Date().toISOString()}",
     "verificationMethod": "${user?.did || (user?.wallet_address ? `did:trueid:${user.wallet_address}` : '')}#key-1",
     "proofPurpose": "assertionMethod",
-    "proofValue": "${(selectedProof.blockchain_tx_hash || selectedProof.data_hash || '').slice(0, 32)}..."
+    "proofValue": "${selectedProof.blockchain_tx_hash || selectedProof.data_hash || ''}"
   }
 }`}
                 </Box>
