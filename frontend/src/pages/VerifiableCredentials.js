@@ -1077,16 +1077,16 @@ const VerifiableCredentials = () => {
   "id": "urn:uuid:${selectedProof.id}",
   "type": ["VerifiableCredential", "${selectedProof.record_type}"],
   "issuer": "${selectedProof.institution}",
-  "issuanceDate": "${selectedProof.start_date || new Date().toISOString()}T00:00:00Z",
+  "issuanceDate": "${selectedProof.start_date ? selectedProof.start_date + 'T00:00:00Z' : (selectedProof.created_at || new Date().toISOString())}",
   "credentialSubject": {
-    "id": "did:trueid:${user?.wallet_address || ''}",
+    "id": "${user?.did || (user?.wallet_address ? `did:trueid:${user.wallet_address}` : '')}",
     "qualification": "${selectedProof.title}",
     "status": "${selectedProof.verification_status}"
   },
   "proof": {
     "type": "Ed25519Signature2020",
-    "created": "2026-11-05T00:00:00Z",
-    "verificationMethod": "did:trueid:${user?.wallet_address || ''}#key-1",
+    "created": "${selectedProof.created_at || new Date().toISOString()}",
+    "verificationMethod": "${user?.did || (user?.wallet_address ? `did:trueid:${user.wallet_address}` : '')}#key-1",
     "proofPurpose": "assertionMethod",
     "proofValue": "${(selectedProof.blockchain_tx_hash || selectedProof.data_hash || '').slice(0, 32)}..."
   }

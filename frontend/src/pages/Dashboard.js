@@ -1365,14 +1365,14 @@ const Dashboard = () => {
   "id": "urn:uuid:${selectedProof.id}",
   "type": ["VerifiableCredential", "${selectedProof.type}"],
   "issuer": "${selectedProof.issuer}",
-  "issuanceDate": "2026-01-15T00:00:00Z",
+  "issuanceDate": "${selectedProof.created_at ? new Date(selectedProof.created_at).toISOString() : new Date().toISOString()}",
   "credentialSubject": {
     "id": "${identityData.did}",
     "qualification": "${selectedProof.title}"
   },
   "proof": {
     "type": "Ed25519Signature2020",
-    "created": "2026-01-15T00:00:00Z",
+    "created": "${selectedProof.created_at ? new Date(selectedProof.created_at).toISOString() : new Date().toISOString()}",
     "verificationMethod": "${identityData.did}#keys-1",
     "proofPurpose": "assertionMethod",
     "proofValue": "${(selectedProof.hash || selectedProof.transaction_hash || selectedProof.blockchain_tx_hash || '').slice(0, 32)}..."

@@ -172,7 +172,7 @@ const Register = () => {
                   label="First Name"
                   value={formData.firstName}
                   onChange={handleChange}
-                  placeholder="e.g. Akshay"
+                  placeholder="e.g. John"
                   sx={inputStyle}
                 />
                 <TextField
@@ -181,7 +181,7 @@ const Register = () => {
                   label="Last Name"
                   value={formData.lastName}
                   onChange={handleChange}
-                  placeholder="e.g. Manbhaw"
+                  placeholder="e.g. Doe"
                   sx={inputStyle}
                 />
               </Box>
@@ -192,7 +192,7 @@ const Register = () => {
                 label="National Citizen Identifier (Gov ID)"
                 value={formData.governmentId}
                 onChange={handleChange}
-                placeholder="e.g. JIFPM9413P"
+                placeholder="e.g. GOV-894132"
                 helperText="Used to generate your unique decentralized identifier (DID)"
                 sx={{
                   ...inputStyle,
@@ -223,7 +223,7 @@ const Register = () => {
                 label="Username"
                 value={formData.username}
                 onChange={handleChange}
-                placeholder="e.g. NotAkshay"
+                placeholder="e.g. citizen_user"
                 sx={inputStyle}
               />
 
@@ -234,7 +234,7 @@ const Register = () => {
                 label="Email Address"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="e.g. akshay@trueid.org"
+                placeholder="e.g. citizen@domain.org"
                 sx={inputStyle}
               />
 

@@ -38,6 +38,7 @@ const TrustVerification = () => {
     submittedAt: '',
     verifiedAt: '',
     verifiedBy: '',
+    verifiedRecordsCount: 0,
     contractAddress: process.env.REACT_APP_CONTRACT_ADDRESS || '',
     lastSync: ''
   });
@@ -47,9 +48,15 @@ const TrustVerification = () => {
     setError(null);
 
     try {
-      const response = await userAPI.getVerificationStatus();
-      const rawData = response?.data?.data || response?.data || {};
+      const [response, recordsRes] = await Promise.allSettled([
+        userAPI.getVerificationStatus(),
+        userAPI.getProfessionalRecords()
+      ]);
+
+      const rawData = response.status === 'fulfilled' ? (response.value?.data?.data || response.value?.data || {}) : {};
       const status = (rawData?.status || rawData?.identity?.status || user?.verification_status || 'PENDING').toUpperCase();
+      const records = recordsRes.status === 'fulfilled' ? (recordsRes.value?.data?.records || recordsRes.value?.data || []) : [];
+      const verifiedCount = Array.isArray(records) ? records.filter(r => r.verification_status === 'VERIFIED').length : 0;
 
       setVerificationData(prev => ({
         ...prev,
@@ -58,6 +65,7 @@ const TrustVerification = () => {
         verifiedBy: rawData?.verifiedBy || 'TrueID Identity Notary Authority',
         submittedAt: rawData?.submittedAt || prev.submittedAt,
         verifiedAt: rawData?.verifiedAt || prev.verifiedAt,
+        verifiedRecordsCount: verifiedCount,
         contractAddress: rawData?.contractAddress || process.env.REACT_APP_CONTRACT_ADDRESS || '',
         lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', year: 'numeric' })
       }));
@@ -171,7 +179,7 @@ const TrustVerification = () => {
   const trustFactors = [
     { name: 'Government ID Validity', weight: '35%', score: 100, color: '#16a34a' },
     { name: 'Live Face Match', weight: '25%', score: 100, color: '#16a34a' },
-    { name: 'Verified Certificates (4 items)', weight: '20%', score: 98, color: '#2563eb' },
+    { name: verificationData.verifiedRecordsCount > 0 ? `Verified Credentials (${verificationData.verifiedRecordsCount} items)` : 'Verified Credentials', weight: '20%', score: verificationData.verifiedRecordsCount > 0 ? 100 : 80, color: verificationData.verifiedRecordsCount > 0 ? '#16a34a' : '#64748b' },
     { name: 'Account History & Good Standing', weight: '20%', score: 100, color: '#16a34a' }
   ];
 
