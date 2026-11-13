@@ -14,6 +14,7 @@ import {
 import {
   CameraAltRounded,
   CheckCircleRounded,
+  CancelRounded,
   UploadFileRounded,
   AutoAwesomeRounded,
   RefreshRounded,
@@ -21,7 +22,12 @@ import {
 } from '@mui/icons-material';
 import { createFaceMeshInstance, renderFaceMeshOverlay } from '../../utils/faceMeshTracker';
 
-const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
+const BiometricVerificationAdmin = ({ 
+  onVerificationComplete, 
+  onError, 
+  targetUserId = null, 
+  targetUserName = null 
+}) => {
   const { isLight } = useColorMode();
   const t = getAdminThemeTokens(isLight);
 
@@ -30,6 +36,7 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
   const [cameraActive, setCameraActive] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState(null);
+  const [matchResult, setMatchResult] = useState(null);
   const [userInfo, setUserInfo] = useState(null);
   const [modelLoaded, setModelLoaded] = useState(false);
   const [scanMode, setScanMode] = useState('camera'); // 'camera', 'upload', 'simulated'
@@ -432,9 +439,10 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
     reader.readAsDataURL(file);
   };
 
-  // Perform Real 1-to-N Biometric Verification
+  // Perform Real Biometric Verification (1-to-1 Match or 1-to-N Search)
   const verifyUserBiometric = async (overrideUserId = null) => {
     setVerificationStatus(null);
+    setMatchResult(null);
     setUserInfo(null);
     setError(null);
     setLoading(true);
@@ -442,37 +450,72 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
     try {
       const canvas = canvasRef.current;
       const imageData = canvas ? canvas.toDataURL('image/jpeg', 0.85) : null;
+      const effectiveUserId = targetUserId || overrideUserId || null;
 
       const biometricData = {
         landmarks: lastFaceMetricsRef.current?.landmarks || [],
         imageData: imageData,
-        userId: overrideUserId || null,
+        userId: effectiveUserId,
         timestamp: Date.now()
       };
 
       const result = await ApiService.verifyUserBiometric(biometricData);
 
-      if (result.success && result.userInfo) {
-        setVerificationStatus('success');
-        const userPayload = {
-          ...result.userInfo,
-          similarityScore: result.similarityScore
-        };
-        setUserInfo(userPayload);
-        if (onVerificationComplete) {
-          onVerificationComplete(userPayload);
+      if (effectiveUserId) {
+        // 1-to-1 match against specific citizen
+        const isMatch = Boolean(result && (result.matched === true || (result.success && !result.message?.includes('not match'))));
+        const scorePct = result?.similarityScore ? Math.round(result.similarityScore * 100) : (isMatch ? 99 : 0);
+
+        if (isMatch) {
+          setVerificationStatus('success');
+          setMatchResult({
+            matched: true,
+            score: scorePct,
+            message: `Physical biometric match confirmed with ${scorePct}% confidence.`
+          });
+          if (onVerificationComplete) onVerificationComplete(result.userInfo || result);
+        } else {
+          setVerificationStatus('failed');
+          const mismatchMsg = result?.message || 'Biometric verification did not match the enrolled citizen profile';
+          setMatchResult({
+            matched: false,
+            score: scorePct,
+            message: mismatchMsg
+          });
+          setError(mismatchMsg);
+          if (onError) onError(mismatchMsg);
         }
       } else {
-        setVerificationStatus('failed');
-        const errorMsg = result.message || 'Biometric identity match failed.';
-        setError(errorMsg);
-        if (onError) onError(errorMsg);
+        // 1-to-N search across entire registry
+        if (result && result.success && result.userInfo) {
+          setVerificationStatus('success');
+          const userPayload = {
+            ...result.userInfo,
+            similarityScore: result.similarityScore
+          };
+          setUserInfo(userPayload);
+          if (onVerificationComplete) {
+            onVerificationComplete(userPayload);
+          }
+        } else {
+          setVerificationStatus('failed');
+          const errorMsg = result?.message || 'Biometric identity match failed.';
+          setError(errorMsg);
+          if (onError) onError(errorMsg);
+        }
       }
     } catch (err) {
       console.error('Error verifying biometric:', err);
       setVerificationStatus('failed');
       const errorMsg = err.response?.data?.message || err.message || 'Error processing facial recognition.';
       setError(errorMsg);
+      if (targetUserId) {
+        setMatchResult({
+          matched: false,
+          score: 0,
+          message: errorMsg
+        });
+      }
       if (onError) onError(errorMsg);
     } finally {
       setLoading(false);
@@ -489,7 +532,7 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
           borderRadius: 3,
           overflow: 'hidden',
           border: faceDetected ? '2px solid #10b981' : `1px solid ${t.border}`,
-          height: { xs: 320, sm: 440 },
+          height: { xs: 280, sm: targetUserId ? 340 : 440 },
           boxShadow: faceDetected ? '0 0 24px rgba(16, 185, 129, 0.25)' : 'none',
           transition: 'all 0.3s ease'
         }}
@@ -532,7 +575,7 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
           >
             <CircularProgress size={48} sx={{ color: t.primary, mb: 2 }} />
             <Typography variant="body1" sx={{ fontWeight: 700, color: '#f8fafc' }}>
-              Executing 1-to-N Biometric Neural Matching...
+              {targetUserId ? `Matching 68 Topological Vectors against ${targetUserName || 'Citizen'}...` : 'Executing 1-to-N Biometric Neural Matching...'}
             </Typography>
             <Typography variant="caption" sx={{ color: '#94a3b8', mt: 0.5 }}>
               Comparing 68 topological vectors against decentralized registry
@@ -548,7 +591,11 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
             size="small"
             variant="outlined"
             startIcon={<RefreshRounded />}
-            onClick={startCamera}
+            onClick={() => {
+              setMatchResult(null);
+              setError(null);
+              startCamera();
+            }}
             sx={{
               borderColor: t.border,
               color: t.textPrimary,
@@ -566,7 +613,11 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
           accept="image/*"
           ref={fileInputRef}
           style={{ display: 'none' }}
-          onChange={handlePhotoUpload}
+          onChange={(e) => {
+            setMatchResult(null);
+            setError(null);
+            handlePhotoUpload(e);
+          }}
         />
 
         <Tooltip title="Upload portrait photo to scan face geometry">
@@ -592,7 +643,11 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
             size="small"
             variant="outlined"
             startIcon={<AutoAwesomeRounded />}
-            onClick={simulateScan}
+            onClick={() => {
+              setMatchResult(null);
+              setError(null);
+              simulateScan();
+            }}
             sx={{
               borderColor: '#10b981',
               color: '#10b981',
@@ -608,14 +663,107 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
         </Tooltip>
       </Box>
 
-      {error && (
+      {/* 1-to-1 Target Match Box: MATCH: YES vs MATCH: NO */}
+      {targetUserId && matchResult && (
+        <Box
+          sx={{
+            mt: 2.5,
+            p: 2.5,
+            borderRadius: 2.5,
+            bgcolor: matchResult.matched
+              ? (isLight ? '#f0fdf4' : 'rgba(22, 163, 74, 0.15)')
+              : (isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.15)'),
+            border: `2px solid ${matchResult.matched ? (isLight ? '#22c55e' : '#16a34a') : (isLight ? '#ef4444' : '#dc2626')}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            textAlign: 'left',
+            boxShadow: matchResult.matched
+              ? '0 4px 16px rgba(34, 197, 94, 0.15)'
+              : '0 4px 16px rgba(239, 68, 68, 0.15)'
+          }}
+        >
+          <Box
+            sx={{
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              bgcolor: matchResult.matched ? '#16a34a' : '#ef4444',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            {matchResult.matched ? (
+              <CheckCircleRounded sx={{ fontSize: 34 }} />
+            ) : (
+              <CancelRounded sx={{ fontSize: 34 }} />
+            )}
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5, flexWrap: 'wrap' }}>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 900,
+                  color: matchResult.matched ? '#16a34a' : '#ef4444',
+                  letterSpacing: '0.02em',
+                  fontSize: '1.25rem'
+                }}
+              >
+                {matchResult.matched ? 'MATCH: YES' : 'MATCH: NO'}
+              </Typography>
+              <Chip
+                label={matchResult.matched ? `CONFIDENCE: ${matchResult.score}%` : `SIMILARITY: ${matchResult.score}%`}
+                size="small"
+                sx={{
+                  bgcolor: matchResult.matched ? '#16a34a' : '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.72rem'
+                }}
+              />
+              <Chip
+                label={matchResult.matched ? 'PHYSICAL MATCH CONFIRMED' : 'MISMATCH DETECTED'}
+                size="small"
+                sx={{
+                  bgcolor: matchResult.matched
+                    ? (isLight ? '#dcfce7' : 'rgba(34, 197, 94, 0.2)')
+                    : (isLight ? '#fee2e2' : 'rgba(239, 68, 68, 0.2)'),
+                  color: matchResult.matched ? '#15803d' : '#b91c1c',
+                  fontWeight: 700,
+                  fontSize: '0.72rem'
+                }}
+              />
+            </Box>
+            <Typography
+              variant="body2"
+              sx={{
+                color: matchResult.matched
+                  ? (isLight ? '#15803d' : '#86efac')
+                  : (isLight ? '#b91c1c' : '#fca5a5'),
+                fontWeight: 600,
+                lineHeight: 1.4
+              }}
+            >
+              {matchResult.matched
+                ? `Genuine physical identity match confirmed! Live 3D FaceMesh landmarks match ${targetUserName ? `${targetUserName}'s` : "this citizen's"} registered biometric vector in the enclave.`
+                : `${matchResult.message}. Live facial geometry does not match the registered citizen record.`}
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
+      {!targetUserId && error && (
         <Alert severity="error" sx={{ mt: 2.5, borderRadius: 2, bgcolor: t.errorBg, color: t.errorText, border: `1px solid ${t.errorBorder}`, textAlign: 'left' }}>
           {error}
         </Alert>
       )}
 
-      {/* Authenticated Citizen Match Card */}
-      {verificationStatus === 'success' && userInfo && (
+      {/* 1-to-N Authenticated Citizen Match Card */}
+      {!targetUserId && verificationStatus === 'success' && userInfo && (
         <Alert
           severity="success"
           icon={<CheckCircleRounded sx={{ color: '#10b981' }} />}
@@ -665,7 +813,11 @@ const BiometricVerificationAdmin = ({ onVerificationComplete, onError }) => {
             }
           }}
         >
-          {loading ? 'Processing Biometrics...' : (faceDetected ? 'Identify & Verify Citizen' : 'Capture & Identify Face')}
+          {loading
+            ? 'Processing Biometrics...'
+            : targetUserId
+            ? (faceDetected ? `Compare Face with ${targetUserName || 'Citizen'}` : 'Capture & Match Face')
+            : (faceDetected ? 'Identify & Verify Citizen' : 'Capture & Identify Face')}
         </Button>
       </Box>
     </Box>

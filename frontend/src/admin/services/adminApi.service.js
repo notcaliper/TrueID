@@ -530,7 +530,7 @@ class ApiService {
     }
   }
   
-  // Verify user with biometric data - directly identifies user from face via real 1-to-N matcher
+  // Verify user with biometric data - directly identifies user from face via real 1-to-N matcher or 1-to-1 match
   async verifyUserBiometric(biometricData) {
     try {
       const response = await this.api.post('/admin/identify-biometric', {
@@ -542,6 +542,8 @@ class ApiService {
       console.error('Error identifying user from biometric data:', error);
       return {
         success: false,
+        matched: false,
+        similarityScore: error.response?.data?.similarityScore || 0,
         message: error.response?.data?.message || error.message || 'Biometric identification failed'
       };
     }

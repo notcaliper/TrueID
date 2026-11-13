@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ApiService from '../services/adminApi.service';
+import BiometricVerificationAdmin from './BiometricVerificationAdmin';
 import { useColorMode } from '../../context/ThemeContext';
 import { getAdminThemeTokens, getInputStyle } from '../utils/adminTheme';
 import {
@@ -459,15 +460,53 @@ const UserDetailModal = ({ user, onClose, onUserUpdated }) => {
                     ACTIVE FACEMESH 68-NODE SHA-256 VECTOR
                   </Typography>
                 </Box>
-                <Tooltip title={copiedField === 'facemesh' ? 'Copied!' : 'Copy Hash'}>
-                  <IconButton size="small" onClick={() => copyToClipboard(userData.facemesh_hash, 'facemesh')} sx={{ color: copiedField === 'facemesh' ? t.success : t.textMuted }}>
-                    <ContentCopyRounded sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Tooltip>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Chip
+                    label={userData.facemesh_hash ? 'ENCLAVE VECTOR ACTIVE' : 'NO VECTOR REGISTERED'}
+                    size="small"
+                    sx={{
+                      bgcolor: userData.facemesh_hash ? t.successBg : t.surfaceSubtle,
+                      color: userData.facemesh_hash ? t.successText : t.textMuted,
+                      border: `1px solid ${userData.facemesh_hash ? t.successBorder : t.border}`,
+                      fontWeight: 700,
+                      fontSize: '0.65rem'
+                    }}
+                  />
+                  {userData.facemesh_hash && (
+                    <Tooltip title={copiedField === 'facemesh' ? 'Copied!' : 'Copy Hash'}>
+                      <IconButton size="small" onClick={() => copyToClipboard(userData.facemesh_hash, 'facemesh')} sx={{ color: copiedField === 'facemesh' ? t.success : t.textMuted }}>
+                        <ContentCopyRounded sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Box>
               </Box>
               <Typography variant="body2" sx={{ fontFamily: 'monospace', color: t.textPrimary, wordBreak: 'break-all', fontSize: '0.85rem' }}>
                 {userData.facemesh_hash || 'No biometric vector registered for this citizen.'}
               </Typography>
+            </Box>
+
+            {/* Live Face Scanning & 1-to-1 Match Section */}
+            <Box sx={{ p: 2.5, borderRadius: 2, bgcolor: t.surfaceSubtle, border: `1px solid ${t.border}` }}>
+              <Box sx={{ mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <FingerprintRounded sx={{ color: t.primary, fontSize: 22 }} />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, color: t.textPrimary }}>
+                    Live Face Scan & Enclave 1-to-1 Match
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ color: t.textMuted }}>
+                  Scan the citizen in real-time to verify physical biological presence against their registered enclave vector.
+                </Typography>
+              </Box>
+
+              <BiometricVerificationAdmin
+                targetUserId={userData.id}
+                targetUserName={userData.name}
+                onVerificationComplete={(matchedUser) => {
+                  setSuccess(`Biometric identity verified: ${matchedUser.name || userData.name}`);
+                }}
+              />
             </Box>
 
             {/* Override Vector */}
