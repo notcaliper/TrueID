@@ -611,8 +611,8 @@ exports.verifyUser = async (req, res) => {
               ]
             );
             
-            // STEP 2: After successful funding, forcefully register user's identity on blockchain
-            if (user.avax_private_key) {
+            // STEP 2: After successful funding, attest citizen identity on blockchain
+            if (user.wallet_address) {
               try {
                 // Get user's biometric data hash
                 const biometricResult = await client.query(
@@ -668,14 +668,23 @@ exports.verifyUser = async (req, res) => {
                     // Use empty professional data hash for now
                     const professionalDataHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
                     
-                    logger.info(`Registering user ${user.id} identity on blockchain using their private key`);
-                    
-                    // Register identity on blockchain using user's private key
-                    blockchainRegistrationResult = await blockchainService.registerIdentity(
-                      user.avax_private_key,
-                      biometricHash,
-                      professionalDataHash
-                    );
+                    if (user.avax_private_key) {
+                      logger.info(`Registering user ${user.id} identity on blockchain using legacy key`);
+                      blockchainRegistrationResult = await blockchainService.registerIdentity(
+                        user.avax_private_key,
+                        biometricHash,
+                        professionalDataHash
+                      );
+                    } else {
+                      logger.info(`Attesting citizen user ${user.id} on Ethereum Sepolia via authority notary`);
+                      const attestRes = await blockchainService.attestCitizenOnChain(targetAddress, biometricHash);
+                      blockchainRegistrationResult = {
+                        transactionHash: attestRes.sbtTxHash || attestRes.identityTxHash || (attestRes.txHashes && attestRes.txHashes[0]) || '0x00',
+                        blockNumber: 0,
+                        status: 'CONFIRMED',
+                        network: 'sepolia'
+                      };
+                    }
                   
                     // Record blockchain registration only if we actually registered (not for existing identities)
                     await client.query(

@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
+const { ethers } = require('ethers');
 const walletService = require('../services/wallet.service');
 
 const { generateFacemeshHash, calculateFacemeshSimilarity, isFacemeshSimilar } = require('../utils/biometric.utils');
@@ -197,24 +198,27 @@ exports.registerUser = async (req, res) => {
       }
     }
     
-    // Generate a new Ethereum wallet if one wasn't provided
-    let userWalletAddress = walletAddress;
-    let avaxPrivateKey = null;
-    
-    if (!userWalletAddress) {
-      try {
-        logger.info('Generating new Ethereum wallet for user registration');
-        const wallet = walletService.generateWallet();
-        userWalletAddress = wallet.address;
-        avaxPrivateKey = wallet.privateKey;
-      } catch (err) {
-        logger.error('Error generating wallet:', err);
-        await db.query('ROLLBACK');
-        return res.status(500).json({ message: 'Error generating wallet' });
-      }
+    // Validate external Ethereum Web3 wallet address
+    if (!walletAddress || !ethers.isAddress(walletAddress)) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({ message: 'A valid external Web3 wallet address (MetaMask) is required for registration' });
     }
-    
-    const userDid = userWalletAddress ? `did:trueid:${userWalletAddress}` : null;
+
+    const userWalletAddress = ethers.getAddress(walletAddress);
+
+    // Check if wallet address is already linked to an existing account
+    const existingWallet = await db.query(
+      'SELECT id FROM users WHERE LOWER(wallet_address) = LOWER($1)',
+      [userWalletAddress]
+    );
+
+    if (existingWallet.rows.length > 0) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({ message: 'This Web3 wallet address is already registered to another TrueID citizen' });
+    }
+
+    const avaxPrivateKey = null;
+    const userDid = `did:trueid:${userWalletAddress}`;
 
     // Insert user
     const userResult = await db.query(

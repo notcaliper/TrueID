@@ -207,11 +207,13 @@ const BlockchainLedger = () => {
     },
     {
       title: 'Security Verification',
-      value: '100% Valid',
-      sub: 'Cryptographically Verified',
-      icon: <VerifiedUserRounded sx={{ color: '#8b5cf6', fontSize: 20 }} />,
-      color: '#8b5cf6',
-      bgColor: isDark ? 'rgba(139, 92, 246, 0.12)' : 'rgba(139, 92, 246, 0.1)'
+      value: blockchainData.verificationStatus === 'VERIFIED' ? '100% Valid' : 'Pending Verification',
+      sub: blockchainData.verificationStatus === 'VERIFIED' ? 'Cryptographically Verified' : 'Awaiting Notary Review',
+      icon: <VerifiedUserRounded sx={{ color: blockchainData.verificationStatus === 'VERIFIED' ? '#8b5cf6' : '#d97706', fontSize: 20 }} />,
+      color: blockchainData.verificationStatus === 'VERIFIED' ? '#8b5cf6' : '#d97706',
+      bgColor: isDark
+        ? (blockchainData.verificationStatus === 'VERIFIED' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(217, 119, 6, 0.12)')
+        : (blockchainData.verificationStatus === 'VERIFIED' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(217, 119, 6, 0.1)')
     }
   ];
 

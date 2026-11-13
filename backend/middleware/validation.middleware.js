@@ -68,9 +68,11 @@ exports.userRegistrationRules = [
     .withMessage('Facemesh data must be a valid JSON object'),
   
   body('walletAddress')
-    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage('External Web3 wallet address (MetaMask) is required for registration')
     .isEthereumAddress()
-    .withMessage('Must provide a valid Ethereum address')
+    .withMessage('Must provide a valid 42-character Ethereum address (0x...)')
 ];
 
 /**

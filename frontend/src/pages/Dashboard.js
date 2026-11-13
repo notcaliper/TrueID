@@ -46,8 +46,7 @@ import {
   HistoryRounded,
   FactCheckRounded,
   OpenInNewRounded,
-  AccessTimeRounded,
-  PendingRounded
+  AccessTimeRounded
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useColorMode } from '../context/ThemeContext';

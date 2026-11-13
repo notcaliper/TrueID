@@ -127,12 +127,12 @@ const TrustVerification = () => {
   const activeTxHash = verificationData.blockchainTxHash || user?.blockchain_tx_hash || '';
 
   // Dynamic mathematically weighted Trust Score Percentage
-  const trustScorePercentage = Math.min(100, Math.round(
-    (isVerified ? 35 : (verificationData.governmentId ? 25 : 0)) +
+  const trustScorePercentage = isVerified ? Math.min(100, Math.round(
+    35 +
     (hasBiometrics ? 25 : 0) +
-    (verificationData.verifiedRecordsCount > 0 ? 20 : (isVerified ? 20 : 0)) +
-    (isVerified ? 20 : 10)
-  ));
+    (verificationData.verifiedRecordsCount > 0 ? 20 : 20) +
+    20
+  )) : 0;
 
   // 4 Core Trust Pillar Metrics
   const trustPillars = [
@@ -153,9 +153,11 @@ const TrustVerification = () => {
       value: verificationData.governmentId || 'Not Registered',
       status: isVerified ? 'VERIFIED' : 'PENDING',
       desc: isVerified ? 'Verified identity registry record' : 'Awaiting verification check',
-      tag: isVerified ? 'Verified' : 'Pending',
-      color: '#2563eb',
-      bg: isLight ? '#eff6ff' : 'rgba(37, 99, 235, 0.12)',
+      tag: isVerified ? 'Verified' : 'Under Review',
+      color: isVerified ? '#2563eb' : '#d97706',
+      bg: isLight
+        ? (isVerified ? '#eff6ff' : '#fffbeb')
+        : (isVerified ? 'rgba(37, 99, 235, 0.12)' : 'rgba(217, 119, 6, 0.12)'),
       icon: <BadgeRounded sx={{ fontSize: 24 }} />
     },
     {
@@ -172,12 +174,16 @@ const TrustVerification = () => {
     },
     {
       title: 'Blockchain Record',
-      value: activeTokenId ? `Badge #${activeTokenId}` : (isVerified ? 'Badge Anchored' : 'Pending Mint'),
-      status: isVerified ? 'VERIFIED & RECORDED' : 'AWAITING MINING',
-      desc: 'Smart contract record permanently anchored on Ethereum Sepolia',
-      tag: isVerified ? 'Permanent' : 'Pending',
-      color: '#0891b2',
-      bg: isLight ? '#ecfeff' : 'rgba(8, 145, 178, 0.12)',
+      value: activeTokenId ? `Badge #${activeTokenId}` : (isVerified ? 'Badge Anchored' : 'Not Minted'),
+      status: isVerified ? 'VERIFIED & RECORDED' : 'NOT MINTED',
+      desc: isVerified
+        ? 'Smart contract record permanently anchored on Ethereum Sepolia'
+        : 'Permanent digital badge will be minted on Ethereum Sepolia upon notary approval',
+      tag: isVerified ? 'Permanent' : 'Pending Mint',
+      color: isVerified ? '#0891b2' : '#d97706',
+      bg: isLight
+        ? (isVerified ? '#ecfeff' : '#fffbeb')
+        : (isVerified ? 'rgba(8, 145, 178, 0.12)' : 'rgba(217, 119, 6, 0.12)'),
       icon: <SecurityRounded sx={{ fontSize: 24 }} />
     }
   ];
@@ -188,14 +194,18 @@ const TrustVerification = () => {
       id: 1,
       stepNum: '01',
       title: 'National ID Check & Registration',
-      desc: 'Government ID card, citizen documents, and account details submitted and verified.',
-      timestamp: verificationData.submittedAt || 'Completed',
+      desc: isVerified
+        ? 'Government ID card, citizen documents, and account details submitted and verified.'
+        : 'Government ID card and registration details submitted. Awaiting notary audit and verification.',
+      timestamp: isVerified
+        ? (verificationData.verifiedAt || verificationData.submittedAt || 'Completed')
+        : (verificationData.submittedAt || 'Submitted & Awaiting Audit'),
       authority: verificationData.verifiedBy || 'Identity Registry',
       hashLabel: 'Attestation DID:',
-      proofHash: activeDid || (activeWallet ? `did:trueid:${activeWallet}` : (verificationData.governmentId ? `ID:${verificationData.governmentId} (Attested)` : 'Document Verified')),
+      proofHash: activeDid || (activeWallet ? `did:trueid:${activeWallet}` : (verificationData.governmentId ? `ID:${verificationData.governmentId} (Attested)` : 'Document Submitted')),
       fullHash: activeDid || (activeWallet ? `did:trueid:${activeWallet}` : ''),
-      completed: true,
-      status: 'VERIFIED'
+      completed: isVerified,
+      status: isVerified ? 'VERIFIED' : 'PENDING'
     },
     {
       id: 2,
@@ -258,8 +268,8 @@ const TrustVerification = () => {
     {
       name: 'Government ID Validity',
       weight: '35%',
-      score: isVerified ? 100 : (verificationData.governmentId ? 85 : 0),
-      color: isVerified || verificationData.governmentId ? '#16a34a' : '#d97706'
+      score: isVerified ? 100 : 0,
+      color: isVerified ? '#16a34a' : '#d97706'
     },
     {
       name: 'Live Face Match',
@@ -270,14 +280,14 @@ const TrustVerification = () => {
     {
       name: verificationData.verifiedRecordsCount > 0 ? `Verified Credentials (${verificationData.verifiedRecordsCount} items)` : 'Verified Credentials',
       weight: '20%',
-      score: verificationData.verifiedRecordsCount > 0 ? 100 : (isVerified ? 100 : 70),
-      color: verificationData.verifiedRecordsCount > 0 || isVerified ? '#16a34a' : '#64748b'
+      score: isVerified ? (verificationData.verifiedRecordsCount > 0 ? 100 : 80) : 0,
+      color: isVerified ? '#16a34a' : '#64748b'
     },
     {
       name: 'Account History & Good Standing',
       weight: '20%',
-      score: 100,
-      color: '#16a34a'
+      score: isVerified ? 100 : 0,
+      color: isVerified ? '#16a34a' : '#d97706'
     }
   ];
 
