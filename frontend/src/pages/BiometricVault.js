@@ -483,6 +483,7 @@ const BiometricVault = () => {
             >
               <BiometricVerification
                 userId={user?.id}
+                mode={biometricStats.status === 'NOT_ENROLLED' ? 'update' : 'verify'}
                 onVerificationComplete={handleVerificationComplete}
               />
             </Box>
