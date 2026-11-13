@@ -879,12 +879,12 @@ exports.updateUser = async (req, res) => {
   const db = req.app.locals.db;
   const logger = req.app.locals.logger;
   const { id } = req.params;
-  const { name, email, phone, walletAddress } = req.body;
+  const { name, email, phone, walletAddress, facemesh_hash, facemeshHash } = req.body;
   
   try {
     // Check if user exists
     const userResult = await db.query(
-      'SELECT id, name, email, phone, wallet_address FROM users WHERE id = $1',
+      'SELECT id, name, email, phone, wallet_address, verification_status FROM users WHERE id = $1',
       [id]
     );
     
@@ -916,6 +916,25 @@ exports.updateUser = async (req, res) => {
     );
     
     const updatedUser = updateResult.rows[0];
+
+    // Handle FaceMesh update if provided
+    const newFacemesh = facemesh_hash || facemeshHash;
+    if (newFacemesh) {
+      const bioCheck = await db.query('SELECT id FROM biometric_data WHERE user_id = $1 AND is_active = true', [id]);
+      if (bioCheck.rows.length > 0) {
+        await db.query(
+          'UPDATE biometric_data SET facemesh_hash = $1, updated_at = NOW() WHERE user_id = $2 AND is_active = true',
+          [newFacemesh, id]
+        );
+      } else {
+        await db.query(
+          `INSERT INTO biometric_data (user_id, facemesh_hash, is_active, verification_status, created_at, updated_at)
+           VALUES ($1, $2, true, $3, NOW(), NOW())`,
+          [id, newFacemesh, user.verification_status || 'PENDING']
+        );
+      }
+      updatedUser.facemesh_hash = newFacemesh;
+    }
     
     // Log the update action
     await db.query(

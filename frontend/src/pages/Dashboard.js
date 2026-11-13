@@ -228,8 +228,8 @@ const Dashboard = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const isVerified = identityData.verificationStatus === 'VERIFIED' || Boolean(user?.is_verified);
-  const hasSoulbound = Boolean(identityData.sbtTokenId || identityData.blockchainTx || user?.soulbound_token_id || user?.soulbound_badge_minted);
+  const isVerified = identityData.verificationStatus === 'VERIFIED' || user?.verification_status === 'VERIFIED' || Boolean(user?.is_verified);
+  const hasSoulbound = isVerified && Boolean(identityData.sbtTokenId || identityData.blockchainTx || user?.soulbound_token_id || user?.soulbound_badge_minted);
   const hasFaceVerified = Boolean(identityData.facemeshStatus === 'Enrolled (SHA-256)' || user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics);
 
   // 4 Core Identity Pillars (Dynamic based on real user state)
@@ -559,18 +559,18 @@ const Dashboard = () => {
               IDENTITY TRUST SCORE
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 0.5, my: 0.2 }}>
-              <Typography variant="h3" sx={{ fontWeight: 800, color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {identityData.verificationStatus === 'VERIFIED' ? '100%' : '0%'}
+              <Typography variant="h3" sx={{ fontWeight: 800, color: isVerified ? '#16a34a' : '#d97706', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                {isVerified ? '100%' : '0%'}
               </Typography>
               <Typography variant="body2" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 700 }}>
                 / 100
               </Typography>
             </Box>
-            <Typography variant="caption" sx={{ color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706', fontWeight: 700, display: 'block' }}>
-              {identityData.verificationStatus === 'VERIFIED' ? 'Verified Citizen' : 'Pending Verification'}
+            <Typography variant="caption" sx={{ color: isVerified ? '#16a34a' : '#d97706', fontWeight: 700, display: 'block' }}>
+              {isVerified ? 'Verified Citizen' : 'Pending Verification'}
             </Typography>
             <Typography variant="caption" sx={{ color: isLight ? '#94a3b8' : '#6b7280', fontSize: '0.7rem' }}>
-              {identityData.verificationStatus === 'VERIFIED' ? 'Attested on Ethereum Sepolia' : 'Awaiting admin verification'}
+              {isVerified ? 'Attested on Ethereum Sepolia' : 'Awaiting admin verification'}
             </Typography>
           </Box>
         </Box>
@@ -1111,19 +1111,19 @@ const Dashboard = () => {
 
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
                 <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 800, color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706', letterSpacing: '-0.02em' }}>
-                    {identityData.verificationStatus === 'VERIFIED' ? '100%' : '0%'}
+                  <Typography variant="h4" sx={{ fontWeight: 800, color: isVerified ? '#16a34a' : '#d97706', letterSpacing: '-0.02em' }}>
+                    {isVerified ? '100%' : '0%'}
                   </Typography>
                   <Typography variant="caption" sx={{ color: isLight ? '#64748b' : '#8b949e', fontWeight: 600 }}>
-                    {identityData.verificationStatus === 'VERIFIED' ? 'Attested Citizen Standing' : 'Pending Verification'}
+                    {isVerified ? 'Attested Citizen Standing' : 'Pending Verification'}
                   </Typography>
                 </Box>
                 <Chip
-                  label={identityData.verificationStatus === 'VERIFIED' ? 'VERIFIED CITIZEN' : 'PENDING'}
+                  label={isVerified ? 'VERIFIED CITIZEN' : 'PENDING'}
                   size="small"
                   sx={{
-                    bgcolor: isLight ? (identityData.verificationStatus === 'VERIFIED' ? '#f0fdf4' : '#fffbeb') : (identityData.verificationStatus === 'VERIFIED' ? 'rgba(22, 163, 74, 0.15)' : 'rgba(217, 119, 6, 0.15)'),
-                    color: identityData.verificationStatus === 'VERIFIED' ? '#16a34a' : '#d97706',
+                    bgcolor: isLight ? (isVerified ? '#f0fdf4' : '#fffbeb') : (isVerified ? 'rgba(22, 163, 74, 0.15)' : 'rgba(217, 119, 6, 0.15)'),
+                    color: isVerified ? '#16a34a' : '#d97706',
                     fontWeight: 800,
                     fontSize: '0.7rem'
                   }}

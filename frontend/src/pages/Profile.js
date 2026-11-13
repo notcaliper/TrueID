@@ -188,7 +188,7 @@ const Profile = () => {
 
   // 4 Core Identity Pillars (Consistent with Dashboard)
   const isVerifiedUser = Boolean(user?.is_verified || user?.verification_status === 'VERIFIED' || profileData?.verificationStatus === 'VERIFIED');
-  const hasSoulbound = Boolean(user?.soulbound_token_id || user?.soulbound_badge_minted || user?.blockchain_tx_hash);
+  const hasSoulbound = isVerifiedUser && Boolean(user?.soulbound_token_id || user?.soulbound_badge_minted || user?.blockchain_tx_hash);
   const hasBiometrics = Boolean(user?.facemesh_hash || user?.has_biometrics || user?.hasBiometrics);
   const profilePillars = [
     {

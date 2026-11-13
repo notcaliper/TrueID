@@ -179,7 +179,7 @@ class ApiService {
   }
 
   // Identity verification
-  async verifyIdentity(userId) {
+  async verifyIdentity(userId, notes = 'Citizen identity verified by authority admin') {
     try {
       // Validate userId to prevent errors
       if (!userId) {
@@ -189,7 +189,8 @@ class ApiService {
       
       console.log(`Verifying user with ID: ${userId}`);
       const response = await this.api.put(`/admin/users/${userId}/verify`, {
-        verificationStatus: 'VERIFIED'
+        verificationStatus: 'VERIFIED',
+        verificationNotes: notes
       });
       return response.data;
     } catch (error) {
@@ -198,8 +199,17 @@ class ApiService {
     }
   }
 
-  async rejectIdentity(userId, reason) {
+  // Alias for verifyIdentity
+  async verifyUser(userId, notes) {
+    return this.verifyIdentity(userId, notes);
+  }
+
+  async rejectIdentity(userId, reason = 'Identity rejected by authority admin') {
     try {
+      if (!userId) {
+        console.error('Error: Attempted to reject user with undefined userId');
+        throw new Error('User ID is required for rejection');
+      }
       
       const response = await this.api.put(`/admin/users/${userId}/verify`, {
         verificationStatus: 'REJECTED',
@@ -208,6 +218,28 @@ class ApiService {
       return response.data;
     } catch (error) {
       console.error(`Error rejecting identity for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  // Alias for rejectIdentity
+  async rejectUser(userId, reason) {
+    return this.rejectIdentity(userId, reason);
+  }
+
+  // Update FaceMesh biometric vector for user
+  async updateFacemesh(userId, facemeshHash) {
+    try {
+      if (!userId) {
+        throw new Error('User ID is required for FaceMesh update');
+      }
+      const response = await this.api.put(`/admin/users/${userId}/update`, {
+        facemesh_hash: facemeshHash,
+        facemeshHash: facemeshHash
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating FaceMesh hash for user ${userId}:`, error);
       throw error;
     }
   }
